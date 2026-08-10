@@ -14,7 +14,7 @@ import httpx
 
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000").rstrip("/")
 COMPOSE_DIR = os.environ.get("LEOVEE_ROOT", "/opt/leovee")
-EMAIL = os.environ.get("VERIFY_EMAIL", f"staging-chain-{uuid.uuid4().hex[:10]}@verify.leovee.local")
+EMAIL = os.environ.get("VERIFY_EMAIL", f"staging-chain-{uuid.uuid4().hex[:10]}@example.com")
 PASSWORD = os.environ.get("VERIFY_PASSWORD", "StagingChainPass1!")
 
 

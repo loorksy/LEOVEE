@@ -149,6 +149,12 @@ async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
     return f"thesis_monitor_ok:{changed}"
 
 
+def _worker_redis_settings() -> RedisSettings:
+    settings = get_settings()
+    url = settings.redis_url or "redis://redis:6379/0"
+    return RedisSettings.from_dsn(url)
+
+
 class WorkerSettings:
     functions = [
         process_learning_outcome,
@@ -170,8 +176,4 @@ class WorkerSettings:
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
     ]
 
-    @staticmethod
-    def redis_settings() -> RedisSettings:
-        settings = get_settings()
-        url = settings.redis_url or "redis://localhost:6379/0"
-        return RedisSettings.from_dsn(url)
+    redis_settings = _worker_redis_settings()
