@@ -11,6 +11,7 @@ from app.api.routes import (
     admin,
     alerts,
     analysis,
+    api_keys,
     auth,
     billing,
     chart,
@@ -32,6 +33,9 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.middleware.observability import ObservabilityMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.observability.sentry_bridge import init_sentry
 from app.services.entitlement_service import EntitlementError
 
 
@@ -39,6 +43,7 @@ from app.services.entitlement_service import EntitlementError
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings = get_settings()
+    init_sentry(settings)
     from app.core.startup import validate_production_startup
 
     validate_production_startup(settings)
@@ -61,6 +66,8 @@ def create_app() -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
+    application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(ObservabilityMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -83,6 +90,7 @@ def create_app() -> FastAPI:
     application.include_router(auth.router)
     application.include_router(admin.router)
     application.include_router(billing.router)
+    application.include_router(api_keys.router)
     application.include_router(tenant.router)
     application.include_router(workspaces.router)
     application.include_router(markets.router)

@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models."""
 
+from app.models.api_key import ApiKey
 from app.models.auth_token import AuthToken
 from app.models.base import Base
 from app.models.billing import BillingWebhookEvent
@@ -44,6 +45,7 @@ __all__ = [
     "OandaConnection",
     "StrategyStat",
     "SymbolProfile",
+    "ApiKey",
     "AuthToken",
     "BillingWebhookEvent",
     "AgentMemory",

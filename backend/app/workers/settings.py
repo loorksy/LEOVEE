@@ -11,6 +11,9 @@ from app.services.learning.pipeline import run_learning_pipeline
 
 async def process_learning_outcome(ctx: dict[str, object], payload: dict[str, object]) -> str:
     """Arq job: run deterministic learning pipeline for a terminal outcome payload."""
+    from app.core.worker_context import bind_worker_request_context
+
+    bind_worker_request_context(dict(payload))
     factory = get_session_factory()
     if factory is None:
         raise RuntimeError("DATABASE_URL is not configured")

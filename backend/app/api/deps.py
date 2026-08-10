@@ -1,11 +1,13 @@
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.request_context import bind_user_workspace
 from app.core.tenant import (
     TenantContext,
     TenantResolutionError,
@@ -107,5 +109,10 @@ async def get_workspace_context(
         tenant_id=ctx.tenant_id,
         workspace_id=ctx.workspace_id,
         user_id=ctx.user_id,
+    )
+    bind_user_workspace(user_id=ctx.user_id, workspace_id=ctx.workspace_id)
+    structlog.contextvars.bind_contextvars(
+        user_id=str(ctx.user_id),
+        workspace_id=str(ctx.workspace_id),
     )
     return ctx
