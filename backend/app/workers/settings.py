@@ -35,8 +35,39 @@ async def oanda_stream_consumer_job(_ctx: dict[str, object]) -> str:
 
 
 async def candle_backfill_job(_ctx: dict[str, object]) -> str:
-    """Scheduled candle maintenance hook (REST backfill orchestration)."""
-    return "candle_backfill_ok"
+    """Scheduled gap repair for M1 candles (REST via configured OANDA provider)."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.models.enums import Timeframe
+    from app.providers.market.oanda import get_market_provider
+    from app.services.market.gaps import repair_candle_gaps
+
+    provider = get_market_provider()
+    repaired = 0
+    async with factory() as session:
+        for symbol in ("EURUSD", "GBPUSD", "USDJPY"):
+            repaired += await repair_candle_gaps(
+                session,
+                symbol_code=symbol,
+                timeframe=Timeframe.M1,
+                provider=provider,
+            )
+        await session.commit()
+    return f"candle_backfill_ok:{repaired}"
+
+
+async def candle_retention_job(_ctx: dict[str, object]) -> str:
+    """Purge candles older than per-timeframe retention policy."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.market.retention import purge_stale_candles
+
+    async with factory() as session:
+        deleted = await purge_stale_candles(session)
+        await session.commit()
+    return f"candle_retention_ok:{deleted}"
 
 
 async def memory_decay_job(_ctx: dict[str, object]) -> str:
@@ -49,11 +80,13 @@ class WorkerSettings:
         process_learning_outcome,
         oanda_stream_consumer_job,
         candle_backfill_job,
+        candle_retention_job,
         memory_decay_job,
     ]
     cron_jobs = [
         cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
+        cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
     ]
 

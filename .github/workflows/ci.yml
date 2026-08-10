@@ -127,3 +127,9 @@ jobs:
           file: docker/web.Dockerfile
           push: false
           build-args: VITE_API_URL=http://localhost:8000
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: chmod +x scripts/check_no_committed_secrets.sh && ./scripts/check_no_committed_secrets.sh
