@@ -18,21 +18,9 @@ router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])
 class AnalysisRunRequest(BaseModel):
     symbol: str = Field(min_length=6, max_length=12)
     timeframe: Timeframe = Timeframe.H1
-
-
-@router.post("/pipeline")
-async def run_analysis_pipeline_endpoint(
-    body: AnalysisRunRequest,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-    tenant: Annotated[TenantContext, Depends(get_workspace_context)],
-) -> dict[str, Any]:
-    from app.services.analysis_pipeline import run_analysis_pipeline
-
-    return await run_analysis_pipeline(
-        session,
-        tenant,
-        symbol=body.symbol.upper(),
-        timeframe=body.timeframe,
+    complete_pipeline: bool = Field(
+        default=False,
+        description="When true: reasoning → recommendation → thesis in one transaction",
     )
 
 
@@ -47,4 +35,5 @@ async def run_analysis_endpoint(
         tenant,
         symbol=body.symbol.upper(),
         timeframe=body.timeframe,
+        complete_pipeline=body.complete_pipeline,
     )

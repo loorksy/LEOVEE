@@ -91,9 +91,7 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
         )
     )
 
-    manager = _ReconnectStreamManager(
-        backfill_candles=backfill, tick=tick, partial_tick=partial
-    )
+    manager = _ReconnectStreamManager(backfill_candles=backfill, tick=tick, partial_tick=partial)
     consumer = OandaCandleStreamConsumer(settings, ["EURUSD"], stream_manager=manager)
     stats = await consumer.run_cycle(db_session, max_ticks=2)
 

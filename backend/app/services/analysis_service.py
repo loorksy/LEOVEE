@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import run_analysis_orchestrator
 from app.core.tenant import TenantContext
+from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
 from app.providers.market.base import MarketDataProvider
-from app.services import market_data
+from app.services import market_data, recommendation_service
 from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol
@@ -31,6 +32,7 @@ async def run_analysis(
     timeframe: Timeframe = Timeframe.H1,
     persist_engines: bool = True,
     market_provider: MarketDataProvider | None = None,
+    complete_pipeline: bool = False,
 ) -> dict[str, Any]:
     symbol_row, candles = await market_data.fetch_and_store_candles(
         session,
@@ -76,4 +78,43 @@ async def run_analysis(
             engines=result.engines,
         )
         payload["persistence"] = counts
+
+    if complete_pipeline:
+        adversarial = run_devils_advocate(decision=result.decision, engines=result.engines)
+        reasoning = run_reasoning_engine(
+            symbol=symbol,
+            decision=result.decision,
+            engines=result.engines,
+            adversarial=adversarial,
+        )
+        direction_value = result.decision.get("direction", RecommendationDirection.WAIT.value)
+        try:
+            direction = RecommendationDirection(direction_value)
+        except ValueError:
+            direction = RecommendationDirection.WAIT
+        status = RecommendationStatus(reasoning["status"])
+        rec = await recommendation_service.create_recommendation(
+            session,
+            tenant,
+            symbol_code=symbol,
+            direction=direction,
+            status=status,
+            evidence={
+                "reasoning": reasoning,
+                "decision": result.decision,
+                "engines": result.engines,
+                "persistence": payload.get("persistence"),
+            },
+            agent_run_id=result.agent_run_id,
+        )
+        thesis = await recommendation_service.spawn_thesis_from_recommendation(
+            session,
+            tenant,
+            rec,
+            statement=str(reasoning.get("summary")),
+        )
+        payload["reasoning"] = reasoning
+        payload["recommendation_id"] = str(rec.id)
+        payload["thesis_id"] = str(thesis.id)
+
     return payload

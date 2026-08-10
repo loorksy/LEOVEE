@@ -14,7 +14,7 @@ from app.models.enums import Timeframe
 from app.models.market_artifacts import MarketEvent
 from app.models.recommendation import Thesis
 from app.providers.market.base import NormalizedCandle
-from app.services.analysis_pipeline import run_analysis_pipeline
+from app.services.analysis_service import run_analysis
 from app.services.recommendation_service import get_recommendation
 from app.tests.conftest import seed_user_org
 from app.tests.doubles.market import FakeMarketDataProvider
@@ -51,12 +51,13 @@ async def test_pipeline_market_to_thesis(db_session: AsyncSession) -> None:
     ctx = await resolve_tenant_context(db_session, user.id)
 
     provider = FakeMarketDataProvider(_synthetic_h1_series())
-    result = await run_analysis_pipeline(
+    result = await run_analysis(
         db_session,
         ctx,
         symbol="EURUSD",
         timeframe=Timeframe.H1,
         market_provider=provider,
+        complete_pipeline=True,
     )
     await db_session.commit()
 
