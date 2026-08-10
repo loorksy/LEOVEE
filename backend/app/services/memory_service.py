@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.infrastructure.rls import set_rls_session_context
 from app.models.learning import CalibrationBin, SymbolProfile
-from app.models.memory import AgentMemory, MemoryType
+from app.models.memory import AgentMemory, MemoryEmbedding, MemoryType
 from app.services.learning.calibration import apply_calibration
+from app.services.memory.embedding import embed_text_deterministic, merge_rank_hybrid
 
 
 async def calibrated_confidence_for_workspace(
@@ -100,6 +101,74 @@ async def retrieve_memories_for_symbol(
             },
         )
     return memories
+
+
+async def index_memory_embedding(
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    text: str,
+) -> MemoryEmbedding:
+    await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
+    vector = embed_text_deterministic(text)
+    row = MemoryEmbedding(
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        memory_id=memory_id,
+        embedding=vector,
+        model="deterministic-v1",
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def retrieve_memories_hybrid(
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    symbol: str,
+    query: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    keyword_hits = await retrieve_memories_for_symbol(
+        session,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        symbol=symbol,
+        limit=limit,
+    )
+    await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
+    vector = embed_text_deterministic(query)
+    vector_hits: list[dict[str, object]] = []
+    try:
+        result = await session.execute(
+            select(MemoryEmbedding, AgentMemory)
+            .join(AgentMemory, AgentMemory.id == MemoryEmbedding.memory_id)
+            .where(
+                MemoryEmbedding.tenant_id == tenant_id,
+                MemoryEmbedding.workspace_id == workspace_id,
+                AgentMemory.key.startswith(f"symbol:{symbol.upper()}"),
+            )
+            .order_by(MemoryEmbedding.embedding.cosine_distance(vector))
+            .limit(limit)
+        )
+        for _emb, mem in result.all():
+            vector_hits.append(
+                {
+                    "id": str(mem.id),
+                    "key": mem.key,
+                    "content": mem.content_json,
+                    "source": "vector",
+                }
+            )
+    except Exception:
+        vector_hits = []
+    merged = merge_rank_hybrid(keyword_hits, vector_hits, limit=limit)
+    return [dict(item) for item in merged]
 
 
 async def store_memory(

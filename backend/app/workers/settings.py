@@ -88,6 +88,34 @@ async def news_ingestion_job(_ctx: dict[str, object]) -> str:
     return f"news_ingestion_ok:{count}"
 
 
+async def memory_embedding_index_job(_ctx: dict[str, object]) -> str:
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from sqlalchemy import select
+
+    from app.models.memory import AgentMemory, MemoryEmbedding
+    from app.services.memory_service import index_memory_embedding
+
+    indexed = 0
+    async with factory() as session:
+        rows = await session.execute(
+            select(AgentMemory).where(~AgentMemory.id.in_(select(MemoryEmbedding.memory_id)))
+        )
+        for mem in rows.scalars().all():
+            text = f"{mem.key}:{mem.content_json}"
+            await index_memory_embedding(
+                session,
+                tenant_id=mem.tenant_id,
+                workspace_id=mem.workspace_id,
+                memory_id=mem.id,
+                text=text,
+            )
+            indexed += 1
+        await session.commit()
+    return f"memory_embedding_index_ok:{indexed}"
+
+
 async def memory_decay_job(_ctx: dict[str, object]) -> str:
     """Placeholder for memory aging sweeps (invoked on schedule)."""
     return "memory_decay_ok"
@@ -100,6 +128,7 @@ class WorkerSettings:
         candle_backfill_job,
         candle_retention_job,
         news_ingestion_job,
+        memory_embedding_index_job,
         memory_decay_job,
     ]
     cron_jobs = [

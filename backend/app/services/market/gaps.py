@@ -70,7 +70,7 @@ async def repair_candle_gaps(
 ) -> int:
     """
     Detect gaps in stored candles and fill via REST provider (idempotent upsert).
-  """
+    """
     symbol = await market_data.get_or_create_symbol(session, symbol_code)
     stored = await load_candles_for_symbol(session, symbol.id, timeframe)
     gaps = detect_candle_gaps(stored, timeframe=timeframe)
@@ -110,6 +110,4 @@ def assert_gapless_series(
         return True
     step = timedelta(minutes=timeframe_to_minutes(timeframe))
     ordered = sorted(candles, key=lambda c: c.ts)
-    return all(
-        curr.ts - prev.ts == step for prev, curr in zip(ordered, ordered[1:], strict=False)
-    )
+    return all(curr.ts - prev.ts == step for prev, curr in zip(ordered, ordered[1:], strict=False))
