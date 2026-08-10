@@ -2,12 +2,11 @@
 # Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 
 services:
+  # Avoid clashing with host Postgres/other stacks (compose merges port lists from base).
   postgres:
-    ports:
-      - "127.0.0.1:5432:5432"
+    ports: !reset []
   redis:
-    ports:
-      - "127.0.0.1:6379:6379"
+    ports: !reset []
 
   api:
     environment:
@@ -20,6 +19,8 @@ services:
     restart: unless-stopped
 
   web:
+    ports: !override
+      - "3001:80"
     restart: unless-stopped
 
   migrate:

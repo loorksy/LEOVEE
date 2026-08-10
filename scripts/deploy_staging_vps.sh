@@ -17,7 +17,7 @@ COMPOSE_FILES="-f docker-compose.yml -f docker-compose.staging.yml"
 if [ -f docker-compose.agent.yml ]; then
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.agent.yml"
 fi
-docker compose ${COMPOSE_FILES} run --rm migrate
+docker compose ${COMPOSE_FILES} run --rm --build migrate
 
 echo "[deploy] starting api, worker, web…"
 docker compose ${COMPOSE_FILES} up -d --build api worker web
