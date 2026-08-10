@@ -19,3 +19,9 @@ ruff format --check app
 mypy app
 pytest
 ```
+
+Run migrations (requires `DATABASE_URL`):
+
+```bash
+alembic upgrade head
+```
