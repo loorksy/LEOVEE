@@ -12,6 +12,7 @@ from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import RecommendationDirection, RecommendationStatus, ThesisStatus
 from app.models.recommendation import Recommendation, Thesis
 from app.services import market_data
+from app.services.recommendation_lifecycle import assert_recommendation_transition
 
 
 async def create_recommendation(
@@ -116,6 +117,35 @@ async def list_theses(
     return list(result.scalars().all())
 
 
+async def resolve_symbol_code(session: AsyncSession, symbol_id: uuid.UUID) -> str | None:
+    from app.models.symbol import Symbol
+
+    row = await session.scalar(select(Symbol).where(Symbol.id == symbol_id))
+    return row.code if row else None
+
+
+def recommendation_to_card(
+    rec: Recommendation,
+    *,
+    symbol_code: str | None = None,
+) -> dict[str, Any]:
+    confidence = float(rec.confidence_calibrated or 0)
+    return {
+        "id": str(rec.id),
+        "symbol": symbol_code,
+        "direction": rec.direction.value,
+        "status": rec.status.value,
+        "confidence": confidence,
+        "headline": f"{symbol_code or 'SYMBOL'} {rec.direction.value}",
+        "thesis": rec.thesis_text,
+        "badges": [rec.status.value, f"conf:{confidence:.0%}"],
+        "entry": float(rec.entry) if rec.entry is not None else None,
+        "stop": float(rec.stop) if rec.stop is not None else None,
+        "targets": rec.targets_json,
+        "evidence_preview": (rec.evidence_json or {}).get("engines", {}),
+    }
+
+
 async def transition_recommendation_status(
     session: AsyncSession,
     tenant: TenantContext,
@@ -127,6 +157,7 @@ async def transition_recommendation_status(
     rec = await get_recommendation(session, tenant, recommendation_id)
     if rec is None:
         return None
+    assert_recommendation_transition(rec.status, new_status)
     rec.status = new_status
     await session.flush()
     from app.services.learning.terminal_hooks import on_recommendation_terminal_status
