@@ -8,5 +8,8 @@
 - [x] Alerts: price condition evaluation + notification fan-out + WS `notifications` — service + mock trigger path
 - [x] Journal: promote → `lessons` row — `journal_service.promote_to_lesson`
 - [x] Memory API: browse/patch/delete + `/calibration`; delete triggers `run_memory_recompute`
-- [ ] Frontend: `MemoryPanel` routed + calibration chart live — **reason:** panel exists; Batch 3 enables route
-- [ ] Market-driven alert worker (not only mock trigger) — **reason:** Batch 4
+- [x] Frontend: `MemoryPanel` routed + calibration chart live — `frontend/src/features/memory/MemoryPage.tsx` at `/memory` (Batch 3)
+- [x] Frontend: `WatchlistPage` routed at `/watchlist` — lists watchlists/symbols, `with_quotes=true` polling + live `/ws/v1/stream?channels=candles` quote updates; smoke tests in `WatchlistPage.test.tsx` (Batch 4)
+- [x] Frontend: `AlertsPage` routed at `/alerts` — create/list alerts, mock trigger demo, notifications rendered from `/ws/v1/stream?channels=notifications`; smoke tests in `AlertsPage.test.tsx` (Batch 4)
+- [x] Frontend: `JournalPage` routed at `/journal` — create/list entries + promote-to-lesson flow; smoke tests in `JournalPage.test.tsx` (Batch 4)
+- [ ] Market-driven alert worker (not only mock trigger) — **reason:** Batch 5+

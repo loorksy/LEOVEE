@@ -9,6 +9,10 @@ import { ChatPage } from "@/features/chat/ChatPage";
 import { AnalysisPage } from "@/features/analysis/AnalysisPage";
 import { RecommendationsPage } from "@/features/recommendations/RecommendationsPage";
 import { MemoryPage } from "@/features/memory/MemoryPage";
+import { WatchlistPage } from "@/features/watchlist/WatchlistPage";
+import { AlertsPage } from "@/features/alerts/AlertsPage";
+import { JournalPage } from "@/features/journal/JournalPage";
+import { PerformancePage } from "@/features/performance/PerformancePage";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +30,10 @@ export function App() {
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/recommendations" element={<RecommendationsPage />} />
               <Route path="/memory" element={<MemoryPage />} />
+              <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/alerts" element={<AlertsPage />} />
+              <Route path="/journal" element={<JournalPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

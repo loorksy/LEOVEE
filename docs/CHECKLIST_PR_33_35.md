@@ -8,5 +8,5 @@
 - [x] `GET /metrics` Prometheus stub — present (edge auth pending Batch 7)
 - [x] MCP HTTP bridge `POST /api/v1/mcp/tools/invoke`; `leovee-mcp --list-tools`
 - [x] ext-apps manifests: chart + recommendation (`contentSecurityPolicy`, bearer auth) — `backend/app/mcp/apps/*.json`
-- [ ] Frontend `PerformanceDashboard` routed — **reason:** Batch 3/4
+- [x] Frontend `PerformanceDashboard` routed — `frontend/src/features/performance/PerformancePage.tsx` at `/performance`, summary from `/api/v1/performance/summary`; smoke tests in `PerformancePage.test.tsx` (Batch 4)
 - [ ] Separate `leovee-mcp` compose service — **reason:** Batch 5

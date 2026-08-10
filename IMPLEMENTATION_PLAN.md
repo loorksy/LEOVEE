@@ -514,11 +514,11 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 26 | **CODE-DONE** | Chat API + RECALL; `ChatPage` routed at `/chat` with RECALL panel (Batch 3); SSE still not provider-native |
 | 27 | **CODE-DONE** | Recommendations API + `RecommendationsPage` routed at `/recommendations` (Batch 3) |
 | 28 | **CODE-DONE** | Trades idea CRUD + execution gate |
-| 29 | **PARTIAL** | Watchlist API; no UI / realtime quote surface |
-| 30 | **PARTIAL** | Alerts API + mock trigger; no market-driven fan-out worker UI |
-| 31 | **PARTIAL** | Journal API + promote; no UI |
+| 29 | **COMPLETE** | Watchlist API + `WatchlistPage` routed at `/watchlist`; `with_quotes=true` polling + live `/ws/v1/stream?channels=candles` quote updates; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
+| 30 | **CODE-DONE** | Alerts API + `AlertsPage` routed at `/alerts`; create/list + mock trigger demo + `/ws/v1/stream?channels=notifications` fan-out display (Batch 4); market-driven alert worker still pending |
+| 31 | **COMPLETE** | Journal API + `JournalPage` routed at `/journal`; create/list entries + promote-to-lesson flow; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
 | 32 | **CODE-DONE** | Memory API + `MemoryPanel` wired at `/memory`; delete triggers recompute stats display (Batch 3) |
-| 33 | **PARTIAL** | Performance API + dashboard component unwired |
+| 33 | **COMPLETE** | Performance API + `PerformanceDashboard` routed at `/performance` via `PerformancePage`, calibration curve from `/api/v1/performance/summary`; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_33_35.md` (Batch 4) |
 | 34 | **PARTIAL** | MCP in-process on API; not separate compose service |
 | 35 | **PARTIAL** | Manifests served; ext-apps packaging incomplete |
 | 36 | **PARTIAL** | Admin API; entitlements panel unwired |
