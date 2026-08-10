@@ -13,10 +13,14 @@ fi
 export ENVIRONMENT="${ENVIRONMENT:-staging}"
 
 echo "[deploy] running migrations (one-shot)…"
-docker compose -f docker-compose.yml -f docker-compose.staging.yml run --rm migrate
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.staging.yml"
+if [ -f docker-compose.agent.yml ]; then
+  COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.agent.yml"
+fi
+docker compose ${COMPOSE_FILES} run --rm migrate
 
 echo "[deploy] starting api, worker, web…"
-docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build api worker web
+docker compose ${COMPOSE_FILES} up -d --build api worker web
 
 echo "[deploy] waiting for API health…"
 for _ in $(seq 1 30); do
@@ -27,4 +31,4 @@ for _ in $(seq 1 30); do
 done
 
 API_URL="${API_URL:-http://127.0.0.1:8000}" "${ROOT}/scripts/smoke_staging.sh"
-echo "[deploy] staging stack is up. Tear-down: docker compose -f docker-compose.yml -f docker-compose.staging.yml down -v"
+echo "[deploy] staging stack is up. Tear-down: docker compose ${COMPOSE_FILES} down -v"

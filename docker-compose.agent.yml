@@ -1,0 +1,6 @@
+# Internal-only Postgres/Redis (no host port bind) — for Cloud Agent / CI docker runs.
+services:
+  postgres:
+    ports: !reset []
+  redis:
+    ports: !reset []
