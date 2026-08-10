@@ -116,6 +116,18 @@ async def memory_embedding_index_job(_ctx: dict[str, object]) -> str:
     return f"memory_embedding_index_ok:{indexed}"
 
 
+async def memory_recompute_job(_ctx: dict[str, object]) -> str:
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.memory_maintenance import run_memory_recompute
+
+    async with factory() as session:
+        stats = await run_memory_recompute(session)
+        await session.commit()
+    return f"memory_recompute_ok:{stats['embeddings_indexed']}"
+
+
 async def memory_decay_job(_ctx: dict[str, object]) -> str:
     """Placeholder for memory aging sweeps (invoked on schedule)."""
     return "memory_decay_ok"
@@ -142,6 +154,7 @@ class WorkerSettings:
         candle_retention_job,
         news_ingestion_job,
         memory_embedding_index_job,
+        memory_recompute_job,
         thesis_monitor_job,
         memory_decay_job,
     ]

@@ -82,3 +82,10 @@ class WorkspaceEventBroadcaster:
 
 
 annotation_broadcaster = WorkspaceEventBroadcaster()
+
+
+class NotificationBroadcaster(WorkspaceEventBroadcaster):
+    """Workspace notification fan-out for alerts and in-app events."""
+
+
+notification_broadcaster = NotificationBroadcaster()
