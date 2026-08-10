@@ -32,7 +32,6 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://leovee:leovee@postgres:5432/leovee
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
@@ -49,7 +48,6 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://leovee:leovee@postgres:5432/leovee
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
