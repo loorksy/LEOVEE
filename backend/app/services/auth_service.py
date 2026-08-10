@@ -23,6 +23,7 @@ from app.models.user import User
 from app.providers.email.base import EmailMessage
 from app.providers.email.factory import get_email_provider
 from app.schemas.auth import TokenResponse
+from app.services.workspace_service import create_default_workspace
 
 
 class AuthError(Exception):
@@ -85,6 +86,13 @@ async def signup(
             user_id=user.id,
             role=OrganizationMemberRole.ORG_OWNER,
         )
+    )
+    await session.flush()
+    await create_default_workspace(
+        session,
+        tenant_id=org.id,
+        owner_user_id=user.id,
+        name="Default Workspace",
     )
 
     verify_token = generate_opaque_token()

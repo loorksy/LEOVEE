@@ -9,8 +9,11 @@ from app.core.config import Settings, get_settings
 from app.core.tenant import (
     TenantContext,
     TenantResolutionError,
+    WorkspaceResolutionError,
     resolve_tenant_context,
+    resolve_workspace_context,
     tenant_resolution_to_http,
+    workspace_resolution_to_http,
 )
 from app.infrastructure.database import get_db_session
 from app.services.auth_service import AuthError, get_user_for_access_token
@@ -72,3 +75,28 @@ async def get_tenant_context(
         )
     except TenantResolutionError as exc:
         raise tenant_resolution_to_http(exc) from exc
+
+
+async def get_workspace_context(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(get_tenant_context)],
+    x_workspace_id: Annotated[str | None, Header()] = None,
+) -> TenantContext:
+    client_workspace_id: uuid.UUID | None = None
+    if x_workspace_id:
+        try:
+            client_workspace_id = uuid.UUID(x_workspace_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid X-Workspace-Id",
+            ) from exc
+
+    try:
+        return await resolve_workspace_context(
+            session,
+            tenant,
+            client_workspace_id=client_workspace_id,
+        )
+    except WorkspaceResolutionError as exc:
+        raise workspace_resolution_to_http(exc) from exc

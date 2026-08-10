@@ -15,5 +15,6 @@ async def get_my_tenant(
     return {
         "tenant_id": str(tenant.tenant_id),
         "user_id": str(tenant.user_id),
+        "workspace_id": str(tenant.workspace_id),
         "role": tenant.role.value,
     }

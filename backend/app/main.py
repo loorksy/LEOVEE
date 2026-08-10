@@ -5,7 +5,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import auth, health, tenant
+from app.api import websocket as ws_router
+from app.api.routes import (
+    analysis,
+    auth,
+    chat,
+    health,
+    markets,
+    memory,
+    recommendations,
+    tenant,
+    theses,
+    workspaces,
+)
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -13,6 +25,16 @@ from app.core.logging import configure_logging
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
+    settings = get_settings()
+    if settings.database_url:
+        from app.infrastructure.database import get_session_factory
+        from app.infrastructure.seed import ensure_platform_seed
+
+        factory = get_session_factory()
+        if factory is not None:
+            async with factory() as session:
+                await ensure_platform_seed(session)
+                await session.commit()
     yield
 
 
@@ -33,6 +55,14 @@ def create_app() -> FastAPI:
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(tenant.router)
+    application.include_router(workspaces.router)
+    application.include_router(markets.router)
+    application.include_router(analysis.router)
+    application.include_router(memory.router)
+    application.include_router(recommendations.router)
+    application.include_router(theses.router)
+    application.include_router(chat.router)
+    application.include_router(ws_router.router)
     return application
 
 

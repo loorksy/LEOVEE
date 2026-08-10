@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.tenant import TenantResolutionError, resolve_tenant_context
 from app.models import Organization, OrganizationMember, User
 from app.models.base import OrganizationMemberRole, OrganizationStatus, UserStatus
+from app.services.workspace_service import create_default_workspace
 from app.tests.conftest import seed_user_org
 
 
@@ -30,6 +31,13 @@ async def test_resolve_tenant_honors_verified_client_tenant_id(db_session: Async
             user_id=user.id,
             role=OrganizationMemberRole.ORG_MEMBER,
         )
+    )
+    await db_session.flush()
+    await create_default_workspace(
+        db_session,
+        tenant_id=org_b.id,
+        owner_user_id=user.id,
+        name="Org B Workspace",
     )
     await db_session.commit()
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.models import Base, Organization, OrganizationMember, User
 from app.models.base import OrganizationMemberRole, OrganizationStatus, UserStatus
+from app.services.workspace_service import create_default_workspace
 
 
 @pytest.fixture
@@ -34,5 +35,12 @@ async def seed_user_org(
         role=OrganizationMemberRole.ORG_OWNER,
     )
     session.add(membership)
+    await session.flush()
+    await create_default_workspace(
+        session,
+        tenant_id=org.id,
+        owner_user_id=user.id,
+        name="Default Workspace",
+    )
     await session.commit()
     return user, org, membership
