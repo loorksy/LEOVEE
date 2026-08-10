@@ -79,3 +79,11 @@ export function dedupeCandles(candles: NormalizedCandle[]): NormalizedCandle[] {
   }
   return [...byTs.values()].sort((a, b) => a.timestamp - b.timestamp);
 }
+
+/** §101: KLineChart replay view must not show candles after replay time T. */
+export function filterCandlesForReplay(
+  candles: NormalizedCandle[],
+  asOfMs: number,
+): NormalizedCandle[] {
+  return candles.filter((c) => c.timestamp <= asOfMs);
+}
