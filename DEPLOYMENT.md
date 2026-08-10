@@ -33,6 +33,7 @@
     caddy/Caddyfile
   docker-compose.yml              # Local full stack
   docker-compose.prod.yml         # Single-server production
+  docker-compose.staging.yml      # VPS staging (§16.1)
   .env.example
   backend/
   frontend/
@@ -40,6 +41,12 @@
     migrate.sh
     backup_pg.sh
     restore_pg.sh
+    smoke_staging.sh
+    deploy_staging_vps.sh
+    check_no_committed_secrets.sh
+  docs/
+    RUNBOOK.md
+    LAUNCH_READINESS.md           # §17 checklist
 ```
 
 ---

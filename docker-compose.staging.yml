@@ -1,0 +1,38 @@
+# Staging / VPS overrides (DEPLOYMENT.md §16.1)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  api:
+    environment:
+      ENVIRONMENT: staging
+    restart: unless-stopped
+
+  worker:
+    environment:
+      ENVIRONMENT: staging
+    restart: unless-stopped
+
+  web:
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_MIGRATION_URL: postgresql+asyncpg://leovee:leovee@postgres:5432/leovee
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - tools
