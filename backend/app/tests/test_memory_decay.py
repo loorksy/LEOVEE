@@ -9,8 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.datetime_utils import utc_now
-from app.models.memory import AgentMemory, Lesson, MemoryType
+from app.core.tenant import resolve_tenant_context
+from app.core.tenant_rls import bind_workspace_rls
+from app.models.memory import Lesson, MemoryType
 from app.services.memory_decay import run_memory_decay
+from app.services.memory_service import store_memory
 from app.tests.conftest import seed_user_org
 
 
@@ -21,19 +24,20 @@ async def test_memory_decay_reduces_freshness_and_archives_expired(
     user, org, _ = await seed_user_org(
         db_session, email="decay@example.com", slug="decay-org"
     )
-    from app.core.tenant import resolve_tenant_context
-
     ctx = await resolve_tenant_context(db_session, user.id)
     assert ctx.workspace_id is not None
-    now = utc_now()
-    mem = AgentMemory(
+    await bind_workspace_rls(db_session, ctx)
+
+    mem = await store_memory(
+        db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        memory_type=MemoryType.SEMANTIC,
         key="symbol:EURUSD",
-        content_json={"note": "x"},
-        freshness_score=Decimal("1.0000"),
+        content={"note": "x"},
+        memory_type=MemoryType.SEMANTIC,
     )
+    mem.freshness_score = Decimal("1.0000")
+    now = utc_now()
     expired = Lesson(
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
@@ -50,7 +54,7 @@ async def test_memory_decay_reduces_freshness_and_archives_expired(
         confidence=Decimal("0.9000"),
         decay_at=now + timedelta(days=30),
     )
-    db_session.add_all([mem, expired, fresh])
+    db_session.add_all([expired, fresh])
     await db_session.flush()
 
     settings = Settings(

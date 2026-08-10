@@ -5,4 +5,4 @@
 - [x] Single `POST /analysis/run` with `complete_pipeline` — `backend/app/api/routes/analysis.py` (no `/analysis/pipeline`, no baseline reasoning module)
 - [x] ModelRouter + `model_configs` seed; HNSW index on `memory_embeddings` — `providers/llm/router.py`, alembic migrations, seed
 - [x] Memory checklist: hybrid retrieval path, embedding worker — `memory_service` / `memory/embedding.py`, `memory_embedding_index_job`
-- [ ] Dedicated provider §99 (Anthropic/OpenAI generate/stream/tools/fallback) — **reason:** Batch 2 work; providers exist with thin coverage
+- [x] Dedicated provider §99 (Anthropic/OpenAI generate/stream/tools/fallback) — `backend/app/tests/test_llm_providers.py`, `integration/test_adversarial_blocks_ready.py`
