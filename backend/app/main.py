@@ -15,8 +15,11 @@ from app.api.routes import (
     health,
     journal,
     markets,
+    mcp,
     memory,
+    metrics,
     news,
+    performance,
     recommendations,
     tenant,
     theses,
@@ -66,6 +69,9 @@ def create_app() -> FastAPI:
     application.include_router(tenant.router)
     application.include_router(workspaces.router)
     application.include_router(markets.router)
+    application.include_router(metrics.router)
+    application.include_router(performance.router)
+    application.include_router(mcp.router)
     application.include_router(news.router)
     application.include_router(analysis.router)
     application.include_router(chart.router)

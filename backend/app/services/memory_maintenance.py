@@ -14,9 +14,7 @@ async def run_memory_recompute(session: AsyncSession) -> dict[str, int]:
     orphan = cast(
         CursorResult[Any],
         await session.execute(
-            delete(MemoryEmbedding).where(
-                ~MemoryEmbedding.memory_id.in_(select(AgentMemory.id))
-            )
+            delete(MemoryEmbedding).where(~MemoryEmbedding.memory_id.in_(select(AgentMemory.id)))
         ),
     )
     from app.services.memory_service import index_memory_embedding

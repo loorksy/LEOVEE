@@ -76,9 +76,7 @@ async def maybe_refresh_conversation_summary(
     conversation: Conversation,
 ) -> str | None:
     count = await session.scalar(
-        select(func.count())
-        .select_from(Message)
-        .where(Message.conversation_id == conversation.id)
+        select(func.count()).select_from(Message).where(Message.conversation_id == conversation.id)
     )
     if count is None or count < SUMMARY_MESSAGE_THRESHOLD:
         return conversation.summary_text
