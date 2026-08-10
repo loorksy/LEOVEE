@@ -20,11 +20,12 @@ fi
 echo "[edge] patching nginx site listen 443 → 127.0.0.1:${NGINX_TLS_PORT} (backup *.bak-leovee-edge)"
 for site in "${SITES_DIR}"/*; do
   [[ -f "${site}" ]] || continue
-  if grep -q 'listen .*443' "${site}"; then
+  [[ "${site}" == *.bak-* ]] && continue
+  if grep -qE 'listen .*443' "${site}"; then
     cp -a "${site}" "${site}.bak-leovee-edge"
     sed -i -E \
-      -e "s/listen ([[:space:]]*)443 ssl/listen \\1127.0.0.1:${NGINX_TLS_PORT} ssl/g" \
-      -e "s/listen ([[:space:]]*)\\[::\\]:443 ssl/listen \\1127.0.0.1:${NGINX_TLS_PORT} ssl/g" \
+      -e "s/^[[:space:]]*listen[[:space:]]+443 ssl(.*);/    listen 127.0.0.1:${NGINX_TLS_PORT} ssl\\1;/" \
+      -e "s/^[[:space:]]*listen[[:space:]]+\\[::\\]:443 ssl(.*);/    # leovee-edge: ipv6 tls handled by stream :443/" \
       "${site}"
   fi
 done
