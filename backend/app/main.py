@@ -9,6 +9,7 @@ from app.api import websocket as ws_router
 from app.api.routes import (
     analysis,
     auth,
+    chart,
     chat,
     health,
     markets,
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     application.include_router(markets.router)
     application.include_router(news.router)
     application.include_router(analysis.router)
+    application.include_router(chart.router)
     application.include_router(memory.router)
     application.include_router(recommendations.router)
     application.include_router(theses.router)
