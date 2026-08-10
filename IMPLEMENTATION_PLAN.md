@@ -430,6 +430,16 @@ Per spec §114:
 **Chart phases (24–25):** KLineChart integration checklist §114.  
 **Memory phases (20–21, 32):** Memory checklist §114.
 
+### Definition of done (three levels)
+
+Use these levels in §7 and status reports. Merged code alone is not DONE.
+
+| Level | Meaning |
+|-------|---------|
+| **COMPLETE** | Exit criteria met; §99 unit **and** integration coverage; reachable and usable in the UI where the phase has a user-facing surface; no placeholders; §114 checklist filled with evidence links. |
+| **CODE-DONE** | Backend/logic complete with tests, but missing UI wiring or the checklist. Close to complete. |
+| **PARTIAL** | Missing tests, missing persistence, or containing placeholders / silent no-ops. |
+
 ---
 
 ## 4. Suggested team parallelization
@@ -472,13 +482,55 @@ Integration milestones: end of Phase 19 (decision), 26 (chat E2E), 42 (deploy).
 
 ## 7. Current status
 
-| Phase | Status |
-|-------|--------|
-| 1 | **Complete** — design documents in repo root |
-| 4 | **Complete** — authentication (JWT, sessions, email, rate limits) |
-| 5–43 | Not started |
+Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers live in `docs/BLOCKED_ON_OWNER.md`.
 
-**Next action after approval:** Begin Phase 2 on branch `cursor/scaffolding-phase-2-199e` (or continuation branch).
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 1 | **COMPLETE** | Design docs in repo root |
+| 2 | **CODE-DONE** | Scaffolding + CI + Docker; sidebar routes still incremental |
+| 3 | **CODE-DONE** | Tenant foundation + RLS tests; checklist evidence pending |
+| 4 | **CODE-DONE** | Auth flows; password-reset/rate-limit evidence gaps |
+| 5 | **CODE-DONE** | Alembic + pgvector + RLS; clean up/down evidence pending |
+| 6 | **CODE-DONE** | Workspaces + seed |
+| 7 | **CODE-DONE** | OANDA practice REST/stream/backfill; Markets UI not routed |
+| 8 | **CODE-DONE** | Candle normalize/upsert/retention; Markets UI not routed |
+| 9 | **CODE-DONE** | Market intelligence + §99 unit |
+| 10 | **CODE-DONE** | MTF engine + §99 unit |
+| 11 | **CODE-DONE** | Structure/liquidity/zones/vol engines + persistence |
+| 12 | **CODE-DONE** | Scenario engine (with engines suite) |
+| 13 | **CODE-DONE** | Risk engine + tests |
+| 14 | **CODE-DONE** | Finnhub + research; needs prod key (owner) |
+| 15 | **PARTIAL** | Anthropic provider exists; dedicated §99 + stream/tools gaps |
+| 16 | **PARTIAL** | OpenAI provider exists; dedicated §99 + stream/tools gaps |
+| 17 | **PARTIAL** | ModelRouter + fallback config; fallback/rate-limit tests thin |
+| 18 | **CODE-DONE** | Reasoning + adversarial + tests |
+| 19 | **CODE-DONE** | Decision path via analysis pipeline |
+| 20 | **CODE-DONE** | Memory foundation + hybrid recall; decay job now real |
+| 21 | **CODE-DONE** | Learning pipeline + worker |
+| 22 | **CODE-DONE** | Thesis monitor job + unit/integration |
+| 23 | **CODE-DONE** | Chart semantic engine + API/WS |
+| 24 | **PARTIAL** | KLineChart adapter/tests; no app route |
+| 25 | **PARTIAL** | Annotation renderer/tests; no app route / live WS UI |
+| 26 | **PARTIAL** | Chat API + RECALL; no Chat UI route; SSE not provider-native |
+| 27 | **PARTIAL** | Recommendations API + card component unwired |
+| 28 | **CODE-DONE** | Trades idea CRUD + execution gate |
+| 29 | **PARTIAL** | Watchlist API; no UI / realtime quote surface |
+| 30 | **PARTIAL** | Alerts API + mock trigger; no market-driven fan-out worker UI |
+| 31 | **PARTIAL** | Journal API + promote; no UI |
+| 32 | **PARTIAL** | Memory API + `MemoryPanel` unwired |
+| 33 | **PARTIAL** | Performance API + dashboard component unwired |
+| 34 | **PARTIAL** | MCP in-process on API; not separate compose service |
+| 35 | **PARTIAL** | Manifests served; ext-apps packaging incomplete |
+| 36 | **PARTIAL** | Admin API; entitlements panel unwired |
+| 37 | **CODE-DONE** | Manual billing default; Stripe test adapter |
+| 38 | **CODE-DONE** | Entitlement hard limits on analysis/chat/MCP |
+| 39 | **CODE-DONE** | Request ID, metrics, Sentry bridge (DSN owner) |
+| 40 | **PARTIAL** | Headers/API keys; `/metrics` still public at edge |
+| 41 | **PARTIAL** | Replay API + panel unwired |
+| 42 | **CODE-DONE** | Compose/Caddy/deploy/backup scripts; staging exercised |
+| 43 | **PARTIAL** | Launch readiness doc; owner sign-off open |
+
+**Next action:** Batches 1–7 completion track (`cursor/batches-1-7-completion-199e`) — truth/cleanup → LLM tests → frontend wiring → product surface → MCP → admin/billing → hardening.
 
 ---
 

@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
 
     memory_min_sample: int = Field(default=20, alias="MEMORY_MIN_SAMPLE")
+    memory_lesson_ttl_days: int = Field(default=180, alias="MEMORY_LESSON_TTL_DAYS")
+    memory_freshness_decay_factor: float = Field(
+        default=0.95,
+        alias="MEMORY_FRESHNESS_DECAY_FACTOR",
+    )
+    memory_archive_freshness_threshold: float = Field(
+        default=0.15,
+        alias="MEMORY_ARCHIVE_FRESHNESS_THRESHOLD",
+    )
     strategy_decay_threshold_avg_r: float = Field(
         default=0.5,
         alias="STRATEGY_DECAY_THRESHOLD_AVG_R",

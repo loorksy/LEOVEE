@@ -48,11 +48,11 @@
 
 ### Baseline E2E (§99 milestone)
 
-**Scope:** First integration test: **market → analysis → reasoning (deterministic baseline) → recommendation → thesis**.
+**Scope:** First integration test: **market → analysis → reasoning → recommendation → thesis**.
 
 **Notes:**
 
-- **Reasoning** here is `reasoning_baseline.py` (deterministic, no LLM). Full `ReasoningEngine` + adversarial gate ships in PR phases **17–18**.
+- **Reasoning** uses the real `ReasoningEngine` path via `complete_pipeline` / `POST /analysis/run` (phases **17–18**). There is no separate baseline reasoning module.
 - Market data in tests uses **`tests/doubles/` only**, never production code paths.
 
 ---
@@ -69,14 +69,13 @@
 | Add | `backend/app/services/market/retention.py` |
 | Add | `backend/app/services/market/gaps.py` |
 | Add | `backend/app/services/market/engine_persistence.py` |
-| Add | `backend/app/services/reasoning_baseline.py` |
 | Add | `backend/app/services/analysis_pipeline.py` |
 | Mod | `backend/app/models/__init__.py` |
 | Mod | `backend/app/core/config.py` (retention settings) |
 | Mod | `backend/app/services/market_data.py` (optional gap query helper) |
 | Mod | `backend/app/workers/settings.py` (`candle_retention_job`, gap repair hook) |
 | Mod | `backend/app/services/analysis_service.py` (wire persistence) |
-| Mod | `backend/app/api/routes/analysis.py` (`POST /pipeline` optional) |
+| Mod | `backend/app/api/routes/analysis.py` (`POST /analysis/run` with `complete_pipeline`) |
 | Add | `backend/app/tests/integration/test_stream_disconnect_backfill.py` |
 | Add | `backend/app/tests/test_candle_upsert_retention.py` |
 | Add | `backend/app/tests/test_engine_persistence.py` |

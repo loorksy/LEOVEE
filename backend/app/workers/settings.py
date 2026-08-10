@@ -77,13 +77,23 @@ async def news_ingestion_job(_ctx: dict[str, object]) -> str:
     factory = get_session_factory()
     if factory is None:
         raise RuntimeError("DATABASE_URL is not configured")
+    from app.core.config import get_settings
     from app.providers.news.finnhub import get_news_provider
     from app.services.news_service import ingest_news_from_provider
 
+    settings = get_settings()
     try:
         provider = get_news_provider()
     except Exception as exc:
-        return f"news_ingestion_skipped:{type(exc).__name__}"
+        # Never claim success when the job did no work.
+        if settings.environment in {"staging", "production"}:
+            raise RuntimeError(
+                f"news_ingestion_failed: provider unavailable ({type(exc).__name__})"
+            ) from exc
+        raise RuntimeError(
+            f"news_ingestion_failed: provider unavailable ({type(exc).__name__}); "
+            "set FINNHUB_API_KEY or disable the cron"
+        ) from exc
 
     async with factory() as session:
         count = await ingest_news_from_provider(session, provider, currency="USD")
@@ -132,8 +142,21 @@ async def memory_recompute_job(_ctx: dict[str, object]) -> str:
 
 
 async def memory_decay_job(_ctx: dict[str, object]) -> str:
-    """Placeholder for memory aging sweeps (invoked on schedule)."""
-    return "memory_decay_ok"
+    """Nightly aging: decay freshness scores and archive expired lessons."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.memory_decay import run_memory_decay
+
+    async with factory() as session:
+        stats = await run_memory_decay(session)
+        await session.commit()
+    return (
+        "memory_decay_ok:"
+        f"memories={stats['memories_decayed']},"
+        f"lessons={stats['lessons_decayed']},"
+        f"archived={stats['lessons_archived']}"
+    )
 
 
 async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
