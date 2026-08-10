@@ -121,6 +121,19 @@ async def memory_decay_job(_ctx: dict[str, object]) -> str:
     return "memory_decay_ok"
 
 
+async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.thesis_monitor_worker import run_thesis_monitor_cycle
+
+    async with factory() as session:
+        outcomes = await run_thesis_monitor_cycle(session)
+        await session.commit()
+    changed = sum(1 for o in outcomes if o.get("changed"))
+    return f"thesis_monitor_ok:{changed}"
+
+
 class WorkerSettings:
     functions = [
         process_learning_outcome,
@@ -129,6 +142,7 @@ class WorkerSettings:
         candle_retention_job,
         news_ingestion_job,
         memory_embedding_index_job,
+        thesis_monitor_job,
         memory_decay_job,
     ]
     cron_jobs = [
@@ -136,6 +150,7 @@ class WorkerSettings:
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
         cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
         cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
+        cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
     ]
 

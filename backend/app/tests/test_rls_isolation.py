@@ -18,6 +18,7 @@ from app.main import app
 from app.models.enums import RecommendationDirection, RecommendationStatus
 from app.models.learning import StrategyStat
 from app.models.memory import AgentMemory, Lesson, MemoryType
+from app.models.news import ResearchItem
 from app.models.oanda_connection import OandaConnection
 from app.models.recommendation import Recommendation
 from app.services import market_data
@@ -204,6 +205,42 @@ async def test_api_list_recommendations_enforces_rls(
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["items"] == []
+
+
+
+@pytest.mark.asyncio
+async def test_rls_blocks_cross_workspace_research_items(
+    db_session: AsyncSession, privileged_session: AsyncSession
+) -> None:
+    user_a, org_a, _ = await seed_user_org(db_session, email="ri-a@example.com", slug="ri-a")
+    user_b, org_b, _ = await seed_user_org(db_session, email="ri-b@example.com", slug="ri-b")
+    await db_session.commit()
+    ctx_a = await resolve_tenant_context(db_session, user_a.id)
+    ctx_b = await resolve_tenant_context(db_session, user_b.id)
+    assert ctx_a.workspace_id and ctx_b.workspace_id
+
+    await set_rls_session_context(
+        privileged_session,
+        tenant_id=org_b.id,
+        workspace_id=ctx_b.workspace_id,
+    )
+    privileged_session.add(
+        ResearchItem(
+            tenant_id=org_b.id,
+            workspace_id=ctx_b.workspace_id,
+            query="secret",
+            items_json=[],
+        )
+    )
+    await privileged_session.commit()
+
+    await set_rls_session_context(
+        db_session,
+        tenant_id=org_a.id,
+        workspace_id=ctx_a.workspace_id,
+    )
+    result = await db_session.execute(select(ResearchItem))
+    assert result.scalars().all() == []
 
 
 @pytest.mark.asyncio
