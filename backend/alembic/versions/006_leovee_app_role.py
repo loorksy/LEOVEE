@@ -25,9 +25,25 @@ def upgrade() -> None:
     op.execute(
         "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO leovee_app"
     )
-    op.execute("GRANT leovee_app TO postgres")
+    op.execute(
+        """
+        DO $do$
+        BEGIN
+          EXECUTE format('GRANT leovee_app TO %I', current_user);
+        END
+        $do$;
+        """
+    )
 
 
 def downgrade() -> None:
-    op.execute("REVOKE leovee_app FROM postgres")
+    op.execute(
+        """
+        DO $do$
+        BEGIN
+          EXECUTE format('REVOKE leovee_app FROM %I', current_user);
+        END
+        $do$;
+        """
+    )
     op.execute("DROP ROLE IF EXISTS leovee_app")
