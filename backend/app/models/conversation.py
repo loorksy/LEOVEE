@@ -67,7 +67,7 @@ class Message(Base, WorkspaceOwnedMixin):
         index=True,
     )
     role: Mapped[MessageRole] = mapped_column(
-        Enum(MessageRole, name="message_role"),
+        Enum(MessageRole, name="message_role", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
