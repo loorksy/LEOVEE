@@ -18,7 +18,8 @@ def load_app_manifest(app_id: str) -> dict[str, Any]:
     path = _APPS_DIR / f"{app_id}.json"
     if not path.is_file():
         raise FileNotFoundError(app_id)
-    return json.loads(path.read_text(encoding="utf-8"))
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return data
 
 
 def list_app_ids() -> list[str]:

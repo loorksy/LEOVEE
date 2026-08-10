@@ -2,6 +2,7 @@
 
 from app.models.auth_token import AuthToken
 from app.models.base import Base
+from app.models.billing import BillingWebhookEvent
 from app.models.candle import Candle
 from app.models.chart_annotation import ChartAnnotation
 from app.models.conversation import Conversation, Message
@@ -44,6 +45,7 @@ __all__ = [
     "StrategyStat",
     "SymbolProfile",
     "AuthToken",
+    "BillingWebhookEvent",
     "AgentMemory",
     "Base",
     "Candle",

@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
+    billing_provider: str = Field(default="manual", alias="BILLING_PROVIDER")
+    stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
+    stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
+
     memory_min_sample: int = Field(default=20, alias="MEMORY_MIN_SAMPLE")
     strategy_decay_threshold_avg_r: float = Field(
         default=0.5,
