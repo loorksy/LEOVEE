@@ -19,8 +19,8 @@ if [ -f docker-compose.agent.yml ]; then
 fi
 docker compose ${COMPOSE_FILES} run --rm --build migrate
 
-echo "[deploy] starting api, worker, web…"
-docker compose ${COMPOSE_FILES} up -d --build api worker web
+echo "[deploy] starting api, worker, web, caddy…"
+docker compose ${COMPOSE_FILES} up -d --build api worker web caddy
 
 echo "[deploy] waiting for API health…"
 for _ in $(seq 1 30); do

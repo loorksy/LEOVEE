@@ -17,4 +17,7 @@ COPY backend/app ./app
 
 RUN pip install --upgrade pip && pip install .
 
-CMD ["python", "-c", "import time; print('leovee-worker placeholder — Arq worker starts in a later phase'); time.sleep(86400)"]
+RUN useradd --create-home --shell /bin/bash leovee
+USER leovee
+
+CMD ["arq", "app.workers.settings.WorkerSettings"]

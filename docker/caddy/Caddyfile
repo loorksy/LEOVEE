@@ -1,24 +1,29 @@
-# Optional TLS reverse proxy (set LEOVEE_DOMAIN in Caddy environment).
+# TLS edge for Leovee staging/production (see DEPLOYMENT.md §6).
+# Set LEOVEE_DOMAIN (e.g. staging.leovee.lork.cloud) and ACME_EMAIL in the Caddy service env.
 {
-  email admin@leovee.example.com
+	email {$ACME_EMAIL:admin@lork.cloud}
 }
 
-:80 {
-  respond "Configure LEOVEE_DOMAIN for TLS" 404
-}
+{$LEOVEE_DOMAIN} {
+	encode gzip
 
-# Example production host block (uncomment and set domain):
-# leovee.example.com {
-#   encode gzip
-#   handle /api/* {
-#     reverse_proxy api:8000
-#   }
-#   handle {
-#     reverse_proxy web:80
-#   }
-#   header {
-#     Strict-Transport-Security "max-age=31536000; includeSubDomains"
-#     X-Content-Type-Options "nosniff"
-#     X-Frame-Options "DENY"
-#   }
-# }
+	handle /health* {
+		reverse_proxy api:8000
+	}
+	handle /metrics {
+		reverse_proxy api:8000
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

@@ -1,14 +1,16 @@
 # Staging / VPS overrides (DEPLOYMENT.md §16.1)
-# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml -f docker-compose.agent.yml up -d
 
 services:
-  # Avoid clashing with host Postgres/other stacks (compose merges port lists from base).
+  # No host bind for Postgres/Redis (shared VPS / local conflicts).
   postgres:
     ports: !reset []
   redis:
     ports: !reset []
 
   api:
+    ports: !override
+      - "127.0.0.1:8000:8000"
     environment:
       ENVIRONMENT: staging
     restart: unless-stopped
@@ -19,9 +21,30 @@ services:
     restart: unless-stopped
 
   web:
-    ports: !override
-      - "3001:80"
+    ports: !reset []
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_API_URL: ""
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"
+      - "127.0.0.1:18443:443"
+    environment:
+      LEOVEE_DOMAIN: ${LEOVEE_DOMAIN:-staging.leovee.lork.cloud}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@lork.cloud}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
 
   migrate:
     build:
@@ -37,3 +60,7 @@ services:
         condition: service_healthy
     profiles:
       - tools
+
+volumes:
+  caddy_data:
+  caddy_config:

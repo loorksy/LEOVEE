@@ -213,7 +213,29 @@ First migration:
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-### 8.3 RLS
+## 8.3 RLS roles and migration `006_leovee_app_role`
+
+| Role | Purpose | Privileges |
+|------|---------|------------|
+| `leovee` | Postgres image superuser / **migration** (`DATABASE_MIGRATION_URL`) | Owns DB objects; runs Alembic; **not** used by API |
+| `leovee_app` | **Runtime** (`DATABASE_URL`) | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT` (see migration `007`); DML on `public` tables under RLS |
+
+Migration **006** creates role `leovee_app` (if missing), grants schema/table DML to it, then runs  
+`GRANT leovee_app TO <current_user>` where `<current_user>` is whoever runs Alembic (`leovee` in Docker).  
+That grant lets the migration session `SET ROLE leovee_app` in tests; it does **not** grant `leovee_app` to the API user.  
+The API connects **as** `leovee_app` directly (login enabled in 007); it never inherits the migration role.
+
+Verify on a deployed database:
+
+```sql
+SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolinherit
+  FROM pg_roles
+ WHERE rolname IN ('leovee', 'leovee_app');
+```
+
+---
+
+## 8.4 RLS
 
 Apply policies in dedicated migrations; use superuser role only for migrations, app role `leovee_app` without BYPASSRLS.
 
@@ -223,15 +245,25 @@ Apply policies in dedicated migrations; use superuser role only for migrations, 
 
 ### 9.1 PostgreSQL
 
-`scripts/backup_pg.sh`:
+`scripts/backup_pg.sh` (host `pg_dump` when Postgres is bound locally) and **`scripts/backup_pg_compose.sh`** (recommended on Docker staging):
 
-- `pg_dump -Fc` daily to object storage (S3-compatible)
-- Retain 30 daily, 12 monthly
-- Include pgvector data in same dump
+```bash
+cd /opt/leovee
+./scripts/backup_pg_compose.sh
+# writes ./backups/leovee-<timestamp>.dump (custom format, includes pgvector)
+```
 
 ### 9.2 Restore
 
-`scripts/restore_pg.sh` — restore to new instance, verify `vector` extension, run smoke tests.
+`scripts/restore_pg.sh` (host) and **`scripts/restore_pg_compose.sh`** (scratch DB inside the stack):
+
+```bash
+./scripts/backup_pg_compose.sh
+DUMP=$(ls -t backups/leovee-*.dump | head -1)
+./scripts/restore_pg_compose.sh "$DUMP" leovee_restore_test
+```
+
+The restore script recreates `leovee_restore_test`, runs `pg_restore`, and checks `vector` + `alembic_version`.
 
 ### 9.3 Redis
 
@@ -359,9 +391,28 @@ Use a **disposable VPS** only for manual integration checks; **CI and default de
 | 4. Guarantees | No SQLite fallback, no synthetic providers in app code, no BYPASSRLS/superuser for the app role, no RLS weakening for tests. |
 | 5. LLM | Tests use stubs in `backend/app/tests/doubles/`. No live model sweeps; optional single smoke test only with documented cost. |
 | 6. Tear-down | `docker compose down -v` (or drop test DB) after runs. Document commands below. |
-| 7. Firewall | Expose **443/80** (API) only if needed; **do not** expose Postgres (5432) or Redis (6379) publicly. |
+| 7. Firewall | Expose **443/80** only at the provider; API/web on **127.0.0.1**; **Caddy** terminates TLS (`docker-compose.staging.yml`). Enable host `ufw` (`scripts/setup_vps_ufw.sh`). On shared nginx hosts run `scripts/setup_vps_edge_nginx.sh` (SNI passthrough to Caddy). |
 
-**Services (docker-compose on VPS):** `postgres`, `redis`, `api`, `worker` — same as §4.
+**Edge (Caddy + TLS):**
+
+```bash
+export LEOVEE_DOMAIN=staging.leovee.lork.cloud
+export PUBLIC_URL=https://${LEOVEE_DOMAIN}
+# in .env: PUBLIC_URL and CORS_ORIGINS=https://${LEOVEE_DOMAIN}
+ENVIRONMENT=staging ./scripts/deploy_staging_vps.sh
+sudo ./scripts/setup_vps_edge_nginx.sh   # shared host only
+sudo ./scripts/setup_vps_ufw.sh
+```
+
+**Verification:**
+
+```bash
+API_URL=https://${LEOVEE_DOMAIN} ./scripts/smoke_staging.sh
+python3 scripts/verify_staging_chain.py
+./scripts/enqueue_staging_worker_job.sh oanda_stream_consumer_job
+```
+
+**Services (docker-compose on VPS):** `postgres`, `redis`, `api`, `worker`, `web`, `caddy` — same as §4.
 
 **Run backend tests on VPS:**
 
