@@ -95,7 +95,7 @@ async def ensure_platform_seed(session: AsyncSession) -> Role:
                 code=PlanCode.FREE,
                 name="Free",
                 limits_json=FREE_PLAN_LIMITS,
-                features_json={"tier": "free"},
+                features_json={"tier": "free", "replay_enabled": True},
                 is_active=True,
             )
         )

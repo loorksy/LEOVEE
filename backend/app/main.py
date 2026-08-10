@@ -25,6 +25,7 @@ from app.api.routes import (
     news,
     performance,
     recommendations,
+    replay,
     tenant,
     theses,
     trades,
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     application.include_router(news.router)
     application.include_router(analysis.router)
     application.include_router(chart.router)
+    application.include_router(replay.router)
     application.include_router(watchlists.router)
     application.include_router(alerts.router)
     application.include_router(journal.router)
