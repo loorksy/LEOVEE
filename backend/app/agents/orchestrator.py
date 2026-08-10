@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
+from app.core.errors import ProviderConfigurationError
 from app.engines.decision import run_decision_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.risk import run_risk_engine
@@ -12,8 +13,8 @@ from app.engines.scenario import run_scenario_engine
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
-from app.providers.llm.base import LLMMessage
-from app.providers.llm.openai import get_openai_provider
+from app.providers.llm.base import LLMMessage, LLMProvider
+from app.providers.llm.factory import get_llm_provider
 
 
 @dataclass
@@ -27,10 +28,7 @@ class OrchestratorResult:
 
 
 def bars_from_candles(candles: list[Any]) -> list[OHLCBar]:
-    return [
-        OHLCBar(open=c.open, high=c.high, low=c.low, close=c.close)
-        for c in candles
-    ]
+    return [OHLCBar(open=c.open, high=c.high, low=c.low, close=c.close) for c in candles]
 
 
 async def run_analysis_orchestrator(
@@ -38,7 +36,11 @@ async def run_analysis_orchestrator(
     symbol: str,
     candles: list[Any],
     memories: list[dict[str, Any]] | None = None,
+    llm: LLMProvider | None = None,
 ) -> OrchestratorResult:
+    if not candles:
+        raise ValueError("Analysis requires at least one stored candle")
+
     run_id = uuid.uuid4()
     perceive = {"symbol": symbol, "candle_count": len(candles)}
     recall = {"memories": memories or [], "count": len(memories or [])}
@@ -50,7 +52,7 @@ async def run_analysis_orchestrator(
     zones = run_zones_engine(bars)
     scenarios = run_scenario_engine(structure, volatility, liquidity)
 
-    entry = Decimal(str(float(bars[-1].close))) if bars else Decimal("1.1")
+    entry = bars[-1].close
     stop = entry - Decimal("0.0020")
     risk = run_risk_engine(entry=entry, stop=stop)
     decision = run_decision_engine(scenarios, risk)
@@ -64,16 +66,21 @@ async def run_analysis_orchestrator(
         "risk": risk,
     }
 
-    llm = get_openai_provider(None)
-    llm_out = await llm.complete(
-        [
-            LLMMessage(role="system", content="You are a trading analyst."),
-            LLMMessage(
-                role="user",
-                content=f"Summarize {symbol} decision {decision['direction']}",
-            ),
-        ]
-    )
+    narrative: dict[str, Any] = {}
+    try:
+        provider = llm or get_llm_provider()
+        llm_out = await provider.complete(
+            [
+                LLMMessage(role="system", content="You are a trading analyst."),
+                LLMMessage(
+                    role="user",
+                    content=f"Summarize {symbol} decision {decision['direction']}",
+                ),
+            ]
+        )
+        narrative = {"llm": llm_out.structured or {"summary": llm_out.content}}
+    except ProviderConfigurationError as exc:
+        narrative = {"llm_unavailable": str(exc)}
 
     return OrchestratorResult(
         agent_run_id=run_id,
@@ -81,5 +88,5 @@ async def run_analysis_orchestrator(
         recall=recall,
         engines=engines,
         decision=decision,
-        narrative={"llm": llm_out.structured or {"summary": llm_out.content}},
+        narrative=narrative,
     )

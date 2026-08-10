@@ -4,7 +4,8 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Enum, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -32,6 +33,6 @@ class Trade(Base, TimestampMixin, WorkspaceOwnedMixin):
     )
     entry: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
     stop: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
-    targets_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    targets_json: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
     oanda_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     execution_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

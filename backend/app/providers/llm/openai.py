@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse, mock_structured_response
+from app.core.errors import ProviderConfigurationError
+from app.providers.llm.base import LLMMessage, LLMResponse
 
 
 class OpenAIProvider:
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str) -> None:
+        if not api_key:
+            raise ProviderConfigurationError("OpenAI API key is not configured")
         self._api_key = api_key
 
     async def complete(
@@ -15,15 +18,6 @@ class OpenAIProvider:
         *,
         response_format: dict[str, Any] | None = None,
     ) -> LLMResponse:
-        if not self._api_key:
-            structured = mock_structured_response(messages)
-            return LLMResponse(
-                content=structured["summary"],
-                model="gpt-4o-mini-mock",
-                provider="openai",
-                usage={"prompt_tokens": 10, "completion_tokens": 20},
-                structured=structured,
-            )
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=self._api_key)
@@ -42,7 +36,3 @@ class OpenAIProvider:
                 "completion_tokens": response.usage.completion_tokens if response.usage else 0,
             },
         )
-
-
-def get_openai_provider(api_key: str | None = None) -> LLMProvider:
-    return OpenAIProvider(api_key)

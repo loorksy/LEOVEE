@@ -23,7 +23,6 @@ def upgrade() -> None:
         "PASSWORD_RESET",
         name="auth_token_purpose",
     )
-    auth_purpose.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "sessions",

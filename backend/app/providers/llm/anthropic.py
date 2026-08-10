@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse, mock_structured_response
+from app.core.errors import ProviderConfigurationError
+from app.providers.llm.base import LLMMessage, LLMResponse
 
 
 class AnthropicProvider:
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str) -> None:
+        if not api_key:
+            raise ProviderConfigurationError("Anthropic API key is not configured")
         self._api_key = api_key
 
     async def complete(
@@ -15,15 +18,6 @@ class AnthropicProvider:
         *,
         response_format: dict[str, Any] | None = None,
     ) -> LLMResponse:
-        if not self._api_key:
-            structured = mock_structured_response(messages)
-            return LLMResponse(
-                content=structured["summary"],
-                model="claude-3-5-haiku-mock",
-                provider="anthropic",
-                usage={"input_tokens": 10, "output_tokens": 20},
-                structured=structured,
-            )
         from anthropic import AsyncAnthropic
 
         client = AsyncAnthropic(api_key=self._api_key)
@@ -47,7 +41,3 @@ class AnthropicProvider:
                 "output_tokens": response.usage.output_tokens,
             },
         )
-
-
-def get_anthropic_provider(api_key: str | None = None) -> LLMProvider:
-    return AnthropicProvider(api_key)

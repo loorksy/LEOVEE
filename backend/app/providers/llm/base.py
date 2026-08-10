@@ -26,12 +26,3 @@ class LLMProvider(Protocol):
         *,
         response_format: dict[str, Any] | None = None,
     ) -> LLMResponse: ...
-
-
-def mock_structured_response(messages: list[LLMMessage]) -> dict[str, Any]:
-    last = messages[-1].content if messages else ""
-    return {
-        "summary": f"Mock analysis for: {last[:120]}",
-        "confidence": 0.62,
-        "bullets": ["Structure aligned", "Volatility moderate", "Risk within limits"],
-    }

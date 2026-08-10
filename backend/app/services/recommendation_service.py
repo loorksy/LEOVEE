@@ -108,3 +108,58 @@ async def list_theses(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def transition_recommendation_status(
+    session: AsyncSession,
+    tenant: TenantContext,
+    recommendation_id: uuid.UUID,
+    *,
+    new_status: RecommendationStatus,
+    facts: dict[str, Any] | None = None,
+) -> Recommendation | None:
+    rec = await get_recommendation(session, tenant, recommendation_id)
+    if rec is None:
+        return None
+    rec.status = new_status
+    await session.flush()
+    from app.services.learning.terminal_hooks import on_recommendation_terminal_status
+
+    await on_recommendation_terminal_status(session, rec, new_status=new_status, facts=facts)
+    return rec
+
+
+async def transition_thesis_status(
+    session: AsyncSession,
+    tenant: TenantContext,
+    thesis_id: uuid.UUID,
+    *,
+    new_status: ThesisStatus,
+    r_multiple: Decimal | None = None,
+    facts: dict[str, Any] | None = None,
+) -> Thesis | None:
+    thesis = await session.scalar(
+        select(Thesis).where(
+            Thesis.id == thesis_id,
+            Thesis.tenant_id == tenant.tenant_id,
+            Thesis.workspace_id == tenant.workspace_id,
+        )
+    )
+    if thesis is None:
+        return None
+    rec = await get_recommendation(session, tenant, thesis.recommendation_id)
+    if rec is None:
+        return None
+    thesis.status = new_status
+    await session.flush()
+    from app.services.learning.terminal_hooks import on_thesis_terminal_status
+
+    await on_thesis_terminal_status(
+        session,
+        thesis,
+        rec,
+        new_status=new_status,
+        r_multiple=r_multiple,
+        facts=facts,
+    )
+    return thesis

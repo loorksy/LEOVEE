@@ -75,22 +75,6 @@ def upgrade() -> None:
     )
     trade_direction = sa.Enum("BUY", "SELL", "WAIT", "NO_TRADE", name="trade_direction")
 
-    for enum in (
-        workspace_status,
-        timeframe,
-        recommendation_direction,
-        recommendation_status,
-        thesis_status,
-        trade_status,
-        subscription_status,
-        conversation_mode,
-        conversation_status,
-        message_role,
-        chart_annotation_status,
-        trade_direction,
-    ):
-        enum.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "roles",
         sa.Column("id", sa.Uuid(), nullable=False),

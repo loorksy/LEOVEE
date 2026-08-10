@@ -29,6 +29,38 @@ class Settings(BaseSettings):
     auth_rate_limit_signup: int = Field(default=5, alias="AUTH_RATE_LIMIT_SIGNUP")
     auth_rate_limit_password_reset: int = Field(default=3, alias="AUTH_RATE_LIMIT_PASSWORD_RESET")
 
+    oanda_api_token: str | None = Field(default=None, alias="OANDA_API_TOKEN")
+    oanda_account_id: str | None = Field(default=None, alias="OANDA_ACCOUNT_ID")
+    oanda_environment: str = Field(default="practice", alias="OANDA_ENVIRONMENT")
+    oanda_api_url: str | None = Field(default=None, alias="OANDA_API_URL")
+    oanda_stream_url: str | None = Field(default=None, alias="OANDA_STREAM_URL")
+
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+
+    memory_min_sample: int = Field(default=20, alias="MEMORY_MIN_SAMPLE")
+    strategy_decay_threshold_avg_r: float = Field(
+        default=0.5,
+        alias="STRATEGY_DECAY_THRESHOLD_AVG_R",
+    )
+    strategy_decay_min_trades: int = Field(default=10, alias="STRATEGY_DECAY_MIN_TRADES")
+
+    @property
+    def oanda_rest_base_url(self) -> str:
+        if self.oanda_api_url:
+            return self.oanda_api_url.rstrip("/")
+        if self.oanda_environment == "live":
+            return "https://api-fxtrade.oanda.com"
+        return "https://api-fxpractice.oanda.com"
+
+    @property
+    def oanda_stream_base_url(self) -> str:
+        if self.oanda_stream_url:
+            return self.oanda_stream_url.rstrip("/")
+        if self.oanda_environment == "live":
+            return "https://stream-fxtrade.oanda.com"
+        return "https://stream-fxpractice.oanda.com"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

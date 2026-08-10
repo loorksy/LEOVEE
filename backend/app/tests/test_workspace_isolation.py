@@ -29,8 +29,8 @@ async def test_workspace_isolation_between_users(
     workspace_app: Any,
     db_session: AsyncSession,
 ) -> None:
-    user_a, org_a, _ = await seed_user_org(db_session, email="a@leovee.test", slug="org-a-ws")
-    user_b, org_b, _ = await seed_user_org(db_session, email="b@leovee.test", slug="org-b-ws")
+    user_a, org_a, _ = await seed_user_org(db_session, email="a@example.com", slug="org-a-ws")
+    user_b, org_b, _ = await seed_user_org(db_session, email="b@example.com", slug="org-b-ws")
 
     ws_b = await create_default_workspace(
         db_session,
@@ -56,7 +56,7 @@ async def test_workspace_isolation_between_users(
 async def test_recommendations_scoped_to_workspace(
     db_session: AsyncSession,
 ) -> None:
-    user, org, _ = await seed_user_org(db_session, email="rec@leovee.test", slug="rec-org")
+    user, org, _ = await seed_user_org(db_session, email="rec@example.com", slug="rec-org")
     from app.core.tenant import resolve_tenant_context
 
     ctx = await resolve_tenant_context(db_session, user.id)

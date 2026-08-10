@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, String
+from sqlalchemy import Boolean, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -20,6 +21,6 @@ class Plan(Base, TimestampMixin):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    limits_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    features_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    limits_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    features_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -13,11 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_workspace_context
 from app.core.datetime_utils import utc_now
+from app.core.errors import ProviderConfigurationError
 from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
 from app.models.conversation import Conversation, ConversationMode, Message, MessageRole
 from app.providers.llm.base import LLMMessage
-from app.providers.llm.openai import get_openai_provider
+from app.providers.llm.factory import get_llm_provider
 
 router = APIRouter(prefix="/api/v1/conversations", tags=["chat"])
 
@@ -110,7 +111,13 @@ async def post_message(
     await session.flush()
 
     use_stream = stream or body.stream
-    llm = get_openai_provider(None)
+    try:
+        llm = get_llm_provider()
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     if use_stream:
 
@@ -130,7 +137,7 @@ async def post_message(
             await session.flush()
             payload = {"event": "token", "data": response.content}
             yield f"data: {json.dumps(payload)}\n\n"
-            yield "data: {\"event\": \"done\"}\n\n"
+            yield 'data: {"event": "done"}\n\n'
 
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 

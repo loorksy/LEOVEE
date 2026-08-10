@@ -26,6 +26,9 @@ from app.core.logging import configure_logging
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings = get_settings()
+    from app.core.startup import validate_production_startup
+
+    validate_production_startup(settings)
     if settings.database_url:
         from app.infrastructure.database import get_session_factory
         from app.infrastructure.seed import ensure_platform_seed

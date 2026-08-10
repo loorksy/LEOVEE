@@ -5,7 +5,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -70,12 +71,12 @@ class Message(Base, WorkspaceOwnedMixin):
         nullable=False,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    content_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    content_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     symbol_context: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    chart_context_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    chart_context_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    token_usage_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    token_usage_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     latency_ms: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

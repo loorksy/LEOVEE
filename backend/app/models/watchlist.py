@@ -19,9 +19,7 @@ class Watchlist(Base, TimestampMixin, WorkspaceOwnedMixin):
 
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
-    __table_args__ = (
-        UniqueConstraint("watchlist_id", "symbol_id", name="uq_watchlist_item"),
-    )
+    __table_args__ = (UniqueConstraint("watchlist_id", "symbol_id", name="uq_watchlist_item"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     watchlist_id: Mapped[uuid.UUID] = mapped_column(

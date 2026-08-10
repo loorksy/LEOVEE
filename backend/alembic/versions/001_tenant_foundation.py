@@ -31,9 +31,6 @@ def upgrade() -> None:
         "ORG_MEMBER",
         name="organization_member_role",
     )
-    organization_status.create(op.get_bind(), checkfirst=True)
-    user_status.create(op.get_bind(), checkfirst=True)
-    member_role.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "organizations",

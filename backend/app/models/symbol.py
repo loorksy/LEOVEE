@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, String
+from sqlalchemy import Boolean, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -20,5 +21,5 @@ class Symbol(Base, TimestampMixin):
     pip_location: Mapped[int] = mapped_column(nullable=False, default=4)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     provider_mappings_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+        JSONB, nullable=False, default=dict
     )

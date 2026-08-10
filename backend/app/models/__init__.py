@@ -6,7 +6,16 @@ from app.models.candle import Candle
 from app.models.chart_annotation import ChartAnnotation
 from app.models.conversation import Conversation, Message
 from app.models.feature_flag import FeatureFlag
+from app.models.learning import (
+    AgentRun,
+    AgentTrace,
+    CalibrationBin,
+    OutcomeRecord,
+    StrategyStat,
+    SymbolProfile,
+)
 from app.models.memory import AgentEpisode, AgentMemory, Lesson, MemoryEmbedding
+from app.models.oanda_connection import OandaConnection
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
 from app.models.plan import Plan
@@ -23,9 +32,16 @@ from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 
 __all__ = [
+    "AgentRun",
+    "AgentTrace",
+    "CalibrationBin",
     "AgentEpisode",
-    "AgentMemory",
+    "OutcomeRecord",
+    "OandaConnection",
+    "StrategyStat",
+    "SymbolProfile",
     "AuthToken",
+    "AgentMemory",
     "Base",
     "Candle",
     "ChartAnnotation",

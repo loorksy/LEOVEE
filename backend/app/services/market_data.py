@@ -4,13 +4,14 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.candle import Candle
 from app.models.enums import Timeframe
 from app.models.symbol import Symbol
 from app.providers.market.base import NormalizedCandle
-from app.providers.market.oanda import get_market_provider
+from app.providers.market.oanda import OandaMarketDataProvider, get_market_provider
 
 
 async def get_or_create_symbol(session: AsyncSession, code: str) -> Symbol:
@@ -40,30 +41,37 @@ async def upsert_candles(
         return 0
     inserted = 0
     for candle in candles:
-        existing = await session.scalar(
-            select(Candle).where(
-                Candle.symbol_id == symbol_id,
-                Candle.timeframe == candle.timeframe,
-                Candle.ts == candle.ts,
+        stmt = (
+            insert(Candle)
+            .values(
+                symbol_id=symbol_id,
+                timeframe=candle.timeframe,
+                ts=candle.ts,
+                open=candle.open,
+                high=candle.high,
+                low=candle.low,
+                close=candle.close,
+                volume=candle.volume,
+                complete=candle.complete,
+                source=candle.source,
+                ingested_at=datetime.now(UTC),
+            )
+            .on_conflict_do_update(
+                index_elements=["symbol_id", "timeframe", "ts"],
+                set_={
+                    "open": candle.open,
+                    "high": candle.high,
+                    "low": candle.low,
+                    "close": candle.close,
+                    "volume": candle.volume,
+                    "complete": candle.complete,
+                    "source": candle.source,
+                    "ingested_at": datetime.now(UTC),
+                },
             )
         )
-        if existing is None:
-            session.add(
-                Candle(
-                    symbol_id=symbol_id,
-                    timeframe=candle.timeframe,
-                    ts=candle.ts,
-                    open=candle.open,
-                    high=candle.high,
-                    low=candle.low,
-                    close=candle.close,
-                    volume=candle.volume,
-                    complete=candle.complete,
-                    source=candle.source,
-                    ingested_at=datetime.now(UTC),
-                )
-            )
-            inserted += 1
+        await session.execute(stmt)
+        inserted += 1
     await session.flush()
     return inserted
 
@@ -74,10 +82,11 @@ async def fetch_and_store_candles(
     symbol_code: str,
     timeframe: Timeframe,
     count: int = 100,
+    provider: OandaMarketDataProvider | None = None,
 ) -> tuple[Symbol, list[Candle]]:
     granularity = timeframe.value
-    provider = get_market_provider()
-    normalized = await provider.fetch_candles(symbol_code, granularity=granularity, count=count)
+    market = provider or get_market_provider()
+    normalized = await market.fetch_candles(symbol_code, granularity=granularity, count=count)
     symbol = await get_or_create_symbol(session, symbol_code)
     await upsert_candles(session, symbol.id, normalized)
     result = await session.execute(
