@@ -5,8 +5,10 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
   },
   resolve: {
     alias: {
@@ -31,6 +33,10 @@ export default defineConfig({
       "/health": {
         target: "http://localhost:8000",
         changeOrigin: true,
+      },
+      "/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
       },
     },
   },

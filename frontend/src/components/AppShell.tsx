@@ -1,22 +1,49 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { logout } from "@/api/auth";
+import { useAuth } from "@/hooks/useAuth";
 
 /** LEOVEE_SPEC.md §9 — full sidebar; routes ship incrementally per IMPLEMENTATION_PLAN.md */
 const navItems: { to: string; label: string; disabled?: boolean; phase?: string }[] = [
   { to: "/", label: "Home" },
-  { to: "/analyst", label: "AI Analyst", disabled: true, phase: "26+" },
-  { to: "/chat", label: "Chat", disabled: true, phase: "26" },
+  { to: "/analyst", label: "AI Analyst" },
+  { to: "/chat", label: "Chat" },
   { to: "/markets", label: "Markets", disabled: true, phase: "7–8" },
   { to: "/watchlist", label: "Watchlist", disabled: true, phase: "29" },
-  { to: "/analysis", label: "Analysis", disabled: true, phase: "18–20" },
+  { to: "/analysis", label: "Analysis" },
   { to: "/trades", label: "Trades", disabled: true, phase: "27" },
-  { to: "/recommendations", label: "Recommendations", disabled: true, phase: "19–22" },
+  { to: "/recommendations", label: "Recommendations" },
   { to: "/alerts", label: "Alerts", disabled: true, phase: "30" },
   { to: "/journal", label: "Journal", disabled: true, phase: "31" },
   { to: "/research", label: "Research", disabled: true, phase: "14" },
-  { to: "/memory", label: "Memory", disabled: true, phase: "32" },
+  { to: "/memory", label: "Memory" },
   { to: "/performance", label: "Performance", disabled: true, phase: "33" },
   { to: "/settings", label: "Settings", disabled: true, phase: "38" },
 ];
+
+function AuthStatus() {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  if (!isAuthenticated) {
+    return (
+      <NavLink to="/login" className="mt-4 block text-xs text-leovee-accent hover:underline">
+        Sign in
+      </NavLink>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        logout();
+        navigate("/login", { replace: true });
+      }}
+      className="mt-4 text-left text-xs text-slate-500 hover:text-slate-300"
+    >
+      Sign out
+    </button>
+  );
+}
 
 export function AppShell() {
   return (
@@ -45,7 +72,10 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <p className="mt-auto text-xs text-slate-500">Spec §9 nav · routes roll out by phase</p>
+        <div className="mt-auto">
+          <p className="text-xs text-slate-500">Spec §9 nav · routes roll out by phase</p>
+          <AuthStatus />
+        </div>
       </aside>
       <main className="flex flex-1 flex-col">
         <Outlet />

@@ -504,20 +504,20 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 16 | **PARTIAL** | OpenAI provider exists; dedicated §99 + stream/tools gaps |
 | 17 | **PARTIAL** | ModelRouter + fallback config; fallback/rate-limit tests thin |
 | 18 | **CODE-DONE** | Reasoning + adversarial + tests |
-| 19 | **CODE-DONE** | Decision path via analysis pipeline |
+| 19 | **CODE-DONE** | Decision path via analysis pipeline; `AnalysisPage` routed at `/analysis` (Batch 3) |
 | 20 | **CODE-DONE** | Memory foundation + hybrid recall; decay job now real |
 | 21 | **CODE-DONE** | Learning pipeline + worker |
 | 22 | **CODE-DONE** | Thesis monitor job + unit/integration |
 | 23 | **CODE-DONE** | Chart semantic engine + API/WS |
-| 24 | **PARTIAL** | KLineChart adapter/tests; no app route |
-| 25 | **PARTIAL** | Annotation renderer/tests; no app route / live WS UI |
-| 26 | **PARTIAL** | Chat API + RECALL; no Chat UI route; SSE not provider-native |
-| 27 | **PARTIAL** | Recommendations API + card component unwired |
+| 24 | **CODE-DONE** | KLineChart adapter/tests; `ChartPage` routed at `/analyst` (Batch 3) |
+| 25 | **CODE-DONE** | Annotation renderer/tests; `ChartPage` subscribes to `/ws/v1/stream?channels=annotations` for incremental updates (Batch 3) |
+| 26 | **CODE-DONE** | Chat API + RECALL; `ChatPage` routed at `/chat` with RECALL panel (Batch 3); SSE still not provider-native |
+| 27 | **CODE-DONE** | Recommendations API + `RecommendationsPage` routed at `/recommendations` (Batch 3) |
 | 28 | **CODE-DONE** | Trades idea CRUD + execution gate |
 | 29 | **PARTIAL** | Watchlist API; no UI / realtime quote surface |
 | 30 | **PARTIAL** | Alerts API + mock trigger; no market-driven fan-out worker UI |
 | 31 | **PARTIAL** | Journal API + promote; no UI |
-| 32 | **PARTIAL** | Memory API + `MemoryPanel` unwired |
+| 32 | **CODE-DONE** | Memory API + `MemoryPanel` wired at `/memory`; delete triggers recompute stats display (Batch 3) |
 | 33 | **PARTIAL** | Performance API + dashboard component unwired |
 | 34 | **PARTIAL** | MCP in-process on API; not separate compose service |
 | 35 | **PARTIAL** | Manifests served; ext-apps packaging incomplete |
