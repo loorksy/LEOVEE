@@ -16,6 +16,7 @@ from app.models.learning import (
 )
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
 from app.models.memory import AgentEpisode, AgentMemory, Lesson, MemoryEmbedding
+from app.models.news import NewsEvent, ResearchItem
 from app.models.oanda_connection import OandaConnection
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
@@ -54,11 +55,13 @@ __all__ = [
     "Message",
     "PriceZone",
     "Structure",
+    "NewsEvent",
     "Organization",
     "OrganizationMember",
     "Permission",
     "Plan",
     "Recommendation",
+    "ResearchItem",
     "Role",
     "RolePermission",
     "Session",

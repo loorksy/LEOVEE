@@ -70,6 +70,24 @@ async def candle_retention_job(_ctx: dict[str, object]) -> str:
     return f"candle_retention_ok:{deleted}"
 
 
+async def news_ingestion_job(_ctx: dict[str, object]) -> str:
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.providers.news.finnhub import get_news_provider
+    from app.services.news_service import ingest_news_from_provider
+
+    try:
+        provider = get_news_provider()
+    except Exception as exc:
+        return f"news_ingestion_skipped:{type(exc).__name__}"
+
+    async with factory() as session:
+        count = await ingest_news_from_provider(session, provider, currency="USD")
+        await session.commit()
+    return f"news_ingestion_ok:{count}"
+
+
 async def memory_decay_job(_ctx: dict[str, object]) -> str:
     """Placeholder for memory aging sweeps (invoked on schedule)."""
     return "memory_decay_ok"
@@ -81,12 +99,14 @@ class WorkerSettings:
         oanda_stream_consumer_job,
         candle_backfill_job,
         candle_retention_job,
+        news_ingestion_job,
         memory_decay_job,
     ]
     cron_jobs = [
         cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
         cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
+        cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
     ]
 

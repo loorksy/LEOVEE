@@ -6,7 +6,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -27,29 +27,34 @@ class _ReconnectStreamManager(OandaStreamManager):
         *,
         backfill_candles: list[NormalizedCandle],
         tick: PriceTick,
+        partial_tick: PriceTick | None = None,
     ) -> None:
         settings = Settings(OANDA_API_TOKEN="token", OANDA_ACCOUNT_ID="acct")
         super().__init__(settings, ["EURUSD"])
-        self._pending_tick = tick
+        self._backfill_candles = backfill_candles
+        self._pending_ticks = [t for t in (partial_tick, tick) if t is not None]
         self._rest.fetch_candles = AsyncMock(return_value=backfill_candles)  # type: ignore[method-assign]
         self._last_tick_ts[tick.symbol] = tick.ts - timedelta(minutes=5)
 
     async def ticks_with_fallback(self) -> AsyncIterator[PriceTick]:
         self._connected = True
-        yield self._pending_tick
+        for pending in self._pending_ticks:
+            yield pending
 
     async def backfill_gaps(self, symbol: str) -> list[datetime]:
-        tick_ts = self._pending_tick.ts
+        tick_ts = self._pending_ticks[-1].ts
         return [tick_ts - timedelta(minutes=2), tick_ts - timedelta(minutes=1)]
 
 
 @pytest.mark.asyncio
 async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: AsyncSession) -> None:
     """
-    §99: stream reconnect triggers REST backfill; recovered window has no M1 gaps.
+    §99: reconnect → REST backfill; no gaps, no duplicate buckets; boundary partial candle.
     """
     settings = Settings(OANDA_API_TOKEN="token", OANDA_ACCOUNT_ID="acct")
     anchor = datetime(2026, 3, 1, 12, 5, 10, tzinfo=UTC)
+    partial_ts = anchor - timedelta(seconds=30)
+    partial = PriceTick("EURUSD", Decimal("1.0950"), Decimal("1.0952"), partial_ts)
     tick = PriceTick("EURUSD", Decimal("1.1000"), Decimal("1.1002"), anchor)
 
     backfill: list[NormalizedCandle] = []
@@ -71,9 +76,26 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
             )
         )
 
-    manager = _ReconnectStreamManager(backfill_candles=backfill, tick=tick)
+    backfill.append(
+        NormalizedCandle(
+            symbol="EURUSD",
+            timeframe=Timeframe.M1,
+            ts=anchor.replace(minute=4, second=0, microsecond=0),
+            open=Decimal("1.099"),
+            high=Decimal("1.0995"),
+            low=Decimal("1.0985"),
+            close=Decimal("1.0992"),
+            volume=Decimal("0"),
+            complete=False,
+            source="oanda_rest_mock_boundary",
+        )
+    )
+
+    manager = _ReconnectStreamManager(
+        backfill_candles=backfill, tick=tick, partial_tick=partial
+    )
     consumer = OandaCandleStreamConsumer(settings, ["EURUSD"], stream_manager=manager)
-    stats = await consumer.run_cycle(db_session, max_ticks=1)
+    stats = await consumer.run_cycle(db_session, max_ticks=2)
 
     assert stats["backfill_rows"] >= len(backfill)
 
@@ -81,5 +103,18 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
         select(Candle).where(Candle.timeframe == Timeframe.M1).order_by(Candle.ts.asc())
     )
     candles = list(rows.scalars().all())
-    assert len(candles) >= len(backfill)
-    assert assert_gapless_series(candles[: len(backfill)], timeframe=Timeframe.M1)
+    backfill_rows = sorted(
+        [c for c in candles if c.source == "oanda_rest_mock"],
+        key=lambda c: c.ts,
+    )
+    assert len(backfill_rows) >= 4
+    assert assert_gapless_series(backfill_rows[:4], timeframe=Timeframe.M1)
+
+    distinct_buckets = await db_session.scalar(
+        select(func.count(func.distinct(Candle.ts))).where(Candle.timeframe == Timeframe.M1)
+    )
+    assert distinct_buckets == len(candles)
+
+    boundary_rows = [c for c in candles if c.source == "oanda_rest_mock_boundary"]
+    if boundary_rows:
+        assert boundary_rows[0].complete is False

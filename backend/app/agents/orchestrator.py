@@ -8,6 +8,8 @@ from typing import Any
 from app.core.errors import ProviderConfigurationError
 from app.engines.decision import run_decision_engine
 from app.engines.liquidity import run_liquidity_engine
+from app.engines.market_intelligence import run_market_intelligence_engine
+from app.engines.mtf import run_mtf_engine
 from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
 from app.engines.structure import run_structure_engine
@@ -37,6 +39,7 @@ async def run_analysis_orchestrator(
     candles: list[Any],
     memories: list[dict[str, Any]] | None = None,
     llm: LLMProvider | None = None,
+    mtf_context: dict[str, Any] | None = None,
 ) -> OrchestratorResult:
     if not candles:
         raise ValueError("Analysis requires at least one stored candle")
@@ -57,6 +60,14 @@ async def run_analysis_orchestrator(
     risk = run_risk_engine(entry=entry, stop=stop)
     decision = run_decision_engine(scenarios, risk)
 
+    intelligence = run_market_intelligence_engine(bars)
+    if mtf_context and "mtf" in mtf_context:
+        mtf = mtf_context["mtf"]
+        intelligence_by_tf = mtf_context.get("intelligence_by_tf", {})
+    else:
+        intelligence_by_tf = {"H1": intelligence}
+        mtf = run_mtf_engine(intelligence_by_tf)
+
     engines = {
         "volatility": volatility,
         "structure": structure,
@@ -64,6 +75,9 @@ async def run_analysis_orchestrator(
         "zones": zones,
         "scenarios": scenarios,
         "risk": risk,
+        "market_intelligence": intelligence,
+        "mtf": mtf,
+        "intelligence_by_tf": intelligence_by_tf,
     }
 
     narrative: dict[str, Any] = {}
