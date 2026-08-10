@@ -12,7 +12,7 @@ from app.core.tenant import resolve_tenant_context
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import Timeframe
 from app.models.market_artifacts import MarketEvent
-from app.models.recommendation import Recommendation, Thesis
+from app.models.recommendation import Thesis
 from app.providers.market.base import NormalizedCandle
 from app.services.analysis_pipeline import run_analysis_pipeline
 from app.services.recommendation_service import get_recommendation

@@ -52,7 +52,7 @@ async def test_analysis_never_uses_synthetic_provider_candles(db_session: AsyncS
             db_session,
             symbol_code="EURUSD",
             timeframe=Timeframe.H1,
-            provider=fake,  # type: ignore[arg-type]
+            provider=fake,
         )
 
 

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
     memory_min_sample: int = Field(default=20, alias="MEMORY_MIN_SAMPLE")
     strategy_decay_threshold_avg_r: float = Field(

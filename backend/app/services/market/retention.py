@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-
 from typing import Any, cast
 
 from sqlalchemy import delete

@@ -10,6 +10,7 @@ from app.models.enums import RecommendationDirection, RecommendationStatus, Time
 from app.providers.market.base import MarketDataProvider
 from app.services import market_data
 from app.services.market.engine_persistence import persist_engine_outputs
+from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol
 
 
@@ -43,10 +44,16 @@ async def run_analysis(
         workspace_id=tenant.workspace_id,
         symbol=symbol,
     )
+    mtf_snapshot = await build_mtf_intelligence(
+        session,
+        symbol=symbol,
+        provider=market_provider,
+    )
     result = await run_analysis_orchestrator(
         symbol=symbol,
         candles=candles,
         memories=memories,
+        mtf_context=mtf_snapshot,
     )
     payload: dict[str, Any] = {
         "agent_run_id": str(result.agent_run_id),

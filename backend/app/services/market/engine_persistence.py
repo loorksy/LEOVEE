@@ -68,6 +68,34 @@ async def persist_engine_outputs(
         )
         counts["market_events"] += 1
 
+    intelligence = engines.get("market_intelligence") or {}
+    if intelligence:
+        session.add(
+            MarketEvent(
+                symbol_id=symbol_id,
+                timeframe=timeframe,
+                event_type="MARKET_INTELLIGENCE",
+                ts=ts,
+                confidence=Decimal(str(intelligence.get("confidence", 0.5))),
+                evidence_json=intelligence,
+            )
+        )
+        counts["market_events"] += 1
+
+    mtf = engines.get("mtf") or {}
+    if mtf:
+        session.add(
+            MarketEvent(
+                symbol_id=symbol_id,
+                timeframe=timeframe,
+                event_type="MTF_ALIGNMENT",
+                ts=ts,
+                confidence=Decimal("0.55"),
+                evidence_json=mtf,
+            )
+        )
+        counts["market_events"] += 1
+
     liquidity = engines.get("liquidity") or {}
     for sweep in liquidity.get("sweeps") or []:
         session.add(
