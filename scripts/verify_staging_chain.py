@@ -142,6 +142,11 @@ def main() -> int:
         print("FAIL: thesis not created", file=sys.stderr)
         return 1
     print("OK: staging chain verified")
+    subprocess.run(
+        [f"{COMPOSE_DIR}/scripts/enqueue_staging_worker_job.sh", "thesis_monitor_job"],
+        cwd=COMPOSE_DIR,
+        check=False,
+    )
     return 0
 
 

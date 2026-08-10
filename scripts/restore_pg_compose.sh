@@ -8,6 +8,7 @@ cd "${ROOT}"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.staging.yml -f docker-compose.agent.yml"
 BACKUP_FILE="${1:?Usage: restore_pg_compose.sh <backup.dump> [scratch_db_name]}"
 SCRATCH_DB="${2:-leovee_restore_test}"
+SOURCE_DB="${SOURCE_DB:-leovee}"
 
 if [[ "${BACKUP_FILE}" == "--dry-run" ]]; then
   echo "[restore] dry-run: create ${SCRATCH_DB}, pg_restore into scratch DB"
@@ -22,8 +23,20 @@ docker compose ${COMPOSE_FILES} exec -T postgres psql -U leovee -d postgres -v O
 docker compose ${COMPOSE_FILES} exec -T postgres \
   pg_restore --clean --if-exists -U leovee -d "${SCRATCH_DB}" <"${BACKUP_FILE}"
 
+COUNT_SQL="
+SELECT 'candles' AS tbl, COUNT(*)::bigint AS n FROM candles
+UNION ALL SELECT 'agent_memories', COUNT(*)::bigint FROM agent_memories
+UNION ALL SELECT 'memory_embeddings', COUNT(*)::bigint FROM memory_embeddings;
+"
+
+echo "[restore] source ${SOURCE_DB} row counts:"
+docker compose ${COMPOSE_FILES} exec -T postgres psql -U leovee -d "${SOURCE_DB}" -v ON_ERROR_STOP=1 -c "${COUNT_SQL}"
+
+echo "[restore] scratch ${SCRATCH_DB} row counts:"
+docker compose ${COMPOSE_FILES} exec -T postgres psql -U leovee -d "${SCRATCH_DB}" -v ON_ERROR_STOP=1 -c "${COUNT_SQL}"
+
 docker compose ${COMPOSE_FILES} exec -T postgres psql -U leovee -d "${SCRATCH_DB}" -v ON_ERROR_STOP=1 \
   -c "SELECT extname FROM pg_extension WHERE extname = 'vector';" \
   -c "SELECT COUNT(*) AS alembic_versions FROM alembic_version;"
 
-echo "[restore] verified scratch database ${SCRATCH_DB}"
+echo "[restore] verified scratch database ${SCRATCH_DB} (compare counts above)"

@@ -2,7 +2,6 @@
 # Set LEOVEE_DOMAIN (e.g. staging.leovee.lork.cloud) and ACME_EMAIL in the Caddy service env.
 {
 	email {$ACME_EMAIL:admin@lork.cloud}
-	auto_https disable_redirects
 }
 
 {$LEOVEE_DOMAIN} {

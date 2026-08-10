@@ -57,6 +57,8 @@ flowchart TB
 
 **Exit:** `docker compose up` starts postgres, redis, api shell, web shell.
 
+**UI (LEOVEE_SPEC §9):** The shell sidebar lists all 14 primary sections (plus Backtesting/Replay/Billing later). Only **Home** is routed in Phase 2; other items stay disabled until their implementation phases (e.g. Chat → Phase 26, Watchlist → 29, Memory UI → 32). This is intentional scaffolding, not a spec omission.
+
 ---
 
 ### Phase 3 — Multi-tenant foundation

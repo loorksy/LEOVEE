@@ -28,6 +28,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ""),
       },
+      "/health": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });
