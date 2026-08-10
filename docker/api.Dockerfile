@@ -13,8 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/pyproject.toml backend/README.md ./
+COPY backend/pyproject.toml backend/README.md backend/alembic.ini ./
 COPY backend/app ./app
+COPY backend/alembic ./alembic
 
 RUN pip install --upgrade pip && pip install .
 

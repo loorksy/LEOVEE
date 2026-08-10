@@ -3,9 +3,9 @@ from typing import Any
 from fastapi import APIRouter
 from redis.asyncio import Redis
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.core.config import get_settings
+from app.infrastructure.database import get_engine
 
 router = APIRouter(tags=["health"])
 
@@ -23,18 +23,16 @@ async def _check_redis(redis_url: str) -> tuple[bool, str | None]:
             await client.close()
 
 
-async def _check_database(database_url: str) -> tuple[bool, str | None]:
-    engine: AsyncEngine | None = None
+async def _check_database() -> tuple[bool, str | None]:
+    engine = get_engine()
+    if engine is None:
+        return False, "DATABASE_URL is not configured"
     try:
-        engine = create_async_engine(database_url, pool_pre_ping=True)
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True, None
     except Exception as exc:  # noqa: BLE001 — health probe
         return False, str(exc)
-    finally:
-        if engine is not None:
-            await engine.dispose()
 
 
 @router.get("/health/live")
@@ -49,7 +47,7 @@ async def readiness() -> dict[str, Any]:
     healthy = True
 
     if settings.database_url:
-        ok, err = await _check_database(settings.database_url)
+        ok, err = await _check_database()
         checks["database"] = {"ok": ok, "error": err}
         healthy = healthy and ok
     else:
@@ -67,4 +65,4 @@ async def readiness() -> dict[str, Any]:
 
 @router.get("/health/startup")
 async def startup() -> dict[str, str]:
-    return {"status": "ok", "migrations": "pending"}
+    return {"status": "ok", "migrations": "alembic"}
