@@ -62,6 +62,7 @@ class OandaCandleStreamConsumer:
             candle.symbol,
             {
                 "event": "candle",
+                "channel": "watchlist",
                 "symbol": candle.symbol,
                 "timeframe": normalized.timeframe.value,
                 "ts": candle.ts.isoformat(),
