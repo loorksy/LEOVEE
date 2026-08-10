@@ -1,15 +1,18 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api import websocket as ws_router
 from app.api.routes import (
+    admin,
     alerts,
     analysis,
     auth,
+    billing,
     chart,
     chat,
     health,
@@ -29,6 +32,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.services.entitlement_service import EntitlementError
 
 
 @asynccontextmanager
@@ -64,8 +68,21 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @application.exception_handler(EntitlementError)
+    async def _entitlement_error_handler(
+        _request: Request,
+        exc: EntitlementError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc), "code": exc.code},
+        )
+
     application.include_router(health.router)
     application.include_router(auth.router)
+    application.include_router(admin.router)
+    application.include_router(billing.router)
     application.include_router(tenant.router)
     application.include_router(workspaces.router)
     application.include_router(markets.router)

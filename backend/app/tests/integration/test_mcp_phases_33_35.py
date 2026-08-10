@@ -92,7 +92,7 @@ async def test_mcp_invoke_writes_audit_and_usage(db_session: AsyncSession) -> No
     await bind_workspace_rls(db_session, ctx)
     audits = await db_session.execute(select(McpAuditEvent))
     assert len(audits.scalars().all()) >= 1
-    usage = await db_session.execute(select(UsageRecord).where(UsageRecord.metric == "mcp_calls"))
+    usage = await db_session.execute(select(UsageRecord).where(UsageRecord.metric == "mcp.call"))
     assert len(usage.scalars().all()) >= 1
 
 

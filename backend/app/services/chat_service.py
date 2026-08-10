@@ -12,6 +12,7 @@ from app.core.datetime_utils import utc_now
 from app.core.tenant import TenantContext
 from app.models.conversation import Conversation, Message, MessageRole
 from app.providers.llm.base import LLMMessage, LLMProvider
+from app.services import entitlement_service
 from app.services.chat_actions import propose_chat_actions
 from app.services.memory_service import retrieve_memories_hybrid
 
@@ -130,6 +131,7 @@ async def run_chat_turn(
     user_content: str,
     llm: LLMProvider,
 ) -> ChatTurnResult:
+    await entitlement_service.check_metric_limit(session, tenant, "chat.send")
     recall = await build_recall_bundle(
         session,
         tenant,
@@ -173,6 +175,7 @@ async def run_chat_turn(
     session.add(assistant)
     conversation.last_message_at = utc_now()
     await session.flush()
+    await entitlement_service.record_usage(session, tenant, "chat.send")
     return ChatTurnResult(
         user_message=user_msg,
         assistant_message=assistant,

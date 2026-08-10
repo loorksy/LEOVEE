@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,8 +10,12 @@ from app.core.datetime_utils import utc_now
 from app.core.tenant import TenantContext
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.mcp import McpAuditEvent, McpSession
-from app.models.usage_record import UsageRecord
-from app.services import chart_semantic_service, market_data, recommendation_service
+from app.services import (
+    chart_semantic_service,
+    entitlement_service,
+    market_data,
+    recommendation_service,
+)
 
 
 class McpToolError(Exception):
@@ -76,27 +78,6 @@ async def record_audit(
     return event
 
 
-async def increment_usage(
-    session: AsyncSession,
-    tenant: TenantContext,
-    *,
-    tool_name: str,
-) -> None:
-    now = datetime.now(UTC)
-    period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    record = UsageRecord(
-        tenant_id=tenant.tenant_id,
-        workspace_id=tenant.workspace_id,
-        metric="mcp_calls",
-        quantity=Decimal("1"),
-        period_start=period_start,
-        period_end=now,
-        metadata_json={"tool": tool_name},
-    )
-    session.add(record)
-    await session.flush()
-
-
 async def invoke_tool(
     session: AsyncSession,
     tenant: TenantContext,
@@ -107,6 +88,8 @@ async def invoke_tool(
 ) -> dict[str, Any]:
     if tool_name not in TOOL_NAMES:
         raise McpToolError("NOT_FOUND", f"Unknown tool: {tool_name}")
+
+    await entitlement_service.check_metric_limit(session, tenant, "mcp.call")
 
     started = time.perf_counter()
     try:
@@ -124,7 +107,12 @@ async def invoke_tool(
         session_id=mcp_session_id,
         metadata={"arguments": arguments},
     )
-    await increment_usage(session, tenant, tool_name=tool_name)
+    await entitlement_service.record_usage(
+        session,
+        tenant,
+        "mcp.call",
+        metadata={"tool": tool_name},
+    )
     return {"schema_version": 1, "tool": tool_name, "result": payload}
 
 

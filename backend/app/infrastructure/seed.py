@@ -51,6 +51,7 @@ ROLE_PERMISSION_MAP: dict[str, list[str]] = {
 FREE_PLAN_LIMITS = {
     "messages_per_month": 100,
     "analysis_runs_per_month": 20,
+    "mcp_calls_per_month": 200,
     "memory_depth": 50,
 }
 

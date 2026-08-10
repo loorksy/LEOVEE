@@ -9,7 +9,7 @@ from app.core.tenant import TenantContext
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
 from app.providers.market.base import MarketDataProvider
-from app.services import market_data, recommendation_service
+from app.services import entitlement_service, market_data, recommendation_service
 from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol
@@ -34,6 +34,7 @@ async def run_analysis(
     market_provider: MarketDataProvider | None = None,
     complete_pipeline: bool = False,
 ) -> dict[str, Any]:
+    await entitlement_service.check_metric_limit(session, tenant, "analysis.run")
     symbol_row, candles = await market_data.fetch_and_store_candles(
         session,
         symbol_code=symbol,
@@ -117,4 +118,5 @@ async def run_analysis(
         payload["recommendation_id"] = str(rec.id)
         payload["thesis_id"] = str(thesis.id)
 
+    await entitlement_service.record_usage(session, tenant, "analysis.run")
     return payload
