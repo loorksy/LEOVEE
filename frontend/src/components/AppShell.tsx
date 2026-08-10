@@ -17,6 +17,7 @@ const navItems: { to: string; label: string; disabled?: boolean; phase?: string 
   { to: "/research", label: "Research", disabled: true, phase: "14" },
   { to: "/memory", label: "Memory" },
   { to: "/performance", label: "Performance" },
+  { to: "/admin", label: "Admin" },
   { to: "/settings", label: "Settings", disabled: true, phase: "38" },
 ];
 

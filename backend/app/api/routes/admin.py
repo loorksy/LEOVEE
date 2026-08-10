@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.admin_deps import require_platform_admin, require_support_audit
+from app.api.admin_deps import describe_admin_access, require_platform_admin, require_support_audit
+from app.api.deps import get_workspace_context
 from app.core.tenant import TenantContext
 from app.core.tenant_rls import bind_workspace_rls
 from app.infrastructure.database import get_db_session
@@ -18,6 +19,15 @@ from app.models.user import User
 from app.models.workspace import Workspace
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+@router.get("/me")
+async def admin_my_access(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, object]:
+    """Never 403s — lets the UI render the permission matrix for any member."""
+    return await describe_admin_access(session, tenant)
 
 
 @router.get("/audit/summary")

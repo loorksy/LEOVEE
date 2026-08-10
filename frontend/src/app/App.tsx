@@ -13,6 +13,7 @@ import { WatchlistPage } from "@/features/watchlist/WatchlistPage";
 import { AlertsPage } from "@/features/alerts/AlertsPage";
 import { JournalPage } from "@/features/journal/JournalPage";
 import { PerformancePage } from "@/features/performance/PerformancePage";
+import { AdminPage } from "@/features/admin/AdminPage";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ export function App() {
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/journal" element={<JournalPage />} />
               <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

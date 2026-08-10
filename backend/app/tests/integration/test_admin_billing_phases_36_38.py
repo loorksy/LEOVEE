@@ -47,6 +47,69 @@ async def _set_workspace_role(
 
 
 @pytest.mark.asyncio
+async def test_admin_me_reflects_permission_matrix_for_each_role(db_session: AsyncSession) -> None:
+    """`/admin/me` never 403s — the UI permission matrix relies on its capability flags."""
+    user, org, _ = await seed_user_org(
+        db_session, email="matrix-user@example.com", slug="matrix-user"
+    )
+    ctx = await resolve_tenant_context(db_session, user.id)
+    assert ctx.workspace_id is not None
+    await db_session.commit()
+
+    async def override_user() -> uuid.UUID:
+        return user.id
+
+    async def override_session() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_current_user_id] = override_user
+    app.dependency_overrides[get_db_session] = override_session
+    transport = ASGITransport(app=app)
+    headers = {
+        "X-Tenant-Id": str(org.id),
+        "X-Workspace-Id": str(ctx.workspace_id),
+    }
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            default_response = await client.get("/api/v1/admin/me", headers=headers)
+            assert default_response.status_code == 200
+            default_body = default_response.json()
+            assert default_body["role"] == "USER"
+            assert default_body["is_support"] is False
+            assert default_body["is_platform_admin"] is False
+
+            await _set_workspace_role(
+                db_session,
+                workspace_id=ctx.workspace_id,
+                user_id=user.id,
+                role_code="SUPPORT",
+            )
+            await db_session.commit()
+            support_response = await client.get("/api/v1/admin/me", headers=headers)
+            assert support_response.status_code == 200
+            support_body = support_response.json()
+            assert support_body["role"] == "SUPPORT"
+            assert support_body["is_support"] is True
+            assert support_body["is_platform_admin"] is False
+
+            await _set_workspace_role(
+                db_session,
+                workspace_id=ctx.workspace_id,
+                user_id=user.id,
+                role_code="ADMIN",
+            )
+            await db_session.commit()
+            admin_response = await client.get("/api/v1/admin/me", headers=headers)
+            assert admin_response.status_code == 200
+            admin_body = admin_response.json()
+            assert admin_body["role"] == "ADMIN"
+            assert admin_body["is_support"] is True
+            assert admin_body["is_platform_admin"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
 async def test_support_cannot_list_admin_conversations(db_session: AsyncSession) -> None:
     user, org, _ = await seed_user_org(
         db_session,

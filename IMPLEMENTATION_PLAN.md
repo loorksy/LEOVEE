@@ -521,9 +521,9 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 33 | **COMPLETE** | Performance API + `PerformanceDashboard` routed at `/performance` via `PerformancePage`, calibration curve from `/api/v1/performance/summary`; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_33_35.md` (Batch 4) |
 | 34 | **CODE-DONE** | `leovee-mcp` compose service (`docker/mcp.Dockerfile`, port 8001) + HTTP bridge |
 | 35 | **CODE-DONE** | `ext-apps/` manifests with CSP + workspace binding; Caddy routes `/api/v1/mcp/*` |
-| 36 | **PARTIAL** | Admin API; entitlements panel unwired |
-| 37 | **CODE-DONE** | Manual billing default; Stripe test adapter |
-| 38 | **CODE-DONE** | Entitlement hard limits on analysis/chat/MCP |
+| 36 | **CODE-DONE** | Admin API (`/admin/me`, `/audit/summary`, `/overview`, `/conversations`, `/observability/agent-runs`); `AdminPage` routed at `/admin` with `AdminEntitlementsPanel` + `AdminOverviewPanel`/`AdminConversationsPanel`/`AdminObservabilityPanel`; UI permission matrix via `useAdminAccess`/`/admin/me` hides support-only vs platform-admin sections client-side ahead of backend 403s (Batch 6); not all 28 spec §36 sections implemented — remaining sections are future scope, checklist evidence in `docs/CHECKLIST_PR_36_38.md` |
+| 37 | **CODE-DONE** | Manual billing default; Stripe test adapter; entitlements now visible in UI via `AdminEntitlementsPanel` at `/admin` for every workspace member (Batch 6); Stripe checkout UI still not wired |
+| 38 | **COMPLETE** | Entitlement hard limits on analysis/chat/MCP; isolated unit-level hard-limit tests per metric (`backend/app/tests/test_entitlement_hard_limits.py`, Batch 6) plus integration coverage in `test_admin_billing_phases_36_38.py`; limits are enforced on the already-routed Analysis/Chat/MCP surfaces |
 | 39 | **CODE-DONE** | Request ID, metrics, Sentry bridge (DSN owner) |
 | 40 | **PARTIAL** | Headers/API keys; `/metrics` still public at edge |
 | 41 | **PARTIAL** | Replay API + panel unwired |
