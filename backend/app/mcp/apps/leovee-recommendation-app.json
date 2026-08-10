@@ -1,0 +1,15 @@
+{
+  "id": "leovee-recommendation-app",
+  "name": "Leovee Recommendation",
+  "version": "1.0.0",
+  "description": "Recommendation card and thesis context",
+  "api": {
+    "baseUrl": "/api/v1",
+    "auth": "bearer"
+  },
+  "resources": {
+    "recommendation": "GET /recommendations/{id}?card=true",
+    "theses": "GET /theses"
+  },
+  "contentSecurityPolicy": "default-src 'self'; script-src 'self' https://cdn.leovee.app; connect-src 'self' https://api.leovee.app; frame-ancestors 'none';"
+}

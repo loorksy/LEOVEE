@@ -1,0 +1,15 @@
+{
+  "id": "leovee-chart-app",
+  "name": "Leovee Chart",
+  "version": "1.0.0",
+  "description": "KLineChart-powered semantic annotations via Leovee API",
+  "api": {
+    "baseUrl": "/api/v1",
+    "auth": "bearer"
+  },
+  "resources": {
+    "candles": "GET /markets/{symbol}/candles",
+    "annotations": "GET /chart/annotations"
+  },
+  "contentSecurityPolicy": "default-src 'self'; script-src 'self' https://cdn.leovee.app; connect-src 'self' https://api.leovee.app; frame-ancestors 'none';"
+}
