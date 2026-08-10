@@ -20,6 +20,22 @@ class AnalysisRunRequest(BaseModel):
     timeframe: Timeframe = Timeframe.H1
 
 
+@router.post("/pipeline")
+async def run_analysis_pipeline_endpoint(
+    body: AnalysisRunRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
+    from app.services.analysis_pipeline import run_analysis_pipeline
+
+    return await run_analysis_pipeline(
+        session,
+        tenant,
+        symbol=body.symbol.upper(),
+        timeframe=body.timeframe,
+    )
+
+
 @router.post("/run")
 async def run_analysis_endpoint(
     body: AnalysisRunRequest,

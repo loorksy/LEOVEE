@@ -16,7 +16,7 @@
 - [x] `OandaCandleStreamConsumer` + Arq `oanda_stream_consumer_job` (stream → aggregate → persist → `CandleBroadcaster`)
 - [x] Reconnect triggers REST `persist_backfill` via `OandaStreamManager`
 - [x] WebSocket `/ws/v1/stream?symbols=EURUSD` fans out published candles (Redis optional)
-- [ ] Full §99 stream disconnect → fallback → backfill HTTP mock integration (follow-up PR)
+- [x] Full §99 stream disconnect → fallback → backfill HTTP mock integration (`test_stream_disconnect_backfill.py`)
 
 ## Deferred (not on this branch)
 - Post–phase-22 route modules live on branch `cursor/post-phase-22-deferred-199e` (from prior corrective snapshot).

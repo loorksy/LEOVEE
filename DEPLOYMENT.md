@@ -340,6 +340,41 @@ Use `.env` from `.env.example`.
 
 ---
 
+## 16.1 VPS test environment (optional)
+
+Use a **disposable VPS** only for manual integration checks; **CI and default developer tests do not require a VPS**.
+
+| Rule | Configuration |
+|------|----------------|
+| 1. Broker credentials | **OANDA practice (demo) only.** Set `OANDA_ENVIRONMENT=practice` and `OANDA_API_TOKEN` from env on the VPS. Never store live `api-fxtrade.oanda.com` tokens or hosts. |
+| 2. Secrets | Load from VPS env / secret manager only. Do not commit `.env`. Do not log tokens (even truncated). Run `scripts/check_no_committed_secrets.sh` before push. |
+| 3. Database | Isolated Postgres instance; `DATABASE_MIGRATION_URL` for `alembic upgrade head`; `DATABASE_URL` as `leovee_app`. Never point at production or shared DBs. |
+| 4. Guarantees | No SQLite fallback, no synthetic providers in app code, no BYPASSRLS/superuser for the app role, no RLS weakening for tests. |
+| 5. LLM | Tests use stubs in `backend/app/tests/doubles/`. No live model sweeps; optional single smoke test only with documented cost. |
+| 6. Tear-down | `docker compose down -v` (or drop test DB) after runs. Document commands below. |
+| 7. Firewall | Expose **443/80** (API) only if needed; **do not** expose Postgres (5432) or Redis (6379) publicly. |
+
+**Services (docker-compose on VPS):** `postgres`, `redis`, `api`, `worker` — same as §4.
+
+**Run backend tests on VPS:**
+
+```bash
+export TEST_DATABASE_MIGRATION_URL="postgresql+asyncpg://postgres:<pw>@127.0.0.1:5432/leovee_vps_test"
+export TEST_DATABASE_URL="postgresql+asyncpg://leovee_app:leovee_app@127.0.0.1:5432/leovee_vps_test"
+cd backend && pip install -e ".[dev]" && alembic upgrade head && pytest
+```
+
+**Tear-down:**
+
+```bash
+docker compose down -v
+# or: dropdb leovee_vps_test
+```
+
+**Before any test touching OANDA practice API:** confirm rules 1–7 on the VPS (practice token only, isolated DB, firewall, no secrets in repo).
+
+---
+
 ## 17. Launch readiness checklist (Phase 43)
 
 - [ ] All health endpoints green

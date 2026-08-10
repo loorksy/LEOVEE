@@ -14,6 +14,7 @@ from app.models.learning import (
     StrategyStat,
     SymbolProfile,
 )
+from app.models.market_artifacts import MarketEvent, PriceZone, Structure
 from app.models.memory import AgentEpisode, AgentMemory, Lesson, MemoryEmbedding
 from app.models.oanda_connection import OandaConnection
 from app.models.organization import Organization
@@ -49,7 +50,10 @@ __all__ = [
     "FeatureFlag",
     "Lesson",
     "MemoryEmbedding",
+    "MarketEvent",
     "Message",
+    "PriceZone",
+    "Structure",
     "Organization",
     "OrganizationMember",
     "Permission",

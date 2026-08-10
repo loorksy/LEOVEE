@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.candle import Candle
 from app.models.enums import Timeframe
 from app.models.symbol import Symbol
-from app.providers.market.base import NormalizedCandle
-from app.providers.market.oanda import OandaMarketDataProvider, get_market_provider
+from app.providers.market.base import MarketDataProvider, NormalizedCandle
+from app.providers.market.oanda import get_market_provider
 
 
 async def get_or_create_symbol(session: AsyncSession, code: str) -> Symbol:
@@ -82,7 +82,7 @@ async def fetch_and_store_candles(
     symbol_code: str,
     timeframe: Timeframe,
     count: int = 100,
-    provider: OandaMarketDataProvider | None = None,
+    provider: MarketDataProvider | None = None,
 ) -> tuple[Symbol, list[Candle]]:
     granularity = timeframe.value
     market = provider or get_market_provider()
@@ -98,6 +98,24 @@ async def fetch_and_store_candles(
     rows = list(result.scalars().all())
     rows.reverse()
     return symbol, rows
+
+
+async def load_recent_candles(
+    session: AsyncSession,
+    symbol_id: uuid.UUID,
+    *,
+    timeframe: Timeframe,
+    count: int = 100,
+) -> list[Candle]:
+    result = await session.execute(
+        select(Candle)
+        .where(Candle.symbol_id == symbol_id, Candle.timeframe == timeframe)
+        .order_by(Candle.ts.desc())
+        .limit(count)
+    )
+    rows = list(result.scalars().all())
+    rows.reverse()
+    return rows
 
 
 def candle_to_dict(candle: Candle) -> dict[str, str | float | bool]:
