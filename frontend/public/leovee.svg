@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="Leovee">
   <rect width="32" height="32" rx="8" fill="#4f46e5"/>
-  <path
-    d="M9 22V10h3.2l5.3 8.4V10H21v12h-3.1v-7.8L12.4 22H9z"
-    fill="#fff"
-  />
+  <!-- Leovee monogram: single stem + base (not an M) -->
+  <path fill="#ffffff" d="M10 22V10h2.6v9.2H22V22H10z"/>
 </svg>
