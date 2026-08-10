@@ -20,6 +20,15 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    access_token_expire_seconds: int = Field(default=900, alias="ACCESS_TOKEN_EXPIRE_SECONDS")
+    refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS")
+    email_from: str = Field(default="notifications@leovee.example.com", alias="EMAIL_FROM")
+    resend_api_key: str | None = Field(default=None, alias="RESEND_API_KEY")
+
+    auth_rate_limit_login: int = Field(default=10, alias="AUTH_RATE_LIMIT_LOGIN")
+    auth_rate_limit_signup: int = Field(default=5, alias="AUTH_RATE_LIMIT_SIGNUP")
+    auth_rate_limit_password_reset: int = Field(default=3, alias="AUTH_RATE_LIMIT_PASSWORD_RESET")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

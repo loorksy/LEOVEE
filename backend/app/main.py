@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api.routes import health, tenant
+from app.api.routes import auth, health, tenant
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(health.router)
+    application.include_router(auth.router)
     application.include_router(tenant.router)
     return application
 

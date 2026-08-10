@@ -473,8 +473,8 @@ Integration milestones: end of Phase 19 (decision), 26 (chat E2E), 42 (deploy).
 | Phase | Status |
 |-------|--------|
 | 1 | **Complete** — design documents in repo root |
-| 3 | **Complete** — organizations, users, TenantContext |
-| 4–43 | Not started |
+| 4 | **Complete** — authentication (JWT, sessions, email, rate limits) |
+| 5–43 | Not started |
 
 **Next action after approval:** Begin Phase 2 on branch `cursor/scaffolding-phase-2-199e` (or continuation branch).
 
