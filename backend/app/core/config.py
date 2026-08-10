@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
+    sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
+    sentry_environment: str | None = Field(default=None, alias="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
+
     billing_provider: str = Field(default="manual", alias="BILLING_PROVIDER")
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")

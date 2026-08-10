@@ -1,9 +1,22 @@
 import logging
 import sys
 
+from typing import Any, MutableMapping
+
 import structlog
 
 from app.core.config import get_settings
+from app.core.request_context import logging_context
+
+
+def _merge_request_context(
+    _logger: Any,
+    _method_name: str,
+    event_dict: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
+    for key, value in logging_context().items():
+        event_dict.setdefault(key, value)
+    return event_dict
 
 
 def configure_logging() -> None:
@@ -13,6 +26,7 @@ def configure_logging() -> None:
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
+            _merge_request_context,
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.JSONRenderer(),

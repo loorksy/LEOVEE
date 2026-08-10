@@ -15,6 +15,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: {
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Content-Security-Policy":
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8000 ws://localhost:8000",
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8000",
