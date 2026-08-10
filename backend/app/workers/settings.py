@@ -159,6 +159,23 @@ async def memory_decay_job(_ctx: dict[str, object]) -> str:
     )
 
 
+async def alert_evaluation_job(_ctx: dict[str, object]) -> str:
+    """Evaluate active price alerts against latest candle closes and fan out."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.alert_evaluation import run_alert_evaluation_cycle
+
+    async with factory() as session:
+        stats = await run_alert_evaluation_cycle(session)
+        await session.commit()
+    return (
+        "alert_evaluation_ok:"
+        f"evaluated={stats['alerts_evaluated']},"
+        f"triggered={stats['alerts_triggered']}"
+    )
+
+
 async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
     factory = get_session_factory()
     if factory is None:
@@ -189,6 +206,7 @@ class WorkerSettings:
         memory_recompute_job,
         thesis_monitor_job,
         memory_decay_job,
+        alert_evaluation_job,
     ]
     cron_jobs = [
         cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
@@ -197,6 +215,7 @@ class WorkerSettings:
         cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
         cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
+        cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
     ]
 
     redis_settings = _worker_redis_settings()

@@ -500,9 +500,9 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 12 | **CODE-DONE** | Scenario engine (with engines suite) |
 | 13 | **CODE-DONE** | Risk engine + tests |
 | 14 | **CODE-DONE** | Finnhub + research; needs prod key (owner) |
-| 15 | **PARTIAL** | Anthropic provider exists; dedicated §99 + stream/tools gaps |
-| 16 | **PARTIAL** | OpenAI provider exists; dedicated §99 + stream/tools gaps |
-| 17 | **PARTIAL** | ModelRouter + fallback config; fallback/rate-limit tests thin |
+| 15 | **CODE-DONE** | Anthropic generate/stream/tools/structured/retries + §99 mocks |
+| 16 | **CODE-DONE** | OpenAI generate/stream/tools/structured/retries + §99 mocks |
+| 17 | **CODE-DONE** | ModelRouter task/fallback/cost/rate + recorded primary failure |
 | 18 | **CODE-DONE** | Reasoning + adversarial + tests |
 | 19 | **CODE-DONE** | Decision path via analysis pipeline; `AnalysisPage` routed at `/analysis` (Batch 3) |
 | 20 | **CODE-DONE** | Memory foundation + hybrid recall; decay job now real |
@@ -515,12 +515,12 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 27 | **CODE-DONE** | Recommendations API + `RecommendationsPage` routed at `/recommendations` (Batch 3) |
 | 28 | **CODE-DONE** | Trades idea CRUD + execution gate |
 | 29 | **COMPLETE** | Watchlist API + `WatchlistPage` routed at `/watchlist`; `with_quotes=true` polling + live `/ws/v1/stream?channels=candles` quote updates; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
-| 30 | **CODE-DONE** | Alerts API + `AlertsPage` routed at `/alerts`; create/list + mock trigger demo + `/ws/v1/stream?channels=notifications` fan-out display (Batch 4); market-driven alert worker still pending |
+| 30 | **COMPLETE** | Alerts API + `AlertsPage` + market-driven `alert_evaluation_job` fan-out; §99 unit/integration + UI |
 | 31 | **COMPLETE** | Journal API + `JournalPage` routed at `/journal`; create/list entries + promote-to-lesson flow; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
 | 32 | **CODE-DONE** | Memory API + `MemoryPanel` wired at `/memory`; delete triggers recompute stats display (Batch 3) |
 | 33 | **COMPLETE** | Performance API + `PerformanceDashboard` routed at `/performance` via `PerformancePage`, calibration curve from `/api/v1/performance/summary`; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_33_35.md` (Batch 4) |
-| 34 | **PARTIAL** | MCP in-process on API; not separate compose service |
-| 35 | **PARTIAL** | Manifests served; ext-apps packaging incomplete |
+| 34 | **CODE-DONE** | `leovee-mcp` compose service (`docker/mcp.Dockerfile`, port 8001) + HTTP bridge |
+| 35 | **CODE-DONE** | `ext-apps/` manifests with CSP + workspace binding; Caddy routes `/api/v1/mcp/*` |
 | 36 | **PARTIAL** | Admin API; entitlements panel unwired |
 | 37 | **CODE-DONE** | Manual billing default; Stripe test adapter |
 | 38 | **CODE-DONE** | Entitlement hard limits on analysis/chat/MCP |
