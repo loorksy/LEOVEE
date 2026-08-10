@@ -18,6 +18,7 @@ from app.api.routes import (
     recommendations,
     tenant,
     theses,
+    trades,
     workspaces,
 )
 from app.core.config import get_settings
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     application.include_router(chart.router)
     application.include_router(memory.router)
     application.include_router(recommendations.router)
+    application.include_router(trades.router)
     application.include_router(theses.router)
     application.include_router(chat.router)
     application.include_router(ws_router.router)

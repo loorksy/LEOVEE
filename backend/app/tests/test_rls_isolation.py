@@ -16,12 +16,13 @@ from app.infrastructure.database import verify_runtime_db_role
 from app.infrastructure.rls import clear_rls_session_context, set_rls_session_context
 from app.main import app
 from app.models.chart_annotation import ChartAnnotation, ChartAnnotationStatus
-from app.models.enums import RecommendationDirection, RecommendationStatus
+from app.models.enums import RecommendationDirection, RecommendationStatus, TradeStatus
 from app.models.learning import StrategyStat
 from app.models.memory import AgentMemory, Lesson, MemoryType
 from app.models.news import ResearchItem
 from app.models.oanda_connection import OandaConnection
 from app.models.recommendation import Recommendation
+from app.models.trade import Trade
 from app.services import market_data
 from app.tests.conftest import seed_user_org
 
@@ -279,6 +280,41 @@ async def test_rls_blocks_cross_workspace_chart_annotations(
         workspace_id=ctx_a.workspace_id,
     )
     result = await db_session.execute(select(ChartAnnotation))
+    assert result.scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_rls_blocks_cross_workspace_trades(
+    db_session: AsyncSession, privileged_session: AsyncSession
+) -> None:
+    user_a, org_a, _ = await seed_user_org(db_session, email="tr-a@example.com", slug="tr-a")
+    user_b, org_b, _ = await seed_user_org(db_session, email="tr-b@example.com", slug="tr-b")
+    await db_session.commit()
+    ctx_a = await resolve_tenant_context(db_session, user_a.id)
+    ctx_b = await resolve_tenant_context(db_session, user_b.id)
+    assert ctx_a.workspace_id and ctx_b.workspace_id
+    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    await set_rls_session_context(
+        privileged_session,
+        tenant_id=org_b.id,
+        workspace_id=ctx_b.workspace_id,
+    )
+    privileged_session.add(
+        Trade(
+            tenant_id=org_b.id,
+            workspace_id=ctx_b.workspace_id,
+            symbol_id=symbol.id,
+            direction=RecommendationDirection.BUY,
+            status=TradeStatus.IDEA,
+        )
+    )
+    await privileged_session.commit()
+    await set_rls_session_context(
+        db_session,
+        tenant_id=org_a.id,
+        workspace_id=ctx_a.workspace_id,
+    )
+    result = await db_session.execute(select(Trade))
     assert result.scalars().all() == []
 
 

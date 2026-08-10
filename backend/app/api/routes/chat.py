@@ -12,13 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_workspace_context
-from app.core.datetime_utils import utc_now
 from app.core.errors import ProviderConfigurationError
 from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
-from app.models.conversation import Conversation, ConversationMode, Message, MessageRole
-from app.providers.llm.base import LLMMessage
+from app.models.conversation import Conversation, ConversationMode
 from app.providers.llm.factory import get_llm_provider
+from app.services import chat_service
 
 router = APIRouter(prefix="/api/v1/conversations", tags=["chat"])
 
@@ -32,6 +31,7 @@ class ConversationCreate(BaseModel):
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=16000)
     stream: bool = False
+    mode: ConversationMode | None = None
 
 
 @router.get("")
@@ -56,6 +56,7 @@ async def list_conversations(
                 "title": c.title,
                 "symbol": c.symbol,
                 "mode": c.mode.value,
+                "summary_text": c.summary_text,
             }
             for c in rows
         ]
@@ -81,6 +82,38 @@ async def create_conversation(
     return {"id": str(conv.id)}
 
 
+@router.get("/{conversation_id}/messages")
+async def list_messages(
+    conversation_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
+    conv = await session.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.tenant_id,
+            Conversation.workspace_id == tenant.workspace_id,
+            Conversation.user_id == tenant.user_id,
+        )
+    )
+    if conv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    rows = await chat_service.load_conversation_messages(session, conv.id, limit=50)
+    return {
+        "items": [
+            {
+                "id": str(m.id),
+                "role": m.role.value,
+                "content": m.content,
+                "content_json": m.content_json,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in rows
+        ],
+        "summary_text": conv.summary_text,
+    }
+
+
 @router.post("/{conversation_id}/messages")
 async def post_message(
     conversation_id: uuid.UUID,
@@ -100,15 +133,8 @@ async def post_message(
     if conv is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
-    user_msg = Message(
-        tenant_id=tenant.tenant_id,
-        workspace_id=tenant.workspace_id,
-        conversation_id=conv.id,
-        role=MessageRole.USER,
-        content=body.content,
-    )
-    session.add(user_msg)
-    await session.flush()
+    if body.mode is not None:
+        conv.mode = body.mode
 
     use_stream = stream or body.stream
     try:
@@ -122,40 +148,42 @@ async def post_message(
     if use_stream:
 
         async def event_stream() -> AsyncIterator[str]:
-            response = await llm.complete([LLMMessage(role="user", content=body.content)])
-            assistant = Message(
-                tenant_id=tenant.tenant_id,
-                workspace_id=tenant.workspace_id,
-                conversation_id=conv.id,
-                role=MessageRole.ASSISTANT,
-                content=response.content,
-                model=response.model,
-                provider=response.provider,
+            turn = await chat_service.run_chat_turn(
+                session,
+                tenant,
+                conv,
+                user_content=body.content,
+                llm=llm,
             )
-            session.add(assistant)
-            conv.last_message_at = utc_now()
-            await session.flush()
-            payload = {"event": "token", "data": response.content}
-            yield f"data: {json.dumps(payload)}\n\n"
-            yield 'data: {"event": "done"}\n\n'
+            recall_event = {
+                "event": "recall",
+                "count": turn.recall.get("count", 0),
+                "label": turn.recall.get("label"),
+            }
+            yield f"data: {json.dumps(recall_event)}\n\n"
+            for chunk in turn.assistant_message.content.split():
+                yield f"data: {json.dumps({'event': 'token', 'data': chunk + ' '})}\n\n"
+            done = {
+                "event": "done",
+                "assistant_message_id": str(turn.assistant_message.id),
+                "actions": turn.actions,
+            }
+            yield f"data: {json.dumps(done)}\n\n"
 
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 
-    response = await llm.complete([LLMMessage(role="user", content=body.content)])
-    assistant = Message(
-        tenant_id=tenant.tenant_id,
-        workspace_id=tenant.workspace_id,
-        conversation_id=conv.id,
-        role=MessageRole.ASSISTANT,
-        content=response.content,
-        model=response.model,
-        provider=response.provider,
+    turn = await chat_service.run_chat_turn(
+        session,
+        tenant,
+        conv,
+        user_content=body.content,
+        llm=llm,
     )
-    session.add(assistant)
-    conv.last_message_at = utc_now()
-    await session.flush()
     return {
-        "user_message_id": str(user_msg.id),
-        "assistant_message_id": str(assistant.id),
-        "content": response.content,
+        "user_message_id": str(turn.user_message.id),
+        "assistant_message_id": str(turn.assistant_message.id),
+        "content": turn.assistant_message.content,
+        "recall": turn.recall,
+        "actions": turn.actions,
+        "summary_text": conv.summary_text,
     }
