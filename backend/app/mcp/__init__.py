@@ -1,1 +1,1 @@
-"""MCP server (leovee-mcp) — implemented in later phases."""
+"""Leovee MCP server package (phases 34–35)."""
