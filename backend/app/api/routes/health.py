@@ -65,4 +65,9 @@ async def readiness() -> dict[str, Any]:
 
 @router.get("/health/startup")
 async def startup() -> dict[str, str]:
-    return {"status": "ok", "migrations": "alembic"}
+    """Kubernetes startup probe — migrations run via `scripts/migrate.sh` job before roll."""
+    return {
+        "status": "ok",
+        "migrations": "external-job",
+        "hint": "Run scripts/migrate.sh or docker compose run --rm migrate",
+    }

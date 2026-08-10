@@ -11,7 +11,7 @@ async def test_liveness() -> None:
     assert response.json()["status"] == "ok"
 
 
-async def test_readiness_without_infra() -> None:
+async def test_readiness_reports_infra_checks() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/health/ready")
@@ -19,4 +19,10 @@ async def test_readiness_without_infra() -> None:
     body = response.json()
     assert body["status"] in {"ok", "degraded"}
     db_check = body["checks"]["database"]
-    assert db_check.get("skipped") is True or db_check.get("ok") is True
+    if db_check.get("skipped"):
+        assert body["status"] == "ok"
+    elif db_check.get("ok"):
+        assert body["status"] == "ok"
+    else:
+        assert body["status"] == "degraded"
+        assert db_check.get("error")
