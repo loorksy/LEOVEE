@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.tenant import TenantContext
 from app.infrastructure.rls import set_rls_session_context
 from app.models.learning import CalibrationBin, SymbolProfile
 from app.models.memory import AgentMemory, MemoryEmbedding, MemoryType
@@ -202,3 +203,98 @@ async def store_memory(
     session.add(memory)
     await session.flush()
     return memory
+
+
+async def list_workspace_memories(
+    session: AsyncSession,
+    tenant: TenantContext,
+    *,
+    limit: int = 100,
+) -> list[AgentMemory]:
+    await set_rls_session_context(
+        session,
+        tenant_id=tenant.tenant_id,
+        workspace_id=tenant.workspace_id,
+    )
+    result = await session.execute(
+        select(AgentMemory)
+        .where(
+            AgentMemory.tenant_id == tenant.tenant_id,
+            AgentMemory.workspace_id == tenant.workspace_id,
+        )
+        .order_by(AgentMemory.updated_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def get_memory(
+    session: AsyncSession,
+    tenant: TenantContext,
+    memory_id: uuid.UUID,
+) -> AgentMemory | None:
+    await set_rls_session_context(
+        session,
+        tenant_id=tenant.tenant_id,
+        workspace_id=tenant.workspace_id,
+    )
+    row = await session.scalar(
+        select(AgentMemory).where(
+            AgentMemory.id == memory_id,
+            AgentMemory.tenant_id == tenant.tenant_id,
+            AgentMemory.workspace_id == tenant.workspace_id,
+        )
+    )
+    return row
+
+
+async def update_memory(
+    session: AsyncSession,
+    tenant: TenantContext,
+    memory: AgentMemory,
+    *,
+    content: dict[str, Any],
+) -> AgentMemory:
+    memory.content_json = content
+    await session.flush()
+    return memory
+
+
+async def delete_memory(
+    session: AsyncSession,
+    tenant: TenantContext,
+    memory_id: uuid.UUID,
+) -> bool:
+    memory = await get_memory(session, tenant, memory_id)
+    if memory is None:
+        return False
+    from sqlalchemy import delete
+
+    await session.execute(delete(MemoryEmbedding).where(MemoryEmbedding.memory_id == memory_id))
+    await session.delete(memory)
+    await session.flush()
+    return True
+
+
+async def list_calibration_curve(
+    session: AsyncSession,
+    tenant: TenantContext,
+) -> list[dict[str, Any]]:
+    await set_rls_session_context(
+        session,
+        tenant_id=tenant.tenant_id,
+        workspace_id=tenant.workspace_id,
+    )
+    result = await session.execute(
+        select(CalibrationBin).where(CalibrationBin.workspace_id == tenant.workspace_id)
+    )
+    bins = list(result.scalars().all())
+    return [
+        {
+            "bin_lower": float(b.bin_lower),
+            "bin_upper": float(b.bin_upper),
+            "predicted_count": b.predicted_count,
+            "realized_success_count": b.realized_success_count,
+        }
+        for b in bins
+    ]

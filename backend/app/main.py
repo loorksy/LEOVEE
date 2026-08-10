@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api import websocket as ws_router
 from app.api.routes import (
+    alerts,
     analysis,
     auth,
     chart,
     chat,
     health,
+    journal,
     markets,
     memory,
     news,
@@ -19,6 +21,7 @@ from app.api.routes import (
     tenant,
     theses,
     trades,
+    watchlists,
     workspaces,
 )
 from app.core.config import get_settings
@@ -66,6 +69,9 @@ def create_app() -> FastAPI:
     application.include_router(news.router)
     application.include_router(analysis.router)
     application.include_router(chart.router)
+    application.include_router(watchlists.router)
+    application.include_router(alerts.router)
+    application.include_router(journal.router)
     application.include_router(memory.router)
     application.include_router(recommendations.router)
     application.include_router(trades.router)

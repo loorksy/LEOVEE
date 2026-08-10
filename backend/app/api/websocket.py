@@ -9,7 +9,11 @@ from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.core.tenant import resolve_tenant_context, resolve_workspace_context
 from app.infrastructure.database import get_session_factory
-from app.infrastructure.realtime import annotation_broadcaster, candle_broadcaster
+from app.infrastructure.realtime import (
+    annotation_broadcaster,
+    candle_broadcaster,
+    notification_broadcaster,
+)
 from app.services.auth_service import AuthError, get_user_for_access_token
 
 router = APIRouter(tags=["websocket"])
@@ -71,6 +75,31 @@ async def authenticated_ws(websocket: WebSocket, token: str | None = None) -> No
             return
         annotation_queue = annotation_broadcaster.subscribe(workspace_key)
 
+    notification_queue = None
+    if "notifications" in channels:
+        workspace_id_param = websocket.query_params.get("workspace_id")
+        if not workspace_id_param:
+            await websocket.send_json({"error": "workspace_id_required_for_notifications"})
+            await websocket.close(code=4400)
+            return
+        try:
+            async with factory() as session:
+                user, _ = await get_user_for_access_token(session, settings, token)
+                tenant = await resolve_tenant_context(session, user.id)
+                tenant = await resolve_workspace_context(
+                    session,
+                    tenant,
+                    client_workspace_id=uuid.UUID(workspace_id_param),
+                )
+                if tenant.workspace_id is None:
+                    raise ValueError("workspace missing")
+                workspace_key = workspace_key or str(tenant.workspace_id)
+        except Exception:
+            await websocket.send_json({"error": "workspace_unauthorized"})
+            await websocket.close(code=4403)
+            return
+        notification_queue = notification_broadcaster.subscribe(workspace_key)
+
     await websocket.send_json(
         {
             "event": "connected",
@@ -97,9 +126,15 @@ async def authenticated_ws(websocket: WebSocket, token: str | None = None) -> No
                 while not annotation_queue.empty():
                     payload = annotation_queue.get_nowait()
                     await websocket.send_json(payload)
+            if notification_queue is not None and workspace_key is not None:
+                while not notification_queue.empty():
+                    payload = notification_queue.get_nowait()
+                    await websocket.send_json(payload)
     except WebSocketDisconnect:
         for symbol, queue in zip(symbols, candle_queues, strict=True):
             candle_broadcaster.unsubscribe(symbol, queue)
         if annotation_queue is not None and workspace_key is not None:
             annotation_broadcaster.unsubscribe(workspace_key, annotation_queue)
+        if notification_queue is not None and workspace_key is not None:
+            notification_broadcaster.unsubscribe(workspace_key, notification_queue)
         return
