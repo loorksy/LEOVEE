@@ -55,7 +55,5 @@ async def test_thesis_monitor_invalidates_on_structure_break(db_session: AsyncSe
     assert updated is not None
     assert updated.status == ThesisStatus.INVALIDATED
 
-    events = await db_session.execute(
-        select(ThesisEvent).where(ThesisEvent.thesis_id == thesis.id)
-    )
+    events = await db_session.execute(select(ThesisEvent).where(ThesisEvent.thesis_id == thesis.id))
     assert len(events.scalars().all()) >= 1

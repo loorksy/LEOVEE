@@ -15,9 +15,7 @@ from app.services.thesis_monitor_service import list_active_theses, monitor_thes
 
 async def _context_for_workspace(session: AsyncSession, workspace: Workspace) -> TenantContext:
     member = await session.scalar(
-        select(WorkspaceMember)
-        .where(WorkspaceMember.workspace_id == workspace.id)
-        .limit(1)
+        select(WorkspaceMember).where(WorkspaceMember.workspace_id == workspace.id).limit(1)
     )
     if member is None:
         raise RuntimeError(f"No workspace member for workspace {workspace.id}")

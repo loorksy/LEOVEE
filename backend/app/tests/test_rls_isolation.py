@@ -15,6 +15,7 @@ from app.core.tenant import resolve_tenant_context
 from app.infrastructure.database import verify_runtime_db_role
 from app.infrastructure.rls import clear_rls_session_context, set_rls_session_context
 from app.main import app
+from app.models.chart_annotation import ChartAnnotation, ChartAnnotationStatus
 from app.models.enums import RecommendationDirection, RecommendationStatus
 from app.models.learning import StrategyStat
 from app.models.memory import AgentMemory, Lesson, MemoryType
@@ -207,7 +208,6 @@ async def test_api_list_recommendations_enforces_rls(
     assert response.json()["items"] == []
 
 
-
 @pytest.mark.asyncio
 async def test_rls_blocks_cross_workspace_research_items(
     db_session: AsyncSession, privileged_session: AsyncSession
@@ -240,6 +240,45 @@ async def test_rls_blocks_cross_workspace_research_items(
         workspace_id=ctx_a.workspace_id,
     )
     result = await db_session.execute(select(ResearchItem))
+    assert result.scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_rls_blocks_cross_workspace_chart_annotations(
+    db_session: AsyncSession, privileged_session: AsyncSession
+) -> None:
+    user_a, org_a, _ = await seed_user_org(db_session, email="ca-a@example.com", slug="ca-a")
+    user_b, org_b, _ = await seed_user_org(db_session, email="ca-b@example.com", slug="ca-b")
+    await db_session.commit()
+    ctx_a = await resolve_tenant_context(db_session, user_a.id)
+    ctx_b = await resolve_tenant_context(db_session, user_b.id)
+    assert ctx_a.workspace_id and ctx_b.workspace_id
+
+    await set_rls_session_context(
+        privileged_session,
+        tenant_id=org_b.id,
+        workspace_id=ctx_b.workspace_id,
+    )
+    privileged_session.add(
+        ChartAnnotation(
+            tenant_id=org_b.id,
+            workspace_id=ctx_b.workspace_id,
+            semantic_type="DRAW_LEVEL",
+            geometry_json={
+                "anchors": [{"ts": "2024-01-01T00:00:00+00:00", "price": 1.1}],
+            },
+            style_json={},
+            status=ChartAnnotationStatus.ACTIVE,
+        )
+    )
+    await privileged_session.commit()
+
+    await set_rls_session_context(
+        db_session,
+        tenant_id=org_a.id,
+        workspace_id=ctx_a.workspace_id,
+    )
+    result = await db_session.execute(select(ChartAnnotation))
     assert result.scalars().all() == []
 
 
