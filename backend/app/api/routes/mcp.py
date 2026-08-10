@@ -12,6 +12,7 @@ from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
 from app.mcp import server as mcp_server
 from app.mcp.runtime import McpToolError, invoke_tool, open_session
+from app.services.entitlement_service import EntitlementError
 
 router = APIRouter(prefix="/api/v1/mcp", tags=["mcp"])
 
@@ -62,6 +63,11 @@ async def invoke_mcp_tool_http(
             arguments=body.arguments,
             mcp_session_id=mcp_session.id,
         )
+    except EntitlementError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
     except McpToolError as exc:
         status_code = status.HTTP_404_NOT_FOUND
         if exc.code in {"FORBIDDEN", "UNAUTHORIZED"}:
