@@ -6,6 +6,15 @@ from app.core.config import Settings, get_settings
 from app.core.errors import DataUnavailableError
 from app.providers.market.base import MarketDataProvider, NormalizedCandle, normalize_oanda_candle
 
+# Internal Timeframe values → OANDA REST granularity codes
+_OANDA_GRANULARITY: dict[str, str] = {
+    "D1": "D",
+}
+
+
+def _oanda_granularity(internal: str) -> str:
+    return _OANDA_GRANULARITY.get(internal, internal)
+
 
 class OandaMarketDataProvider:
     def __init__(self, settings: Settings) -> None:
@@ -23,8 +32,9 @@ class OandaMarketDataProvider:
         count: int = 100,
     ) -> list[NormalizedCandle]:
         oanda_instrument = instrument if "_" in instrument else f"{instrument[:3]}_{instrument[3:]}"
+        oanda_granularity = _oanda_granularity(granularity)
         url = f"{self._base_url}/v3/instruments/{oanda_instrument}/candles"
-        params = {"granularity": granularity, "count": str(count), "price": "M"}
+        params = {"granularity": oanda_granularity, "count": str(count), "price": "M"}
         headers = {"Authorization": f"Bearer {self._token}"}
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, params=params, headers=headers)
