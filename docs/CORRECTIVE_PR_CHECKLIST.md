@@ -1,27 +1,25 @@
 # Corrective PR — Phases 5–22 blockers (exit checklist)
 
-## Blocker 1 — PostgreSQL + RLS
-- [x] Test suite runs on PostgreSQL (`TEST_DATABASE_URL` / CI `pgvector/pgvector:pg16` service)
-- [x] Alembic migrations through `006_leovee_app_role` (learning tables, RLS, partitioned candles, pgvector column)
-- [x] ORM uses `JSONB` / `Vector` (no SQLite JSON shim)
-- [x] `test_rls_isolation.py` — `SET ROLE leovee_app` + session vars; cross-workspace denial on tenant tables
+## Blocker 1 — PostgreSQL + RLS (runtime enforced)
+- [x] Tests and API use `DATABASE_URL` as **`leovee_app`** (non-superuser, no BYPASSRLS)
+- [x] Alembic uses **`DATABASE_MIGRATION_URL`** (privileged) only
+- [x] `get_db_session` clears GUCs; `get_workspace_context` sets `app.tenant_id` / `app.workspace_id` / `app.user_id`
+- [x] Tests: `pg_roles` asserts on `leovee_app`; API list recommendations isolation; zero rows without workspace GUC
 
 ## Blocker 2 — No production mocks
-- [x] OANDA / LLM providers fail without credentials (`DataUnavailableError` / `ProviderConfigurationError`)
-- [x] `validate_production_startup()` in API lifespan
-- [x] Test doubles under `app/tests/doubles/` only
-- [x] `test_blockers.py` — no synthetic market path without explicit fixtures
+- [x] OANDA / LLM fail closed; production startup validation; test doubles in `tests/doubles/`
 
 ## Blocker 3 — Learning pipeline (Phase 21)
-- [x] `OutcomeRecorder` + `run_learning_pipeline` (stats, symbol profiles, calibration, decay)
-- [x] Terminal hooks on recommendation/thesis status transitions
-- [x] Arq `process_learning_outcome` job (replaces placeholders)
-- [x] Integration test: outcome → profile recall with `LOW_SAMPLE`
+- [x] OutcomeRecorder, pipeline, terminal hooks, Arq `process_learning_outcome`, recall integration test
 
 ## Blocker 4 — OANDA streaming (Phase 7)
-- [x] `OandaPricingStream` (reconnect/backoff)
-- [x] `OandaStreamManager` REST fallback + gap bucket helper
-- [x] Unit tests: tick aggregation / dedupe (`test_engines_unit.py`)
+- [x] `OandaCandleStreamConsumer` + Arq `oanda_stream_consumer_job` (stream → aggregate → persist → `CandleBroadcaster`)
+- [x] Reconnect triggers REST `persist_backfill` via `OandaStreamManager`
+- [x] WebSocket `/ws/v1/stream?symbols=EURUSD` fans out published candles (Redis optional)
+- [ ] Full §99 stream disconnect → fallback → backfill HTTP mock integration (follow-up PR)
 
-## Process note
-Further phase work should land in **3–4 phases per PR** with tests and §114 verification. Do **not** merge `cursor/complete-remaining-phases-199e` until this corrective chain is accepted.
+## Deferred (not on this branch)
+- Post–phase-22 route modules live on branch `cursor/post-phase-22-deferred-199e` (from prior corrective snapshot).
+
+## Process
+- Phases 5–22 continue in **3–4 phases per PR** with §99 tests + §114 checklist. **Phase 23 blocked** until accepted.

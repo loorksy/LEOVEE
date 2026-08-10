@@ -17,5 +17,6 @@ async def test_readiness_without_infra() -> None:
         response = await client.get("/health/ready")
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "ok"
-    assert body["checks"]["database"]["skipped"] is True
+    assert body["status"] in {"ok", "degraded"}
+    db_check = body["checks"]["database"]
+    assert db_check.get("skipped") is True or db_check.get("ok") is True

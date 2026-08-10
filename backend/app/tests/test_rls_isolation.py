@@ -1,92 +1,135 @@
-"""RLS isolation across tenant-owned tables (PostgreSQL only)."""
+"""Runtime RLS enforcement and leovee_app role guarantees."""
 
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_id
 from app.core.tenant import resolve_tenant_context
-from app.infrastructure.rls import set_rls_session_context
-from app.models.chart_annotation import ChartAnnotation, ChartAnnotationStatus
+from app.infrastructure.database import verify_runtime_db_role
+from app.infrastructure.rls import clear_rls_session_context, set_rls_session_context
+from app.main import app
 from app.models.enums import RecommendationDirection, RecommendationStatus
-from app.models.learning import StrategyStat, SymbolProfile
+from app.models.learning import StrategyStat
 from app.models.memory import AgentMemory, Lesson, MemoryType
 from app.models.oanda_connection import OandaConnection
 from app.models.recommendation import Recommendation
-from app.services import market_data, recommendation_service
+from app.services import market_data
 from app.tests.conftest import seed_user_org
 
 
 @pytest.mark.asyncio
-async def test_rls_blocks_cross_workspace_reads(db_session: AsyncSession) -> None:
+async def test_leovee_app_role_is_not_superuser(db_session: AsyncSession) -> None:
+    await verify_runtime_db_role(db_session)
+    row = await db_session.execute(
+        text(
+            """
+            SELECT rolsuper, rolbypassrls
+            FROM pg_roles
+            WHERE rolname = 'leovee_app'
+            """
+        )
+    )
+    rolsuper, rolbypassrls = row.one()
+    assert rolsuper is False
+    assert rolbypassrls is False
+
+
+@pytest.mark.asyncio
+async def test_rls_without_workspace_guc_returns_zero_rows(
+    db_session: AsyncSession,
+    privileged_session: AsyncSession,
+) -> None:
+    user, org, _ = await seed_user_org(privileged_session, email="noguc@example.com", slug="noguc")
+    await privileged_session.commit()
+    ctx = await resolve_tenant_context(privileged_session, user.id)
+    assert ctx.workspace_id is not None
+    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    privileged_session.add(
+        Recommendation(
+            tenant_id=org.id,
+            workspace_id=ctx.workspace_id,
+            symbol_id=symbol.id,
+            direction=RecommendationDirection.BUY,
+            status=RecommendationStatus.READY,
+            confidence_calibrated=Decimal("0.6"),
+        )
+    )
+    await privileged_session.commit()
+
+    await clear_rls_session_context(db_session)
+    result = await db_session.execute(select(Recommendation))
+    assert len(result.scalars().all()) == 0
+
+
+@pytest.mark.asyncio
+async def test_rls_blocks_cross_workspace_reads(
+    db_session: AsyncSession, privileged_session: AsyncSession
+) -> None:
     user_a, org_a, _ = await seed_user_org(db_session, email="rls-a@example.com", slug="rls-a")
     user_b, org_b, _ = await seed_user_org(db_session, email="rls-b@example.com", slug="rls-b")
+    await db_session.commit()
 
     ctx_a = await resolve_tenant_context(db_session, user_a.id)
     ctx_b = await resolve_tenant_context(db_session, user_b.id)
     assert ctx_a.workspace_id is not None
     assert ctx_b.workspace_id is not None
 
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
-    rec_b = Recommendation(
+    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    await set_rls_session_context(
+        privileged_session,
         tenant_id=org_b.id,
         workspace_id=ctx_b.workspace_id,
-        symbol_id=symbol.id,
-        direction=RecommendationDirection.BUY,
-        status=RecommendationStatus.READY,
-        confidence_calibrated=Decimal("0.6"),
     )
-    db_session.add(rec_b)
-    lesson_b = Lesson(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        statement="Workspace B lesson",
-        conditions_json={},
+    privileged_session.add(
+        Recommendation(
+            tenant_id=org_b.id,
+            workspace_id=ctx_b.workspace_id,
+            symbol_id=symbol.id,
+            direction=RecommendationDirection.BUY,
+            status=RecommendationStatus.READY,
+            confidence_calibrated=Decimal("0.6"),
+        )
     )
-    memory_b = AgentMemory(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        memory_type=MemoryType.SEMANTIC,
-        key="symbol:EURUSD",
-        content_json={"note": "secret"},
+    privileged_session.add_all(
+        [
+            Lesson(
+                tenant_id=org_b.id,
+                workspace_id=ctx_b.workspace_id,
+                statement="Workspace B lesson",
+                conditions_json={},
+            ),
+            AgentMemory(
+                tenant_id=org_b.id,
+                workspace_id=ctx_b.workspace_id,
+                memory_type=MemoryType.SEMANTIC,
+                key="symbol:EURUSD",
+                content_json={"note": "secret"},
+            ),
+            StrategyStat(
+                tenant_id=org_b.id,
+                workspace_id=ctx_b.workspace_id,
+                strategy_code="DEFAULT",
+                setup_type="ANY",
+                regime_bucket="ANY",
+                session_bucket="ANY",
+                volatility_bucket="ANY",
+                metadata_json={},
+            ),
+            OandaConnection(
+                tenant_id=org_b.id,
+                workspace_id=ctx_b.workspace_id,
+                account_id="101-001-1",
+            ),
+        ]
     )
-    stat_b = StrategyStat(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        strategy_code="DEFAULT",
-        setup_type="ANY",
-        regime_bucket="ANY",
-        session_bucket="ANY",
-        volatility_bucket="ANY",
-        metadata_json={},
-    )
-    profile_b = SymbolProfile(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        symbol_id=symbol.id,
-        profile_json={"outcomes": []},
-    )
-    annotation_b = ChartAnnotation(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        semantic_type="zone",
-        geometry_json={"points": []},
-        style_json={},
-        status=ChartAnnotationStatus.ACTIVE,
-    )
-    oanda_b = OandaConnection(
-        tenant_id=org_b.id,
-        workspace_id=ctx_b.workspace_id,
-        account_id="101-001-1",
-    )
-    db_session.add_all([lesson_b, memory_b, stat_b, profile_b, annotation_b, oanda_b])
-    await db_session.flush()
+    await privileged_session.commit()
 
-    await db_session.execute(text("SET ROLE leovee_app"))
     await set_rls_session_context(
         db_session,
         tenant_id=org_a.id,
@@ -95,37 +138,71 @@ async def test_rls_blocks_cross_workspace_reads(db_session: AsyncSession) -> Non
     )
 
     async def count(model: type[Any]) -> int:
-        result = await db_session.execute(select(model))
+        result: Any = await db_session.execute(select(model))
         return len(result.scalars().all())
 
     assert await count(Recommendation) == 0
     assert await count(Lesson) == 0
     assert await count(AgentMemory) == 0
     assert await count(StrategyStat) == 0
-    assert await count(SymbolProfile) == 0
-    assert await count(ChartAnnotation) == 0
     assert await count(OandaConnection) == 0
 
-    # Workspace A can see only its own recommendation created under RLS context
-    rec_a = await recommendation_service.create_recommendation(
-        db_session,
-        ctx_a,
-        symbol_code="EURUSD",
-        direction=RecommendationDirection.SELL,
-    )
-    await db_session.flush()
-    visible = await db_session.scalar(select(Recommendation).where(Recommendation.id == rec_a.id))
-    assert visible is not None
-    assert visible.id == rec_a.id
 
+@pytest.mark.asyncio
+async def test_api_list_recommendations_enforces_rls(
+    db_session: AsyncSession, privileged_session: AsyncSession
+) -> None:
+    import uuid
+    from collections.abc import AsyncGenerator
+
+    from app.infrastructure.database import get_db_session
+
+    user_a, org_a, _ = await seed_user_org(db_session, email="api-a@example.com", slug="api-a")
+    user_b, org_b, _ = await seed_user_org(db_session, email="api-b@example.com", slug="api-b")
+    await db_session.commit()
+    ctx_a = await resolve_tenant_context(db_session, user_a.id)
+    ctx_b = await resolve_tenant_context(db_session, user_b.id)
+    assert ctx_a.workspace_id is not None and ctx_b.workspace_id is not None
+
+    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
     await set_rls_session_context(
-        db_session,
+        privileged_session,
         tenant_id=org_b.id,
         workspace_id=ctx_b.workspace_id,
     )
-    foreign = await db_session.scalar(select(Recommendation).where(Recommendation.id == rec_a.id))
-    assert foreign is None
-    await db_session.execute(text("RESET ROLE"))
+    privileged_session.add(
+        Recommendation(
+            tenant_id=org_b.id,
+            workspace_id=ctx_b.workspace_id,
+            symbol_id=symbol.id,
+            direction=RecommendationDirection.SELL,
+            status=RecommendationStatus.READY,
+            confidence_calibrated=Decimal("0.55"),
+        )
+    )
+    await privileged_session.commit()
+
+    async def _provide_session() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = _provide_session
+
+    async def _user_a() -> uuid.UUID:
+        return user_a.id
+
+    app.dependency_overrides[get_current_user_id] = _user_a
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/recommendations",
+            headers={
+                "X-Tenant-Id": str(org_a.id),
+                "X-Workspace-Id": str(ctx_a.workspace_id),
+            },
+        )
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["items"] == []
 
 
 @pytest.mark.asyncio

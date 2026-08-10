@@ -76,7 +76,7 @@ class OandaStreamManager:
             yield PriceTick(symbol=instrument.replace("_", ""), bid=mid, ask=mid, ts=ts)
             await asyncio.sleep(0.25)
 
-    def ingest_tick(self, tick: PriceTick) -> tuple[LiveCandle | None, LiveCandle | None]:
+    def ingest_tick(self, tick: PriceTick) -> tuple[list[LiveCandle], LiveCandle | None]:
         return self._aggregator.ingest_tick(tick)
 
     async def backfill_gaps(self, symbol: str) -> list[datetime]:

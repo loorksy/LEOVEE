@@ -42,17 +42,28 @@ class CandleAggregator:
     def timeframe_minutes(self) -> int:
         return self._timeframe_minutes
 
-    def ingest_tick(self, tick: PriceTick) -> tuple[LiveCandle | None, LiveCandle | None]:
+    def ingest_tick(self, tick: PriceTick) -> tuple[list[LiveCandle], LiveCandle | None]:
         """
-        Returns (completed_candle, updated_candle).
+        Returns (completed_candles, updated_candle).
         Out-of-order ticks for older buckets are ignored.
         """
         mid = (tick.bid + tick.ask) / Decimal("2")
         bucket = _bucket_start(tick.ts, self._timeframe_minutes)
         key = (tick.symbol, bucket)
 
+        completed: list[LiveCandle] = []
         existing = self._active.get(key)
         if existing is None:
+            stale_keys = [
+                stale_key
+                for stale_key in self._active
+                if stale_key[0] == tick.symbol and stale_key[1] < bucket
+            ]
+            for stale_key in sorted(stale_keys, key=lambda item: item[1]):
+                closed = self.close_bucket(stale_key[0], stale_key[1])
+                if closed is not None:
+                    completed.append(closed)
+
             candle = LiveCandle(
                 symbol=tick.symbol,
                 timeframe_minutes=self._timeframe_minutes,
@@ -63,15 +74,15 @@ class CandleAggregator:
                 close=mid,
             )
             self._active[key] = candle
-            return None, candle
+            return completed, candle
 
         if tick.ts < existing.ts:
-            return None, None
+            return completed, None
 
         existing.high = max(existing.high, mid)
         existing.low = min(existing.low, mid)
         existing.close = mid
-        return None, existing
+        return completed, existing
 
     def close_bucket(self, symbol: str, bucket_ts: datetime) -> LiveCandle | None:
         key = (symbol, bucket_ts)

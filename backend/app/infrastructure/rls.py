@@ -5,6 +5,24 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+_DENY_ALL_UUID = "00000000-0000-0000-0000-000000000000"
+
+
+async def clear_rls_session_context(session: AsyncSession) -> None:
+    """Deny workspace-scoped access until a workspace context is bound."""
+    await session.execute(
+        text("SELECT set_config('app.tenant_id', :value, true)"),
+        {"value": _DENY_ALL_UUID},
+    )
+    await session.execute(
+        text("SELECT set_config('app.workspace_id', :value, true)"),
+        {"value": _DENY_ALL_UUID},
+    )
+    await session.execute(
+        text("SELECT set_config('app.user_id', :value, true)"),
+        {"value": _DENY_ALL_UUID},
+    )
+
 
 async def set_rls_session_context(
     session: AsyncSession,

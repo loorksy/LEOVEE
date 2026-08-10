@@ -16,6 +16,7 @@ from app.core.tenant import (
     workspace_resolution_to_http,
 )
 from app.infrastructure.database import get_db_session
+from app.infrastructure.rls import set_rls_session_context
 from app.services.auth_service import AuthError, get_user_for_access_token
 
 _bearer = HTTPBearer(auto_error=False)
@@ -93,10 +94,18 @@ async def get_workspace_context(
             ) from exc
 
     try:
-        return await resolve_workspace_context(
+        ctx = await resolve_workspace_context(
             session,
             tenant,
             client_workspace_id=client_workspace_id,
         )
     except WorkspaceResolutionError as exc:
         raise workspace_resolution_to_http(exc) from exc
+
+    await set_rls_session_context(
+        session,
+        tenant_id=ctx.tenant_id,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+    )
+    return ctx

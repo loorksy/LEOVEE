@@ -59,6 +59,7 @@ def test_candle_aggregator_dedupes_and_orders_ticks() -> None:
     ]
     ordered = agg.dedupe_ticks(ticks)
     assert len(ordered) == 2
-    _, updated = agg.ingest_tick(ordered[0])
+    completed, updated = agg.ingest_tick(ordered[0])
+    assert not completed
     assert updated is not None
     assert updated.close == Decimal("1.1001")

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.infrastructure.database import get_session_factory
+from app.infrastructure.realtime import candle_broadcaster
 from app.services.auth_service import AuthError, get_user_for_access_token
 
 router = APIRouter(tags=["websocket"])
@@ -34,10 +37,24 @@ async def authenticated_ws(websocket: WebSocket, token: str | None = None) -> No
         return
 
     claims = decode_access_token(settings, token)
-    await websocket.send_json({"event": "connected", "user": claims["sub"]})
+    symbols_param = websocket.query_params.get("symbols", "EURUSD")
+    symbols = [s.strip().upper() for s in symbols_param.split(",") if s.strip()]
+    queues = [candle_broadcaster.subscribe(symbol) for symbol in symbols]
+
+    await websocket.send_json({"event": "connected", "user": claims["sub"], "symbols": symbols})
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_json({"event": "echo", "data": data})
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=0.05)
+                await websocket.send_json({"event": "echo", "data": data})
+            except TimeoutError:
+                pass
+
+            for queue in queues:
+                while not queue.empty():
+                    payload = queue.get_nowait()
+                    await websocket.send_json(payload)
     except WebSocketDisconnect:
+        for symbol, queue in zip(symbols, queues, strict=True):
+            candle_broadcaster.unsubscribe(symbol, queue)
         return

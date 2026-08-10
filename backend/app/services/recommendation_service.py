@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenant import TenantContext
+from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import RecommendationDirection, RecommendationStatus, ThesisStatus
 from app.models.recommendation import Recommendation, Thesis
 from app.services import market_data
@@ -23,6 +24,7 @@ async def create_recommendation(
     evidence: dict[str, Any] | None = None,
     agent_run_id: uuid.UUID | None = None,
 ) -> Recommendation:
+    await bind_workspace_rls(session, tenant)
     symbol = await market_data.get_or_create_symbol(session, symbol_code)
     rec = Recommendation(
         tenant_id=tenant.tenant_id,
@@ -45,6 +47,7 @@ async def list_recommendations(
     *,
     limit: int = 50,
 ) -> list[Recommendation]:
+    await bind_workspace_rls(session, tenant)
     result = await session.execute(
         select(Recommendation)
         .where(
@@ -62,6 +65,7 @@ async def get_recommendation(
     tenant: TenantContext,
     recommendation_id: uuid.UUID,
 ) -> Recommendation | None:
+    await bind_workspace_rls(session, tenant)
     rec = await session.scalar(
         select(Recommendation).where(
             Recommendation.id == recommendation_id,
@@ -79,6 +83,7 @@ async def spawn_thesis_from_recommendation(
     *,
     statement: str | None = None,
 ) -> Thesis:
+    await bind_workspace_rls(session, tenant)
     default_statement = f"Thesis for {recommendation.direction.value}"
     thesis = Thesis(
         tenant_id=tenant.tenant_id,
@@ -98,6 +103,7 @@ async def list_theses(
     *,
     limit: int = 50,
 ) -> list[Thesis]:
+    await bind_workspace_rls(session, tenant)
     result = await session.execute(
         select(Thesis)
         .where(

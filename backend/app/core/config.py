@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    database_migration_url: str | None = Field(default=None, alias="DATABASE_MIGRATION_URL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

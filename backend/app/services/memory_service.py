@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.infrastructure.rls import set_rls_session_context
 from app.models.learning import CalibrationBin, SymbolProfile
 from app.models.memory import AgentMemory, MemoryType
 from app.services.learning.calibration import apply_calibration
@@ -46,6 +47,7 @@ async def retrieve_memories_for_symbol(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     settings = get_settings()
+    await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
     key_prefix = f"symbol:{symbol.upper()}"
     result = await session.execute(
         select(AgentMemory)
@@ -110,6 +112,7 @@ async def store_memory(
     memory_type: MemoryType = MemoryType.SEMANTIC,
 ) -> AgentMemory:
     settings = get_settings()
+    await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
     raw_conf = content.get("confidence")
     stated = Decimal(str(raw_conf)) if raw_conf is not None else None
     calibrated = (

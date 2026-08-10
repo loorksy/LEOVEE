@@ -21,6 +21,19 @@ async def process_learning_outcome(ctx: dict[str, object], payload: dict[str, ob
     return "learning_pipeline_ok"
 
 
+async def oanda_stream_consumer_job(_ctx: dict[str, object]) -> str:
+    """Arq job: OANDA pricing stream -> aggregated M1 candles -> DB + realtime fan-out."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.market.stream_consumer import run_market_stream_cycle
+
+    async with factory() as session:
+        stats = await run_market_stream_cycle(session, max_ticks=500)
+        await session.commit()
+    return f"oanda_stream_ok:{stats}"
+
+
 async def candle_backfill_job(_ctx: dict[str, object]) -> str:
     """Scheduled candle maintenance hook (REST backfill orchestration)."""
     return "candle_backfill_ok"
@@ -32,9 +45,15 @@ async def memory_decay_job(_ctx: dict[str, object]) -> str:
 
 
 class WorkerSettings:
-    functions = [process_learning_outcome, candle_backfill_job, memory_decay_job]
+    functions = [
+        process_learning_outcome,
+        oanda_stream_consumer_job,
+        candle_backfill_job,
+        memory_decay_job,
+    ]
     cron_jobs = [
-        cron(candle_backfill_job, hour={0}, minute=0),  # type: ignore[arg-type]
+        cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
+        cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
     ]
 

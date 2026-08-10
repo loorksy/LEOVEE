@@ -16,6 +16,13 @@ async def run_learning_pipeline(
     lesson_proposals: list[LessonProposal] | None = None,
 ) -> dict[str, object]:
     """Deterministic learning steps; optional schema-validated lesson proposals."""
+    from app.infrastructure.rls import set_rls_session_context
+
+    await set_rls_session_context(
+        session,
+        tenant_id=terminal.tenant_id,
+        workspace_id=terminal.workspace_id,
+    )
     outcome_row = await OutcomeRecorder.record(session, terminal)
     await update_strategy_stats(session, terminal)
     await update_symbol_profile(session, terminal)

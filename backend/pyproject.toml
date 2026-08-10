@@ -59,23 +59,15 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 "app/api/routes/watchlists.py" = ["E501"]
 "app/providers/market/oanda_stream.py" = ["E501", "SIM117"]
 "app/tests/doubles/market.py" = ["E501"]
-"app/tests/test_engines_unit.py" = ["E501"]
+"app/tests/test_rls_isolation.py" = ["E501"]
+"app/services/market/stream_consumer.py" = ["E501"]
+"app/tests/conftest.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 packages = ["app"]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "app.providers.billing.*",
-    "app.api.routes.billing",
-    "app.api.routes.chart",
-    "app.api.routes.watchlists",
-    "app.services.watchlist_service",
-]
-ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

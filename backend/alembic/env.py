@@ -18,9 +18,10 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     settings = get_settings()
-    if not settings.database_url:
-        raise RuntimeError("DATABASE_URL is required for Alembic")
-    return settings.database_url
+    url = settings.database_migration_url or settings.database_url
+    if not url:
+        raise RuntimeError("DATABASE_MIGRATION_URL or DATABASE_URL is required for Alembic")
+    return url
 
 
 def run_migrations_offline() -> None:
