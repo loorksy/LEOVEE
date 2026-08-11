@@ -72,10 +72,14 @@ async def signup(
         slug=await _unique_org_slug(session, normalized.split("@")[0]),
         status=OrganizationStatus.ACTIVE,
     )
+    # Without a real mailer (Resend), auto-verify so staging/local signup is usable.
+    # Production with RESEND_API_KEY keeps the email verification gate.
+    auto_verify = not bool(settings.resend_api_key)
     user = User(
         email=normalized,
         password_hash=hash_password(password),
-        status=UserStatus.PENDING_VERIFICATION,
+        status=UserStatus.ACTIVE if auto_verify else UserStatus.PENDING_VERIFICATION,
+        email_verified_at=utc_now() if auto_verify else None,
     )
     session.add_all([org, user])
     await session.flush()
@@ -95,26 +99,29 @@ async def signup(
         name="Default Workspace",
     )
 
-    verify_token = generate_opaque_token()
-    session.add(
-        AuthToken(
-            user_id=user.id,
-            token_hash=hash_token(verify_token),
-            purpose=AuthTokenPurpose.EMAIL_VERIFY,
-            expires_at=utc_now() + timedelta(hours=24),
+    if not auto_verify:
+        verify_token = generate_opaque_token()
+        session.add(
+            AuthToken(
+                user_id=user.id,
+                token_hash=hash_token(verify_token),
+                purpose=AuthTokenPurpose.EMAIL_VERIFY,
+                expires_at=utc_now() + timedelta(hours=24),
+            )
         )
-    )
-    await session.flush()
+        await session.flush()
 
-    verify_url = f"{settings.public_url}/verify-email?token={verify_token}"
-    await get_email_provider().send(
-        EmailMessage(
-            to=normalized,
-            subject="Verify your Leovee email",
-            html_body=f'<p>Welcome to Leovee.</p><p><a href="{verify_url}">Verify email</a></p>',
-            text_body=f"Verify your email: {verify_url}",
+        verify_url = f"{settings.public_url}/verify-email?token={verify_token}"
+        await get_email_provider().send(
+            EmailMessage(
+                to=normalized,
+                subject="Verify your Leovee email",
+                html_body=(
+                    f'<p>Welcome to Leovee.</p><p><a href="{verify_url}">Verify email</a></p>'
+                ),
+                text_body=f"Verify your email: {verify_url}",
+            )
         )
-    )
 
     token_response = await _create_session_tokens(
         session,

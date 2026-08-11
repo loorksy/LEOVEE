@@ -10,16 +10,20 @@ from app.infrastructure.database import get_db_session
 from app.infrastructure.rate_limit import reset_rate_limiter_for_tests
 from app.main import app
 from app.providers.email.console import clear_console_outbox, get_console_outbox
+from app.providers.email.factory import get_email_provider
 
 
 @pytest.fixture(autouse=True)
 def _test_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
     get_settings.cache_clear()
+    get_email_provider.cache_clear()
     clear_console_outbox()
     reset_rate_limiter_for_tests()
     yield
     get_settings.cache_clear()
+    get_email_provider.cache_clear()
 
 
 @pytest.fixture
@@ -43,10 +47,10 @@ def _extract_token_from_outbox() -> str:
     return match.group(1)
 
 
-async def test_signup_verify_login_and_tenant(
+async def test_signup_auto_verifies_without_resend(
     api_client: AsyncClient,
-    db_session: AsyncSession,
 ) -> None:
+    """Console/no-Resend mode auto-verifies so staging signup is immediately usable."""
     signup = await api_client.post(
         "/api/v1/auth/signup",
         json={"email": "trader@example.com", "password": "securepassword1"},
@@ -54,6 +58,44 @@ async def test_signup_verify_login_and_tenant(
     assert signup.status_code == 200
     tokens = signup.json()
     assert "access_token" in tokens
+    assert get_console_outbox() == []
+
+    tenant = await api_client.get(
+        "/api/v1/me/tenant",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert tenant.status_code == 200
+    assert tenant.json()["role"] == "ORG_OWNER"
+
+    login = await api_client.post(
+        "/api/v1/auth/login",
+        json={"email": "trader@example.com", "password": "securepassword1"},
+    )
+    assert login.status_code == 200
+
+
+async def test_signup_requires_verify_when_resend_configured(
+    api_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+    get_settings.cache_clear()
+    get_email_provider.cache_clear()
+    assert get_settings().resend_api_key
+
+    # Keep Resend key for the auto-verify gate, but capture mail via console.
+    from app.providers.email.console import ConsoleEmailProvider
+    import app.services.auth_service as auth_service
+
+    monkeypatch.setattr(auth_service, "get_email_provider", lambda: ConsoleEmailProvider())
+    clear_console_outbox()
+
+    signup = await api_client.post(
+        "/api/v1/auth/signup",
+        json={"email": "verify-me@example.com", "password": "securepassword1"},
+    )
+    assert signup.status_code == 200
+    tokens = signup.json()
 
     me_unverified = await api_client.get(
         "/api/v1/me/tenant",
@@ -63,7 +105,7 @@ async def test_signup_verify_login_and_tenant(
 
     login_blocked = await api_client.post(
         "/api/v1/auth/login",
-        json={"email": "trader@example.com", "password": "securepassword1"},
+        json={"email": "verify-me@example.com", "password": "securepassword1"},
     )
     assert login_blocked.status_code == 403
 
@@ -73,17 +115,9 @@ async def test_signup_verify_login_and_tenant(
 
     login = await api_client.post(
         "/api/v1/auth/login",
-        json={"email": "trader@example.com", "password": "securepassword1"},
+        json={"email": "verify-me@example.com", "password": "securepassword1"},
     )
     assert login.status_code == 200
-    access = login.json()["access_token"]
-
-    tenant = await api_client.get(
-        "/api/v1/me/tenant",
-        headers={"Authorization": f"Bearer {access}"},
-    )
-    assert tenant.status_code == 200
-    assert tenant.json()["role"] == "ORG_OWNER"
 
 
 async def test_refresh_rotation_and_logout(api_client: AsyncClient) -> None:
@@ -91,8 +125,6 @@ async def test_refresh_rotation_and_logout(api_client: AsyncClient) -> None:
         "/api/v1/auth/signup",
         json={"email": "refresh@example.com", "password": "securepassword1"},
     )
-    verify_token = _extract_token_from_outbox()
-    await api_client.post("/api/v1/auth/verify-email", json={"token": verify_token})
 
     login = await api_client.post(
         "/api/v1/auth/login",
