@@ -15,6 +15,7 @@ Items that need the product owner. Agents continue around these and do not wait.
 | **Sentry DSN verification** | Bridge is wired; confirm events in Sentry UI with a real DSN | Waiting |
 | **Live / funded OANDA + `OANDA_EXECUTION`** | Explicitly **not** authorized. Practice OANDA only on staging until owner reviews the completed system and authorizes live. | Forbidden until written authorization |
 | **VPS backup/restore re-run** | Scripts count `candles` / `agent_memories` / `memory_embeddings`; owner should re-run after next staging deploy with real data | Waiting |
+| **Deploy Batch 8 to staging** | Live Playwright (`frontend/e2e/staging-live.spec.ts`) failed on current staging: `/signup` has no `signup-form` (pre-Batch-8 SPA). Merge PR #19 (after #18) and redeploy so the real E2E can be re-run | Waiting |
 
 ## Broker policy (non-negotiable)
 
