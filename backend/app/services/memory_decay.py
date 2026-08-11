@@ -33,9 +33,7 @@ async def run_memory_decay(
 
     memories_decayed = 0
     mem_rows = await session.execute(
-        select(AgentMemory).where(
-            (AgentMemory.valid_to.is_(None)) | (AgentMemory.valid_to > now)
-        )
+        select(AgentMemory).where((AgentMemory.valid_to.is_(None)) | (AgentMemory.valid_to > now))
     )
     for mem in mem_rows.scalars().all():
         current = mem.freshness_score if mem.freshness_score is not None else Decimal("1.0")

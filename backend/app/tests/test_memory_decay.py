@@ -21,9 +21,7 @@ from app.tests.conftest import seed_user_org
 async def test_memory_decay_reduces_freshness_and_archives_expired(
     db_session: AsyncSession,
 ) -> None:
-    user, org, _ = await seed_user_org(
-        db_session, email="decay@example.com", slug="decay-org"
-    )
+    user, org, _ = await seed_user_org(db_session, email="decay@example.com", slug="decay-org")
     ctx = await resolve_tenant_context(db_session, user.id)
     assert ctx.workspace_id is not None
     await bind_workspace_rls(db_session, ctx)

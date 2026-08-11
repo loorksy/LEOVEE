@@ -28,9 +28,7 @@ def create_mcp_app() -> FastAPI:
     application.add_middleware(ObservabilityMiddleware)
 
     @application.exception_handler(EntitlementError)
-    async def entitlement_error_handler(
-        _request: Request, exc: EntitlementError
-    ) -> JSONResponse:
+    async def entitlement_error_handler(_request: Request, exc: EntitlementError) -> JSONResponse:
         return JSONResponse(
             status_code=403,
             content={"detail": str(exc), "code": getattr(exc, "code", "entitlement")},
