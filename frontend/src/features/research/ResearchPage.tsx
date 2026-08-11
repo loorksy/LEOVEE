@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { listNews } from "@/api/news";
+import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
 
 export function ResearchPage() {
   const newsQuery = useQuery({
@@ -23,17 +24,11 @@ export function ResearchPage() {
         <p className="text-amber-400">{(newsQuery.error as Error).message}</p>
       )}
       {notConfigured && (
-        <div
-          className="rounded border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
-          data-testid="news-provider-not-configured"
-        >
-          <p className="font-medium">News provider not configured</p>
-          <p className="mt-1 text-amber-200/80">
-            Set the <code className="text-amber-100">FINNHUB_API_KEY</code> GitHub Actions secret
-            and re-run <strong>Deploy staging</strong>. This page stays empty until that key is
-            present on the server.
-          </p>
-        </div>
+        <ProviderNotConfiguredBanner
+          title="News provider not configured"
+          credentials={["FINNHUB_API_KEY"]}
+          testId="news-provider-not-configured"
+        />
       )}
       {!notConfigured && (
         <ul className="space-y-3">

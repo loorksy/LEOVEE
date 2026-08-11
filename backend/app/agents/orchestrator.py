@@ -15,6 +15,7 @@ from app.engines.scenario import run_scenario_engine
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
+from app.models.enums import RecommendationDirection
 from app.providers.llm.base import LLMMessage, LLMProvider
 from app.providers.llm.factory import get_llm_provider
 
@@ -31,6 +32,20 @@ class OrchestratorResult:
 
 def bars_from_candles(candles: list[Any]) -> list[OHLCBar]:
     return [OHLCBar(open=c.open, high=c.high, low=c.low, close=c.close) for c in candles]
+
+
+def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str, Any]:
+    """Spec §95: analysis-path failures resolve to NO_TRADE — never a soft BUY/SELL."""
+    payload: dict[str, Any] = {
+        "direction": RecommendationDirection.NO_TRADE.value,
+        "confidence": None,
+        "rationale": reason,
+        "degraded": True,
+        "degraded_reason": reason,
+    }
+    if detail:
+        payload["detail"] = detail
+    return payload
 
 
 async def run_analysis_orchestrator(
@@ -94,7 +109,18 @@ async def run_analysis_orchestrator(
         )
         narrative = {"llm": llm_out.structured or {"summary": llm_out.content}}
     except ProviderConfigurationError as exc:
-        narrative = {"llm_unavailable": str(exc)}
+        # Fail closed: never emit BUY/SELL with confidence when the LLM layer is absent.
+        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
+        narrative = {
+            "llm_unavailable": str(exc),
+            "degraded_reason": "LLM_UNAVAILABLE",
+        }
+    except Exception as exc:  # noqa: BLE001 — analysis path must fail closed
+        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
+        narrative = {
+            "llm_unavailable": str(exc),
+            "degraded_reason": "LLM_UNAVAILABLE",
+        }
 
     return OrchestratorResult(
         agent_run_id=run_id,

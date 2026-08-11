@@ -56,8 +56,8 @@ export function AlertsPage() {
       <header>
         <h1 className="text-2xl font-semibold text-slate-100">Alerts</h1>
         <p className="mt-1 text-slate-400">
-          Create price alerts and fire the mock trigger to see in-app notifications fan out over{" "}
-          <code>/ws/v1/stream?channels=notifications</code> (§30).
+          Create price alerts. Live evaluation runs from market ticks on the worker — not from the
+          UI test control below.
         </p>
       </header>
 
@@ -137,31 +137,39 @@ export function AlertsPage() {
                 {alert.last_triggered_at ? ` · last triggered ${alert.last_triggered_at}` : ""}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor={`trigger-price-${alert.id}`} className="sr-only">
-                Mock price for {alert.type} alert
-              </label>
-              <input
-                id={`trigger-price-${alert.id}`}
-                value={triggerPrices[alert.id] ?? ""}
-                onChange={(event) =>
-                  setTriggerPrices((prev) => ({ ...prev, [alert.id]: event.target.value }))
-                }
-                placeholder="price"
-                className="w-20 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  triggerMutation.mutate({
-                    id: alert.id,
-                    price: Number(triggerPrices[alert.id] ?? "0"),
-                  })
-                }
-                className="rounded border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
-              >
-                Trigger (demo)
-              </button>
+            <div
+              className="flex flex-col items-end gap-1 rounded border border-dashed border-amber-800/70 bg-amber-950/20 p-2"
+              data-testid={`alert-ui-test-${alert.id}`}
+            >
+              <p className="max-w-[14rem] text-right text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                UI test control — not live evaluation
+              </p>
+              <div className="flex items-center gap-2">
+                <label htmlFor={`trigger-price-${alert.id}`} className="sr-only">
+                  UI test price (not a live market quote) for {alert.type} alert
+                </label>
+                <input
+                  id={`trigger-price-${alert.id}`}
+                  value={triggerPrices[alert.id] ?? ""}
+                  onChange={(event) =>
+                    setTriggerPrices((prev) => ({ ...prev, [alert.id]: event.target.value }))
+                  }
+                  placeholder="test price"
+                  className="w-24 rounded border border-amber-900/60 bg-slate-900 px-2 py-1 text-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerMutation.mutate({
+                      id: alert.id,
+                      price: Number(triggerPrices[alert.id] ?? "0"),
+                    })
+                  }
+                  className="rounded border border-amber-700/70 px-3 py-1 text-xs font-medium text-amber-100 hover:bg-amber-950/50"
+                >
+                  Fire UI test (not live)
+                </button>
+              </div>
             </div>
           </li>
         ))}
@@ -171,7 +179,8 @@ export function AlertsPage() {
         <h2 className="text-lg font-semibold text-slate-100">Notifications</h2>
         {notifications.length === 0 && (
           <p className="mt-2 text-sm text-slate-400">
-            No notifications yet — trigger an alert above to see it appear here in real time.
+            No notifications yet. Live alerts arrive from market evaluation; the UI test control
+            only exercises the notification fan-out path.
           </p>
         )}
         <ul className="mt-2 space-y-2" data-testid="notification-list">

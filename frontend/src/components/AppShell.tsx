@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { logout } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
+import { WorkspaceBootstrap } from "@/features/workspace/WorkspaceBootstrap";
 
 /** LEOVEE_SPEC.md §9 — full sidebar; routes ship incrementally per IMPLEMENTATION_PLAN.md */
 const navItems: { to: string; label: string; disabled?: boolean; phase?: string }[] = [
@@ -50,6 +51,7 @@ function AuthStatus() {
 export function AppShell() {
   return (
     <div className="flex min-h-screen">
+      <WorkspaceBootstrap />
       <aside className="flex w-56 flex-col border-r border-slate-800 bg-leovee-panel p-4">
         <div className="mb-8 flex items-center gap-2">
           <img src="/leovee.svg" alt="Leovee" className="h-8 w-8" />

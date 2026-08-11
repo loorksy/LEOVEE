@@ -1,6 +1,7 @@
 import { apiUrl } from "@/api/config";
 import { clearTokens, getAccessToken } from "@/api/authStore";
 import { ApiError, apiFetch } from "@/api/httpClient";
+import { getWorkspaceId } from "@/api/workspaceStore";
 
 export type ConversationSummary = {
   id: string;
@@ -93,6 +94,8 @@ export async function postMessageStream(
   };
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  const workspaceId = getWorkspaceId();
+  if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
 
   const response = await fetch(
     `${apiUrl(`/api/v1/conversations/${conversationId}/messages`)}?stream=true`,
@@ -107,13 +110,21 @@ export async function postMessageStream(
   if (!response.ok) {
     if (response.status === 401) clearTokens();
     let message = response.statusText;
+    let code: string | undefined;
     try {
-      const data = (await response.json()) as { detail?: string };
-      if (typeof data.detail === "string") message = data.detail;
+      const data = (await response.json()) as {
+        detail?: string | { message?: string; code?: string };
+      };
+      if (typeof data.detail === "string") {
+        message = data.detail;
+      } else if (data.detail && typeof data.detail === "object") {
+        message = data.detail.message ?? message;
+        code = data.detail.code;
+      }
     } catch {
       // ignore
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, code);
   }
 
   if (!response.body) {

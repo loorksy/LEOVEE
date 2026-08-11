@@ -39,7 +39,7 @@ Design principles:
 | Market data | OANDA v20 REST + pricing stream | Abstract `MarketDataProvider` |
 | News / calendar | **Finnhub** adapters | See §2.2 |
 | Email | **Resend** | `EmailProvider` abstraction |
-| Payments | **Stripe** + **manual invoice** | Entitlements processor-agnostic |
+| Payments | **Manual invoice (default)** + **Stripe** adapter | `BILLING_PROVIDER=manual` until Stripe creds; entitlements processor-agnostic |
 | MCP | `leovee-mcp` on MCP + ext-apps patterns | Same authZ as API |
 | Logging | structlog | JSON in production |
 | Quality | pytest, mypy, ruff (backend); eslint, tsc (frontend) | |
@@ -75,8 +75,8 @@ Leovee workers are predominantly I/O-bound: OANDA streams, HTTP to LLM/news APIs
 | News | `FinnhubNewsProvider` | Forex/market news API, stable REST, clear attribution fields |
 | Economic calendar | `FinnhubEconomicCalendarProvider` | Same vendor reduces secret sprawl; calendar events with currency + impact |
 | Email | `ResendEmailProvider` | Transactional API, templates, deliverability |
-| Payments (primary) | `StripePaymentProvider` | Subscriptions, invoices, webhooks |
-| Payments (fallback) | `ManualInvoicePaymentProvider` | Admin-recorded payments; entitlements unchanged |
+| Payments (default) | `ManualInvoicePaymentProvider` | Admin-recorded payments; current `BILLING_PROVIDER` default |
+| Payments (Stripe) | `StripePaymentProvider` | Subscriptions, invoices, webhooks when credentials are set |
 
 LLM **web search** (if enabled) is supplementary only, with stored provenance — never the primary news/calendar feed.
 

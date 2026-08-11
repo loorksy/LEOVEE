@@ -1,5 +1,6 @@
 import { apiFetch } from "@/api/httpClient";
 import { clearTokens, setTokens } from "@/api/authStore";
+import { clearWorkspaceId } from "@/api/workspaceStore";
 
 export type TokenResponse = {
   access_token: string;
@@ -34,4 +35,5 @@ export async function signup(
 
 export function logout(): void {
   clearTokens();
+  clearWorkspaceId();
 }

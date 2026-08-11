@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, ApiError } from "./httpClient";
 import { clearTokens, setTokens } from "./authStore";
+import { clearWorkspaceId, setWorkspaceId } from "./workspaceStore";
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -13,10 +14,12 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 describe("apiFetch", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    clearWorkspaceId();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearWorkspaceId();
   });
 
   it("issues a GET without Authorization when no token is stored", async () => {
@@ -39,6 +42,18 @@ describe("apiFetch", () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-123");
+  });
+
+  it("attaches X-Workspace-Id when a workspace is selected", async () => {
+    setTokens({ access_token: "tok-123", refresh_token: "r" });
+    setWorkspaceId("ws-abc");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/v1/protected");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["X-Workspace-Id"]).toBe("ws-abc");
   });
 
   it("serializes query params and JSON body", async () => {

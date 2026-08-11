@@ -18,13 +18,22 @@ def run_devils_advocate(
     intelligence = engines.get("market_intelligence") or {}
 
     issues: list[str] = []
+    if direction == RecommendationDirection.NO_TRADE.value:
+        # Already fail-closed — adversarial has nothing to approve.
+        return {
+            "approved": False,
+            "issues": ["no_trade"],
+            "severity": "LOW",
+        }
     if direction == RecommendationDirection.BUY.value and mtf.get("trade_bias") == "BEARISH":
         issues.append("decision_buy_vs_mtf_bearish")
     if direction == RecommendationDirection.SELL.value and mtf.get("trade_bias") == "BULLISH":
         issues.append("decision_sell_vs_mtf_bullish")
     if intelligence.get("exhaustion"):
         issues.append("exhaustion_flag")
-    if float(decision.get("confidence", 0)) < 0.45:
+    conf_raw = decision.get("confidence")
+    confidence = 0.0 if conf_raw is None else float(conf_raw)
+    if confidence < 0.45:
         issues.append("low_confidence")
 
     approved = len(issues) == 0

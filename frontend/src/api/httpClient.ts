@@ -1,5 +1,6 @@
 import { apiUrl } from "@/api/config";
 import { clearTokens, getAccessToken } from "@/api/authStore";
+import { getWorkspaceId } from "@/api/workspaceStore";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -58,6 +59,10 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     const token = getAccessToken();
     if (token) {
       finalHeaders.Authorization = `Bearer ${token}`;
+    }
+    const workspaceId = getWorkspaceId();
+    if (workspaceId && !finalHeaders["X-Workspace-Id"]) {
+      finalHeaders["X-Workspace-Id"] = workspaceId;
     }
   }
 
