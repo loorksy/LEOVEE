@@ -52,3 +52,21 @@ async def require_support_audit(
     if code not in _SUPPORT_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Audit access required")
     return tenant
+
+
+async def describe_admin_access(
+    session: AsyncSession,
+    tenant: TenantContext,
+) -> dict[str, object]:
+    """Role/capability summary for the UI permission matrix — never 403s for members.
+
+    Every workspace member may read their own admin capabilities so the
+    frontend can hide/disable support-only vs platform-admin sections and
+    actions without guessing at role logic that only the backend owns.
+    """
+    code = await _workspace_role_code(session, tenant)
+    return {
+        "role": code,
+        "is_support": code in _SUPPORT_ROLES,
+        "is_platform_admin": code in _ADMIN_ROLES,
+    }

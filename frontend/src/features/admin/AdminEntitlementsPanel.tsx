@@ -1,9 +1,6 @@
-export type Entitlements = {
-  plan_code: string;
-  plan_name: string;
-  limits?: Record<string, number>;
-  subscription_status?: string;
-};
+import type { Entitlements } from "@/features/admin/types";
+
+export type { Entitlements };
 
 export function formatPlanLabel(entitlements: Entitlements): string {
   return `${entitlements.plan_name} (${entitlements.plan_code})`;

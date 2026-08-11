@@ -35,7 +35,7 @@ async def propose_lessons_from_outcome(
             conditions_json=proposal.conditions_json,
             confidence=proposal.confidence,
             supporting_episode_ids=proposal.supporting_episode_ids,
-            decay_at=utc_now() + timedelta(days=180),
+            decay_at=utc_now() + timedelta(days=settings.memory_lesson_ttl_days),
         )
         if low_sample:
             lesson.conditions_json = {

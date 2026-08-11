@@ -20,6 +20,13 @@ services:
       ENVIRONMENT: staging
     restart: unless-stopped
 
+  leovee-mcp:
+    ports: !override
+      - "127.0.0.1:8001:8001"
+    environment:
+      ENVIRONMENT: staging
+    restart: unless-stopped
+
   web:
     ports: !reset []
     build:

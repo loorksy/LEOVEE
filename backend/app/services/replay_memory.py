@@ -61,6 +61,7 @@ async def recall_at_time(
             Lesson.tenant_id == tenant.tenant_id,
             Lesson.workspace_id == tenant.workspace_id,
             Lesson.created_at <= cutoff,
+            Lesson.archived_at.is_(None),
         )
         .order_by(Lesson.created_at.desc())
         .limit(limit)

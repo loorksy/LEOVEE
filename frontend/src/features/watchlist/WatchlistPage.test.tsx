@@ -1,0 +1,46 @@
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import { WatchlistPage } from "./WatchlistPage";
+import * as watchlistApi from "@/api/watchlist";
+import * as watchlistStreamHook from "@/features/watchlist/useWatchlistQuotesStream";
+
+describe("WatchlistPage", () => {
+  it("lists watchlists with symbols and quotes from with_quotes=true", async () => {
+    vi.spyOn(watchlistApi, "listWatchlists").mockResolvedValue({
+      items: [
+        {
+          id: "wl-1",
+          name: "Majors",
+          symbols: [{ code: "EURUSD", item_id: "item-1", last_price: 1.0812 }],
+        },
+      ],
+      ws_symbols: ["EURUSD"],
+    });
+    vi.spyOn(watchlistStreamHook, "useWatchlistQuotesStream").mockImplementation(() => undefined);
+
+    renderWithProviders(<WatchlistPage />);
+
+    expect(await screen.findByText("Majors")).toBeInTheDocument();
+    expect(screen.getByText("EURUSD")).toBeInTheDocument();
+    expect(await screen.findByTestId("quote-EURUSD")).toHaveTextContent("1.0812");
+    expect(watchlistApi.listWatchlists).toHaveBeenCalledWith(true);
+  });
+
+  it("creates a watchlist from the form", async () => {
+    vi.spyOn(watchlistApi, "listWatchlists").mockResolvedValue({ items: [], ws_symbols: [] });
+    vi.spyOn(watchlistStreamHook, "useWatchlistQuotesStream").mockImplementation(() => undefined);
+    const createSpy = vi.spyOn(watchlistApi, "createWatchlist").mockResolvedValue({ id: "wl-2" });
+
+    renderWithProviders(<WatchlistPage />);
+
+    expect(await screen.findByText(/no watchlists yet/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/new watchlist name/i), {
+      target: { value: "Metals" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create watchlist/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith("Metals"));
+  });
+});

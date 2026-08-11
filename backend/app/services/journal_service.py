@@ -62,11 +62,19 @@ async def promote_to_lesson(
 ) -> Lesson:
     await bind_workspace_rls(session, tenant)
     lesson_text = entry.lesson or entry.notes
+    from datetime import timedelta
+
+    from app.core.config import get_settings
+    from app.core.datetime_utils import utc_now
+
+    settings = get_settings()
     lesson = Lesson(
         tenant_id=tenant.tenant_id,
         workspace_id=tenant.workspace_id,
         statement=lesson_text,
         conditions_json={"tags": entry.tags_json, "source": "journal", "title": entry.title},
+        decay_at=utc_now() + timedelta(days=settings.memory_lesson_ttl_days),
+        confidence=1.0,
     )
     session.add(lesson)
     await session.flush()

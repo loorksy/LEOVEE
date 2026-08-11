@@ -10,20 +10,43 @@ from app.mcp.runtime import TOOL_NAMES
 _APPS_DIR = Path(__file__).resolve().parent / "apps"
 
 
+def _apps_dirs() -> list[Path]:
+    """Resolve ext-apps from monorepo root or Docker /app/ext-apps, then packaged apps."""
+    here = Path(__file__).resolve()
+    candidates = [
+        Path.cwd() / "ext-apps",
+        here.parents[2] / "ext-apps",  # docker: /app/app/mcp → /app/ext-apps
+        here.parents[3] / "ext-apps",  # monorepo: backend/app/mcp → repo/ext-apps
+    ]
+    dirs: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate.is_dir() and candidate not in seen:
+            dirs.append(candidate)
+            seen.add(candidate)
+    if _APPS_DIR not in seen:
+        dirs.append(_APPS_DIR)
+    return dirs
+
+
 def list_tools() -> list[dict[str, Any]]:
     return [{"name": name, "description": f"Leovee tool {name}"} for name in sorted(TOOL_NAMES)]
 
 
 def load_app_manifest(app_id: str) -> dict[str, Any]:
-    path = _APPS_DIR / f"{app_id}.json"
-    if not path.is_file():
-        raise FileNotFoundError(app_id)
-    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    return data
+    for directory in _apps_dirs():
+        path = directory / f"{app_id}.json"
+        if path.is_file():
+            data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+            return data
+    raise FileNotFoundError(app_id)
 
 
 def list_app_ids() -> list[str]:
-    return sorted(p.stem for p in _APPS_DIR.glob("*.json"))
+    ids: set[str] = set()
+    for directory in _apps_dirs():
+        ids.update(p.stem for p in directory.glob("*.json"))
+    return sorted(ids)
 
 
 def main() -> None:
