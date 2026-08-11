@@ -5,19 +5,23 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_workspace_context
+from app.core.config import get_settings
 from app.core.errors import ProviderConfigurationError
 from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
 from app.models.conversation import Conversation, ConversationMode
+from app.providers.llm.anthropic import AnthropicProvider
 from app.providers.llm.factory import get_llm_provider
+from app.providers.llm.openai import OpenAIProvider
 from app.services import chat_service
+from app.services.chat_stream import iter_chat_turn_stream
 
 router = APIRouter(prefix="/api/v1/conversations", tags=["chat"])
 
@@ -32,6 +36,20 @@ class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=16000)
     stream: bool = False
     mode: ConversationMode | None = None
+
+
+def _optional_fallback_provider() -> Any | None:
+    """Secondary provider for mid-stream failure recovery when both keys exist."""
+    settings = get_settings()
+    try:
+        primary = get_llm_provider(settings)
+    except ProviderConfigurationError:
+        return None
+    if isinstance(primary, OpenAIProvider) and settings.anthropic_api_key:
+        return AnthropicProvider(settings.anthropic_api_key)
+    if isinstance(primary, AnthropicProvider) and settings.openai_api_key:
+        return OpenAIProvider(settings.openai_api_key)
+    return None
 
 
 @router.get("")
@@ -118,6 +136,7 @@ async def list_messages(
 async def post_message(
     conversation_id: uuid.UUID,
     body: MessageCreate,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     tenant: Annotated[TenantContext, Depends(get_workspace_context)],
     stream: Annotated[bool, Query()] = False,
@@ -146,31 +165,71 @@ async def post_message(
         ) from exc
 
     if use_stream:
+        fallback = _optional_fallback_provider()
+        conversation_id_value = conv.id
+        if body.mode is not None:
+            await session.flush()
 
         async def event_stream() -> AsyncIterator[str]:
-            turn = await chat_service.run_chat_turn(
-                session,
-                tenant,
-                conv,
-                user_content=body.content,
-                llm=llm,
-            )
-            recall_event = {
-                "event": "recall",
-                "count": turn.recall.get("count", 0),
-                "label": turn.recall.get("label"),
-            }
-            yield f"data: {json.dumps(recall_event)}\n\n"
-            for chunk in turn.assistant_message.content.split():
-                yield f"data: {json.dumps({'event': 'token', 'data': chunk + ' '})}\n\n"
-            done = {
-                "event": "done",
-                "assistant_message_id": str(turn.assistant_message.id),
-                "actions": turn.actions,
-            }
-            yield f"data: {json.dumps(done)}\n\n"
+            from app.infrastructure.database import get_session_factory
 
-        return StreamingResponse(event_stream(), media_type="text/event-stream")
+            factory = get_session_factory()
+            if factory is None:
+                err = {
+                    "event": "error",
+                    "code": "database_unconfigured",
+                    "message": "DATABASE_URL is not configured",
+                    "partial_discarded": True,
+                }
+                yield f"data: {json.dumps(err)}\n\n"
+                return
+            async with factory() as stream_session:
+                stream_conv = await stream_session.scalar(
+                    select(Conversation).where(Conversation.id == conversation_id_value)
+                )
+                if stream_conv is None:
+                    err = {
+                        "event": "error",
+                        "code": "not_found",
+                        "message": "Conversation not found",
+                        "partial_discarded": True,
+                    }
+                    yield f"data: {json.dumps(err)}\n\n"
+                    return
+                if body.mode is not None:
+                    stream_conv.mode = body.mode
+                try:
+                    async for event in iter_chat_turn_stream(
+                        stream_session,
+                        tenant,
+                        stream_conv,
+                        user_content=body.content,
+                        llm=llm,
+                        fallback_llm=fallback,
+                    ):
+                        if await request.is_disconnected():
+                            await stream_session.rollback()
+                            return
+                        yield f"data: {json.dumps(event, default=str)}\n\n"
+                    await stream_session.commit()
+                except Exception as exc:  # noqa: BLE001
+                    await stream_session.rollback()
+                    err = {
+                        "event": "error",
+                        "code": type(exc).__name__,
+                        "message": str(exc) or "stream_failed",
+                        "partial_discarded": True,
+                    }
+                    yield f"data: {json.dumps(err)}\n\n"
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     turn = await chat_service.run_chat_turn(
         session,

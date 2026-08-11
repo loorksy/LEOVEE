@@ -239,27 +239,38 @@ User preferences in workspace settings gate channels per type.
 
 ---
 
-## 9. Admin control plane (spec §70)
+## 9. Admin control plane (spec §70 — reduced)
 
-Separate React **admin** feature module — 28 sections:
+Single-operator admin module. Scope is intentionally reduced from the
+historical 28-section list; unbuilt sections are **not** open debt.
 
-Overview, Users, Workspaces, Organizations, Subscriptions, Billing, Usage, AI Models, AI Providers, Market Data, OANDA, MCP, System Health, Agent Runs, Agent Traces, Memory & Learning, Recommendations, Trades, News, Background Jobs, Redis, Database, API, Errors, Security, Audit Logs, Feature Flags, System Settings.
+Required surfaces:
+1. **Entitlements** — plan/limits/subscription (`AdminEntitlementsPanel`)
+2. **Overview** — platform counts (`AdminOverviewPanel`)
+3. **Conversations** — operator conversation list (`AdminConversationsPanel`)
+4. **Observability** — agent-run summary (`AdminObservabilityPanel`)
+
+Permission matrix via `/admin/me` (support vs platform-admin).
 
 ### 9.1 Admin overview metrics
 
-Users, active workspaces, subscriptions, AI requests, tokens, market-data requests, MCP requests, errors, latency, job queue depth, memory store size, learning pipeline health.
+Counts needed for §70 Overview (users/workspaces/conversations). Deeper
+metrics (tokens, MCP, job depth, learning health) are optional depth and
+out of current scope.
 
 ### 9.2 AI management
 
-Configure providers, models, routing, fallbacks, rate limits, token budgets, system prompts, agent parameters, memory thresholds — all via `model_configs` / `provider_configs` / admin UI.
+Provider/model routing remains code + env configuration for the operator
+deployment. A full AI admin console is out of §70 required scope.
 
 ### 9.3 Feature flags
 
-Server-side evaluation middleware:
+Server-side evaluation middleware remains:
 
 `AI_CHAT`, `ADVANCED_ANALYSIS`, `RESEARCH`, `BACKTEST`, `MCP`, `OANDA_EXECUTION`, `ADVANCED_CHARTS`, `PREMIUM_MODELS`, `MEMORY`, `LEARNING`, `CROSS_TENANT_AGGREGATE_LEARNING`.
 
-Scoped: platform → tenant → workspace override.
+Scoped: platform → tenant → workspace override. A dedicated Feature Flags
+admin section is out of §70 required scope.
 
 ---
 

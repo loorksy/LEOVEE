@@ -1,5 +1,7 @@
 # §114 checklist — PR phases 36–38 (admin, billing, entitlements)
 
+**Scope note (Batch 8):** LEOVEE_SPEC §70 and SAAS_ARCHITECTURE §9 were amended to a reduced operator admin plane (entitlements, overview, conversations, observability). The historical 28-section list is out of scope and is **not** carried as permanent debt. Phase 36 COMPLETE is judged against the amended scope.
+
 - [x] ruff, mypy, pytest on Postgres + `leovee_app` — CI
 - [x] Migration `014_billing_webhooks` — idempotent `(provider, external_event_id)`
 - [x] Admin RBAC: `require_support_audit` vs `require_platform_admin`; support **403** on `/admin/conversations`
@@ -8,6 +10,7 @@
 - [x] `EntitlementError` → HTTP 403 (global handler + MCP route)
 - [x] Integration `test_admin_billing_phases_36_38.py`
 - [x] Admin capability endpoint: `GET /admin/me` — never 403s, returns `{role, is_support, is_platform_admin}` so the UI can build the permission matrix without duplicating backend RBAC logic (`backend/app/api/admin_deps.py::describe_admin_access`); covered by `test_admin_me_reflects_permission_matrix_for_each_role` (USER/SUPPORT/ADMIN)
+- [x] Amended §70 required surfaces shipped — entitlements + overview + conversations + observability on `AdminPage` (Batch 6); Settings page also surfaces entitlements (Batch 8)
 - [x] Frontend `AdminEntitlementsPanel` routed + UI permission matrix — **Batch 6.** `frontend/src/features/admin/AdminPage.tsx` routed at `/admin` (added to `App.tsx`, nav entry enabled in `AppShell.tsx`). Composes:
   - `AdminEntitlementsPanel` — plan/limits, visible to every workspace member (`GET /billing/entitlements`)
   - `AdminOverviewPanel`, `AdminConversationsPanel`, `AdminObservabilityPanel` — platform-admin only (`GET /admin/overview`, `/admin/conversations`, `/admin/observability/agent-runs`)

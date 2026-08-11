@@ -7,19 +7,19 @@ const navItems: { to: string; label: string; disabled?: boolean; phase?: string 
   { to: "/", label: "Home" },
   { to: "/analyst", label: "AI Analyst" },
   { to: "/chat", label: "Chat" },
-  { to: "/markets", label: "Markets", disabled: true, phase: "7–8" },
+  { to: "/markets", label: "Markets" },
   { to: "/watchlist", label: "Watchlist" },
   { to: "/analysis", label: "Analysis" },
-  { to: "/trades", label: "Trades", disabled: true, phase: "27" },
+  { to: "/trades", label: "Trades" },
   { to: "/recommendations", label: "Recommendations" },
   { to: "/alerts", label: "Alerts" },
   { to: "/journal", label: "Journal" },
-  { to: "/research", label: "Research", disabled: true, phase: "14" },
+  { to: "/research", label: "Research" },
   { to: "/memory", label: "Memory" },
   { to: "/performance", label: "Performance" },
   { to: "/replay", label: "Replay" },
   { to: "/admin", label: "Admin" },
-  { to: "/settings", label: "Settings", disabled: true, phase: "38" },
+  { to: "/settings", label: "Settings" },
 ];
 
 function AuthStatus() {

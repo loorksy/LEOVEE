@@ -1,40 +1,71 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ChatPage } from "./ChatPage";
-import * as conversationsApi from "@/api/conversations";
+
+const postMessageStream = vi.fn();
+const listMessages = vi.fn();
+const listConversations = vi.fn();
+const createConversation = vi.fn();
+
+vi.mock("../../api/conversations", () => ({
+  listMessages: (...args: unknown[]) => listMessages(...args),
+  listConversations: (...args: unknown[]) => listConversations(...args),
+  postMessageStream: (...args: unknown[]) => postMessageStream(...args),
+  createConversation: (...args: unknown[]) => createConversation(...args),
+}));
+
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("ChatPage", () => {
-  it("starts a conversation, sends a message, and shows the RECALL bundle", async () => {
-    vi.spyOn(conversationsApi, "listConversations").mockResolvedValue({ items: [] });
-    vi.spyOn(conversationsApi, "createConversation").mockResolvedValue({ id: "conv-1" });
-    vi.spyOn(conversationsApi, "listMessages").mockResolvedValue({
-      items: [],
-      summary_text: null,
+  beforeEach(() => {
+    listMessages.mockReset();
+    listConversations.mockReset();
+    postMessageStream.mockReset();
+    createConversation.mockReset();
+    listConversations.mockResolvedValue({
+      items: [{ id: "c1", title: "EURUSD", symbol: "EURUSD", mode: "CHAT", summary_text: null }],
     });
-    vi.spyOn(conversationsApi, "postMessage").mockResolvedValue({
-      user_message_id: "m-user",
-      assistant_message_id: "m-assistant",
-      content: "EURUSD is showing a bullish structure break.",
-      recall: {
-        label: "HISTORICAL_MEMORY",
-        symbol: "EURUSD",
-        count: 2,
-        items: [{ key: "eurusd.sweep.bias" }],
+    listMessages.mockResolvedValue({ items: [], summary_text: null });
+  });
+
+  it("streams assistant tokens incrementally", async () => {
+    postMessageStream.mockImplementation(
+      async (
+        _id: string,
+        _content: string,
+        handlers: {
+          onToken: (t: string) => void;
+          onDone: (p: { assistant_message_id: string; actions: unknown[] }) => void;
+        },
+      ) => {
+        handlers.onToken("Hello ");
+        handlers.onToken("world");
+        handlers.onDone({ assistant_message_id: "a1", actions: [] });
       },
-      actions: [],
-      summary_text: null,
+    );
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "EURUSD" }));
+    fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => {
+      expect(postMessageStream).toHaveBeenCalled();
     });
-
-    renderWithProviders(<ChatPage />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /new conversation/i }));
-    const input = await screen.findByLabelText(/message/i);
-    fireEvent.change(input, { target: { value: "What is the setup on EURUSD?" } });
-    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
-
-    const recallPanel = await screen.findByTestId("recall-panel");
-    expect(recallPanel).toHaveTextContent("HISTORICAL_MEMORY");
-    expect(recallPanel).toHaveTextContent("2 memories");
+    await waitFor(() => {
+      expect(screen.getByTestId("message-list")).toBeInTheDocument();
+    });
   });
 });

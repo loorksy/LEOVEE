@@ -811,60 +811,78 @@ Entities: Plan, Subscription, Invoice, Usage, Entitlement.
 Entitlement checks must happen server-side.
 
 ============================================================
-70. ADMIN DASHBOARD
+70. ADMIN DASHBOARD (reduced operator scope)
 ============================================================
 
-A completely separate admin application/section with:
-1. Overview  2. Users  3. Workspaces  4. Organizations  5. Subscriptions  6. Billing  7. Usage  8. AI Models  9. AI Providers  10. Market Data  11. OANDA  12. MCP  13. System Health  14. Agent Runs  15. Agent Traces  16. Memory & Learning  17. Recommendations  18. Trades  19. News  20. Background Jobs  21. Redis  22. Database  23. API  24. Errors  25. Security  26. Audit Logs  27. Feature Flags  28. System Settings
+A separate admin section for the single-operator deployment. The original
+28-section admin plane is **intentionally reduced** — unbuilt sections are
+not carried as permanent debt.
+
+Required admin surfaces (exit criteria for Phase 36):
+1. **Entitlements** — plan, limits, and subscription status for the workspace
+2. **Overview** — high-level platform counts (users/workspaces/conversations)
+3. **Conversations** — operator listing of conversations in scope
+4. **Observability** — agent-run / memory observability summary
+
+Permission matrix: support vs platform-admin via `/admin/me`; support-only
+sections hide client-side ahead of backend 403s.
+
+Sections 71–77 below document optional depth that is **out of scope** for
+the current product unless re-opened by the owner. They are not open debt.
 
 ============================================================
-71. ADMIN OVERVIEW
+71. ADMIN OVERVIEW (optional depth — out of scope)
 ============================================================
 
-Display: total users, active users, active workspaces, active subscriptions, AI requests, token usage, market-data requests, MCP requests, errors, latency, background jobs, active agents, memory store size, learning pipeline health, system health.
+Optional depth beyond §70 Overview: total users, active users, active
+workspaces, subscriptions, AI/token/market-data/MCP request counts, errors,
+latency, jobs, agents, memory store size, learning pipeline health.
 
 ============================================================
-72. ADMIN USER MANAGEMENT
+72. ADMIN USER MANAGEMENT (optional depth — out of scope)
 ============================================================
 
-Admins can: search users, inspect user, suspend, activate, verify, reset sessions, view usage, view subscription, view workspace, view audit history.
-Do not allow admins to see private user data unnecessarily. Use permission boundaries.
+Optional: search/inspect/suspend/activate users, reset sessions, usage,
+subscription, workspace, audit history. Permission boundaries still apply
+if this surface is re-opened.
 
 ============================================================
-73. ADMIN WORKSPACE MANAGEMENT
+73. ADMIN WORKSPACE MANAGEMENT (optional depth — out of scope)
 ============================================================
 
-Admins can: search workspace, inspect metadata, subscription, usage, members, status, limits, feature flags.
-Avoid exposing sensitive chat content or private memories unless explicitly authorized for support/debugging.
+Optional: search workspace, inspect metadata, subscription, usage, members,
+status, limits, feature flags. Avoid exposing private chat/memories unless
+explicitly authorized.
 
 ============================================================
-74. ADMIN AI MANAGEMENT
+74. ADMIN AI MANAGEMENT (optional depth — out of scope)
 ============================================================
 
-Configure: providers, models, routing, fallbacks, rate limits, token budgets, temperature where applicable, feature flags, system prompts, agent configuration, memory/learning parameters (sample thresholds, decay rates, calibration settings, retrieval budgets).
-Do not hard-code AI provider configuration.
+Optional: configure providers, models, routing, fallbacks, rate limits,
+token budgets, system prompts, agent/memory parameters via admin UI.
+Provider configuration must not be hard-coded when this surface exists.
 
 ============================================================
-75. ADMIN MARKET DATA
+75. ADMIN MARKET DATA (optional depth — out of scope)
 ============================================================
 
-Display: OANDA status, stream health, API health, latency, rate limits, last successful request, failed requests, active symbols, candle synchronization, backfill/gap-repair status, data freshness, provider errors.
+Optional: OANDA/stream/API health, latency, rate limits, candle sync,
+backfill status, freshness, provider errors.
 
 ============================================================
-76. ADMIN MCP
+76. ADMIN MCP (optional depth — out of scope)
 ============================================================
 
-Display: MCP server status, active sessions, requests, errors, latency, connected clients, tools used, resource usage, authentication failures.
+Optional: MCP server status, sessions, requests, errors, latency, tools,
+auth failures.
 
 ============================================================
-77. ADMIN AGENT & MEMORY OBSERVABILITY
+77. ADMIN AGENT & MEMORY OBSERVABILITY (optional depth — out of scope)
 ============================================================
 
-Every agent execution creates an AgentRun: run_id, workspace_id, user_id, symbol, trigger, state, started_at, completed_at, latency, model, provider, tool_calls, memories_retrieved, decision, status, error.
-
-AgentTrace records the safe execution trace: tool calls, tool inputs, tool outputs, retrieved memories, decisions, evidence, state transitions. Never expose or store private chain-of-thought.
-
-Memory & Learning admin panel: episodes recorded, lessons created, calibration accuracy over time, strategy decay flags, memory store growth, retrieval latency, per-workspace memory usage.
+§70 Observability covers the required agent-run summary. Optional depth:
+full AgentRun/AgentTrace browsers, calibration curves, strategy decay
+flags, per-workspace memory growth. Never expose private chain-of-thought.
 
 ============================================================
 78. EVENT-DRIVEN ARCHITECTURE

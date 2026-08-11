@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_workspace_context
+from app.core.config import get_settings
 from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
 from app.services import news_service
@@ -20,8 +21,13 @@ async def list_news(
     currency: str | None = None,
     limit: int = 20,
 ) -> dict[str, object]:
+    settings = get_settings()
+    provider_configured = bool(settings.finnhub_api_key)
     rows = await news_service.list_recent_news(session, currency=currency, limit=limit)
     return {
+        "provider": "finnhub",
+        "provider_configured": provider_configured,
+        "provider_status": "ok" if provider_configured else "not_configured",
         "items": [
             {
                 "id": str(r.id),
@@ -32,5 +38,5 @@ async def list_news(
                 "url": r.url,
             }
             for r in rows
-        ]
+        ],
     }
