@@ -294,10 +294,16 @@ Normalized engine artifacts with `symbol_id`, `timeframe`, time range, geometry 
 
 ## 7. News & research
 
-### 7.1 `news_events`
+### 7.1 `news_events` (shared global reference data — intentional)
 
 `id`, `source`, `published_at`, `headline`, `summary`, `currency`, `relevance`, `market_impact`, `url`, `external_id`, `raw_json`, `ingested_at`.  
 Unique `(source, external_id)`.
+
+**Tenant scoping decision:** `news_events` is **deliberately shared global reference data**, not workspace-scoped. It has **no** `tenant_id` / `workspace_id` columns and **no** RLS policy.
+
+Rationale: rows are upserted from public market/news providers (Finnhub headlines / calendar-style fields) keyed by `(source, external_id)`. Nothing user-specific, conversation-specific, or workspace-specific is written into this table. Per-workspace copies would only duplicate the same public feed.
+
+Isolation boundary: user-authored research stays in `research_items` (workspace-owned + RLS). Do **not** store private notes, prompts, or PII in `news_events`.
 
 ### 7.2 `research_items`
 
@@ -467,9 +473,12 @@ Layouts: user/workspace preferences. Versions: link `analysis_id` → chart stat
 | is_active | boolean | |
 | created_at, updated_at | timestamptz | |
 
-### 13.2 `provider_configs` / `model_configs`
+### 13.2 `platform_secrets` / `model_configs`
 
-Encrypted provider secrets at platform/tenant level; model routing table (provider, model_id, task_type, priority, rate_limit).
+There is **no** `provider_configs` table. Reality in code:
+
+- **`platform_secrets`** — encrypted platform-level credentials (LLM keys, Finnhub, practice OANDA, etc.) managed by SUPER_ADMIN via Admin → Platform secrets.
+- **`model_configs`** — model routing rows (`task`, provider, model id, priority / limits).
 
 ### 13.3 `mcp_sessions`
 

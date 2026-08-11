@@ -16,7 +16,9 @@ export type AnalysisRunResponse = {
   engines: Record<string, unknown>;
   decision: {
     direction?: string;
-    confidence?: number;
+    confidence?: number | null;
+    degraded?: boolean;
+    degraded_reason?: string;
     [key: string]: unknown;
   };
   /** String in older clients; orchestrator returns `{ llm }` or `{ llm_unavailable }`. */

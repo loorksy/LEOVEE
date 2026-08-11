@@ -173,8 +173,8 @@ Limits encoded in `plans.limits_json`:
 
 | Provider | Role |
 |----------|------|
-| `StripePaymentProvider` | Primary — checkout, subscriptions, webhooks |
-| `ManualInvoicePaymentProvider` | Offline — admin marks paid |
+| `ManualInvoicePaymentProvider` | **Default** (`BILLING_PROVIDER=manual`) — offline / admin marks paid |
+| `StripePaymentProvider` | Production adapter when Stripe credentials are configured — checkout, subscriptions, webhooks |
 
 **EntitlementService** reads subscription status + plan — **never** Stripe SDK in feature code.
 
@@ -219,8 +219,9 @@ Used by MCP and user automation — same workspace binding.
 
 Execution (spec §19) requires:
 
-- Feature flag `OANDA_EXECUTION`
-- Workspace opt-in + kill switch
+- Deploy/server policy gate `OANDA_EXECUTION` (not a Settings UI field; staging forces `false`)
+- `trade_service` hard-rejects `execution_enabled=True` until live execution is authorized
+- Workspace opt-in + kill switch (future)
 - Limits: max daily loss, max risk, max position size, max open trades
 
 ---
@@ -249,6 +250,7 @@ Required surfaces:
 2. **Overview** — platform counts (`AdminOverviewPanel`)
 3. **Conversations** — operator conversation list (`AdminConversationsPanel`)
 4. **Observability** — agent-run summary (`AdminObservabilityPanel`)
+5. **Platform secrets** — encrypted platform credentials (`AdminSecretsPanel` / `platform_secrets`)
 
 Permission matrix via `/admin/me` (support vs platform-admin).
 
@@ -260,8 +262,9 @@ out of current scope.
 
 ### 9.2 AI management
 
-Provider/model routing remains code + env configuration for the operator
-deployment. A full AI admin console is out of §70 required scope.
+Provider secrets are editable via **Platform secrets** (`platform_secrets`).
+Model routing uses `model_configs` (+ env). A full multi-section AI admin
+console beyond secrets/status remains out of the reduced §70 scope.
 
 ### 9.3 Feature flags
 

@@ -7,7 +7,7 @@ import * as workspaceHook from "@/hooks/useWorkspaceId";
 import * as notificationsStreamHook from "@/features/alerts/useNotificationsStream";
 
 describe("AlertsPage", () => {
-  it("lists alerts and triggers the demo mock endpoint", async () => {
+  it("lists alerts and fires the labeled UI test control", async () => {
     vi.spyOn(alertsApi, "listAlerts").mockResolvedValue({
       items: [
         {
@@ -35,10 +35,11 @@ describe("AlertsPage", () => {
 
     expect(await screen.findByTestId("alert-alert-1")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/mock price for PRICE alert/i), {
+    expect(screen.getByText(/UI test control — not live evaluation/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/UI test price/i), {
       target: { value: "1.15" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /trigger \(demo\)/i }));
+    fireEvent.click(screen.getByRole("button", { name: /fire ui test \(not live\)/i }));
 
     await waitFor(() => expect(triggerSpy).toHaveBeenCalledWith("alert-1", 1.15));
   });

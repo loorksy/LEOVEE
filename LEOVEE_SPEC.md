@@ -137,7 +137,7 @@ EMAIL:
 Define an EmailProvider abstraction with a concrete production adapter (e.g. Resend, AWS SES, or SMTP — choose and document). Used for verification, password reset, alerts, and notifications.
 
 PAYMENTS:
-Define a PaymentProvider abstraction with adapters. Implement one concrete production adapter (Stripe as default where available) plus a manual-invoice/offline adapter so billing remains operable if the primary processor is unavailable. Entitlement logic must not depend on any single processor.
+Define a PaymentProvider abstraction with adapters. Implement a concrete Stripe adapter plus a manual-invoice/offline adapter. **Current default is `BILLING_PROVIDER=manual`** (code / staging); switch to Stripe when production Stripe credentials are supplied. Entitlement logic must not depend on any single processor.
 
 MCP:
 Build a dedicated MCP server (leovee-mcp) compatible with https://github.com/modelcontextprotocol/ext-apps. Use the official MCP Apps architecture where appropriate.
@@ -771,7 +771,7 @@ agent_episodes, agent_memories, memory_embeddings (pgvector), symbol_profiles, s
 chart_annotations, chart_layouts, chart_versions,
 alerts, notifications,
 journal_entries,
-provider_configs, model_configs,
+platform_secrets, model_configs,
 oanda_connections,
 api_keys,
 mcp_sessions,
@@ -818,11 +818,14 @@ A separate admin section for the single-operator deployment. The original
 28-section admin plane is **intentionally reduced** — unbuilt sections are
 not carried as permanent debt.
 
-Required admin surfaces (exit criteria for Phase 36):
+Required admin surfaces (exit criteria for Phase 36 + operator secrets):
 1. **Entitlements** — plan, limits, and subscription status for the workspace
 2. **Overview** — high-level platform counts (users/workspaces/conversations)
 3. **Conversations** — operator listing of conversations in scope
 4. **Observability** — agent-run / memory observability summary
+5. **Platform secrets** — SUPER_ADMIN / platform-admin panel to set encrypted
+   platform credentials (`platform_secrets`; LLM / Finnhub / practice OANDA).
+   Never returns secret values; masks configured state only.
 
 Permission matrix: support vs platform-admin via `/admin/me`; support-only
 sections hide client-side ahead of backend 403s.
@@ -1050,7 +1053,12 @@ News unavailable → lower confidence.
 Spread abnormal → WAIT.
 Conflicting timeframes → WAIT / NO_TRADE.
 Risk calculation failure → NO_TRADE.
-LLM unavailable → fallback provider if configured.
+LLM unavailable (no provider configured, or all failover providers fail) →
+**NO_TRADE** with reason `LLM_UNAVAILABLE`. Never emit BUY/SELL with a
+confidence value when the LLM / narrative layer did not run. Prefer failover
+across configured providers first; if none can run, fail closed.
+Adversarial validation cannot run → **NO_TRADE** with reason
+`ADVERSARIAL_UNAVAILABLE` (same fail-closed rule).
 Chart failure → recommendation survives.
 Database failure → fail safely.
 OANDA failure → do not fabricate data.
@@ -1067,10 +1075,10 @@ backend/app/
   api/ (routes, websocket)
   core/ (config, security, logging, errors)
   domain/ (market, structure, liquidity, zones, volatility, risk, scenario, thesis, recommendation, chart, memory, users, workspaces, billing)
-  agents/ (orchestrator, analysis, research, reasoning, validation, monitoring, memory_writer)
-  engines/ (market_intelligence, scenario, decision, risk, chart_composition, monitoring, learning)
-  providers/ (llm/anthropic, llm/openai, market/oanda, news, calendar, email, payments)
-  services/ (auth, workspace, chat, analysis, recommendation, thesis, trade, memory, billing, usage, notification)
+  agents/ (orchestrator, …)
+  engines/ (market_intelligence, scenario, decision, risk, chart_composition, monitoring, learning, reasoning)
+  providers/ (llm/anthropic, llm/openai, llm/openrouter, market/oanda, news, calendar, email, payments)
+  services/ (auth, workspace, chat, analysis, recommendation, thesis, trade, memory, billing, usage, notification, learning/memory_writer)
   infrastructure/ (database, redis, queues, storage, embeddings)
   mcp/ (server, tools, resources, apps)
   workers/
@@ -1132,6 +1140,12 @@ No meaningful event → NO LLM CALL. Minor event → FAST MODEL. Major structura
 
 Flags: AI_CHAT, ADVANCED_ANALYSIS, RESEARCH, BACKTEST, MCP, OANDA_EXECUTION, ADVANCED_CHARTS, PREMIUM_MODELS, MEMORY, LEARNING, CROSS_TENANT_AGGREGATE_LEARNING (default OFF).
 Feature flags must be enforced server-side.
+
+**`OANDA_EXECUTION` note:** this is a **deploy / server policy gate**, not a
+Settings UI field. Live order placement is rejected in `trade_service` when
+`execution_enabled=True`; staging deploy scripts force practice OANDA and
+`OANDA_EXECUTION=false`. Do not present it as a user-toggleable product setting
+until live execution is explicitly authorized.
 
 ============================================================
 104. ADMIN FEATURE CONTROL

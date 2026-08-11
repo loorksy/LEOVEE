@@ -12,7 +12,7 @@
 | `leovee-api` | `leovee-backend` | 8000 | FastAPI HTTP + WebSocket |
 | `leovee-worker` | `leovee-backend` | — | Arq workers (all queues) |
 | `leovee-stream` | `leovee-backend` | — | OANDA stream supervisor (optional dedicated) |
-| `leovee-mcp` | `leovee-backend` | 8090 | MCP SSE/HTTP (optional) |
+| `leovee-mcp` | `leovee-backend` | 8001 | MCP SSE/HTTP (optional; compose binds `127.0.0.1:8001:8001`) |
 | `leovee-web` | `leovee-frontend` | 80 | Static SPA + nginx |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | Primary database |
 | `redis` | `redis:7-alpine` | 6379 | Cache, Arq, streams, pub/sub |
@@ -450,6 +450,6 @@ docker compose down -v
 
 ## 18. MCP deployment
 
-- Optional service `leovee-mcp` exposing SSE on internal port 8090
+- Optional service `leovee-mcp` exposing SSE on internal port **8001** (matches `docker/mcp.Dockerfile` / `docker-compose.yml`)
 - Not exposed publicly by default — VPN or authenticated gateway
 - Same `DATABASE_URL` and secrets as API (read-only DB role optional for strict mode)

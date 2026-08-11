@@ -39,6 +39,8 @@ describe("MarketsPage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("oanda-provider-not-configured")).toBeInTheDocument(),
     );
+    expect(screen.getByText(/OANDA_API_TOKEN/)).toBeInTheDocument();
+    expect(screen.getByText(/not an empty-data state/i)).toBeInTheDocument();
     expect(getCandles).not.toHaveBeenCalled();
   });
 

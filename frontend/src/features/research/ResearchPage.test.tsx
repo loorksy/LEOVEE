@@ -35,6 +35,8 @@ describe("ResearchPage", () => {
       expect(screen.getByTestId("news-provider-not-configured")).toBeInTheDocument(),
     );
     expect(screen.getByText(/News provider not configured/i)).toBeInTheDocument();
+    expect(screen.getByText(/FINNHUB_API_KEY/)).toBeInTheDocument();
+    expect(screen.getByText(/not an empty-data state/i)).toBeInTheDocument();
   });
 
   it("lists news items when provider is configured", async () => {

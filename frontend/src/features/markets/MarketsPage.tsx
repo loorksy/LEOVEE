@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getCandles } from "@/api/markets";
 import { getProvidersStatus } from "@/api/providers";
+import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
 
 const TIMEFRAMES = ["M15", "H1", "H4", "D1"] as const;
 
@@ -31,23 +32,17 @@ export function MarketsPage() {
         </p>
       </header>
       {providersQuery.isSuccess && !oandaConfigured && (
-        <div
-          className="rounded border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
-          data-testid="oanda-provider-not-configured"
-        >
-          <p className="font-medium">Market data provider not configured</p>
-          <p className="mt-1 text-amber-200/80">
-            Set <code className="text-amber-100">OANDA_API_TOKEN</code> and{" "}
-            <code className="text-amber-100">OANDA_ACCOUNT_ID</code> (practice) as GitHub Actions
-            secrets and re-run Deploy staging.
-          </p>
-        </div>
+        <ProviderNotConfiguredBanner
+          title="Market data provider not configured"
+          credentials={["OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"]}
+          testId="oanda-provider-not-configured"
+        />
       )}
       <div className="flex flex-wrap gap-3">
         <label className="text-xs text-slate-400">
           Symbol
           <input
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
             disabled={!oandaConfigured}
@@ -56,7 +51,7 @@ export function MarketsPage() {
         <label className="text-xs text-slate-400">
           Timeframe
           <select
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value as (typeof TIMEFRAMES)[number])}
             disabled={!oandaConfigured}

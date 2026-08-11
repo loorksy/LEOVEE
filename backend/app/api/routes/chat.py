@@ -148,7 +148,15 @@ async def post_message(
     except ProviderConfigurationError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
+            detail={
+                "message": str(exc),
+                "code": "provider_not_configured",
+                "missing": [
+                    "OPENAI_API_KEY",
+                    "ANTHROPIC_API_KEY",
+                    "OPENROUTER_API_KEY",
+                ],
+            },
         ) from exc
 
     settings = get_settings()
