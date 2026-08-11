@@ -33,6 +33,7 @@ describe("AdminPage permission matrix", () => {
     const overviewSpy = vi.spyOn(adminApi, "getAdminOverview");
     const conversationsSpy = vi.spyOn(adminApi, "listAdminConversations");
     const agentRunsSpy = vi.spyOn(adminApi, "listAdminAgentRuns");
+    const secretsSpy = vi.spyOn(adminApi, "getAdminSecrets");
 
     renderWithProviders(<AdminPage />);
 
@@ -44,10 +45,12 @@ describe("AdminPage permission matrix", () => {
     expect(screen.queryByTestId("admin-overview-panel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-conversations-panel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-observability-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-secrets-panel")).not.toBeInTheDocument();
     expect(auditSpy).not.toHaveBeenCalled();
     expect(overviewSpy).not.toHaveBeenCalled();
     expect(conversationsSpy).not.toHaveBeenCalled();
     expect(agentRunsSpy).not.toHaveBeenCalled();
+    expect(secretsSpy).not.toHaveBeenCalled();
   });
 
   it("shows audit summary but hides platform-admin-only sections for SUPPORT", async () => {
@@ -110,14 +113,27 @@ describe("AdminPage permission matrix", () => {
         { id: "r-1", symbol: "EURUSD", status: "COMPLETE", tool_calls: 2, memories_retrieved: 3 },
       ],
     });
+    vi.spyOn(adminApi, "getAdminSecrets").mockResolvedValue({
+      items: [
+        { key: "OPENAI_API_KEY", configured: false, updated_at: null },
+        { key: "OANDA_API_TOKEN", configured: true, updated_at: "2026-08-11T00:00:00Z" },
+      ],
+      oanda_environment: "practice",
+      oanda_execution_enabled: false,
+      managed_keys: ["OPENAI_API_KEY", "OANDA_API_TOKEN"],
+    });
 
     renderWithProviders(<AdminPage />);
 
+    expect(await screen.findByTestId("admin-secrets-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-overview-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-conversations-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-observability-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-conversation-c-1")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-agent-run-r-1")).toBeInTheDocument();
+    expect(await screen.findByTestId("secret-status-OANDA_API_TOKEN")).toHaveTextContent(
+      "configured",
+    );
 
     expect(screen.queryByTestId("admin-access-restricted")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-platform-only-hint")).not.toBeInTheDocument();

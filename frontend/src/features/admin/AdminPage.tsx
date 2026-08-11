@@ -1,15 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAdminOverview,
+  getAdminSecrets,
   getAuditSummary,
   listAdminAgentRuns,
   listAdminConversations,
+  putAdminSecrets,
 } from "@/api/admin";
 import { getEntitlements } from "@/api/billing";
 import { AdminConversationsPanel } from "@/features/admin/AdminConversationsPanel";
 import { AdminEntitlementsPanel } from "@/features/admin/AdminEntitlementsPanel";
 import { AdminObservabilityPanel } from "@/features/admin/AdminObservabilityPanel";
 import { AdminOverviewPanel } from "@/features/admin/AdminOverviewPanel";
+import { AdminSecretsPanel } from "@/features/admin/AdminSecretsPanel";
 import { useAdminAccess } from "@/features/admin/useAdminAccess";
 
 /**
@@ -21,9 +25,12 @@ import { useAdminAccess } from "@/features/admin/useAdminAccess";
  * they never see an avoidable 403.
  */
 export function AdminPage() {
+  const queryClient = useQueryClient();
   const accessQuery = useAdminAccess();
   const isSupport = accessQuery.data?.is_support ?? false;
   const isPlatformAdmin = accessQuery.data?.is_platform_admin ?? false;
+  const [secretsSuccess, setSecretsSuccess] = useState<string | null>(null);
+  const [secretsError, setSecretsError] = useState<string | null>(null);
 
   const entitlementsQuery = useQuery({
     queryKey: ["billing", "entitlements"],
@@ -52,6 +59,25 @@ export function AdminPage() {
     queryKey: ["admin", "agent-runs"],
     queryFn: listAdminAgentRuns,
     enabled: isPlatformAdmin,
+  });
+
+  const secretsQuery = useQuery({
+    queryKey: ["admin", "secrets"],
+    queryFn: getAdminSecrets,
+    enabled: isPlatformAdmin,
+  });
+
+  const secretsMutation = useMutation({
+    mutationFn: putAdminSecrets,
+    onSuccess: async () => {
+      setSecretsError(null);
+      setSecretsSuccess("Secrets saved. Providers will use the new values immediately.");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "secrets"] });
+    },
+    onError: (err: unknown) => {
+      setSecretsSuccess(null);
+      setSecretsError(err instanceof Error ? err.message : "Failed to save secrets");
+    },
   });
 
   return (
@@ -83,13 +109,26 @@ export function AdminPage() {
 
       {isSupport && !isPlatformAdmin && (
         <p data-testid="admin-platform-only-hint" className="text-sm text-slate-500">
-          Overview, conversations, and agent observability require the platform Admin or Super
-          Admin role and are hidden for Support.
+          Overview, conversations, agent observability, and secrets require the platform Admin or
+          Super Admin role and are hidden for Support.
         </p>
       )}
 
       {isPlatformAdmin && (
         <>
+          <AdminSecretsPanel
+            items={secretsQuery.data?.items ?? []}
+            oandaEnvironment={secretsQuery.data?.oanda_environment ?? "practice"}
+            loading={secretsQuery.isLoading}
+            saving={secretsMutation.isPending}
+            error={secretsError ?? (secretsQuery.isError ? "Could not load secrets status." : null)}
+            success={secretsSuccess}
+            onSave={async (secrets) => {
+              setSecretsSuccess(null);
+              setSecretsError(null);
+              await secretsMutation.mutateAsync(secrets);
+            }}
+          />
           <AdminOverviewPanel overview={overviewQuery.data ?? null} loading={overviewQuery.isLoading} />
           <AdminConversationsPanel
             conversations={conversationsQuery.data?.items ?? []}

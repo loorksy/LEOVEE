@@ -99,4 +99,12 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    """Env-based settings plus any admin-managed runtime secret overrides."""
+    base = Settings()
+    try:
+        from app.services.platform_secrets import apply_runtime_overrides
+
+        return apply_runtime_overrides(base)
+    except Exception:
+        # During early import / tests before the secrets module is fully available.
+        return base

@@ -23,6 +23,7 @@ dependencies = [
     "anthropic>=0.42.0",
     "arq>=0.26.1",
     "stripe>=11.0.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]

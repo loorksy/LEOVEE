@@ -52,11 +52,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if settings.database_url:
         from app.infrastructure.database import get_session_factory
         from app.infrastructure.seed import ensure_platform_seed
+        from app.services.platform_secrets import load_runtime_overrides
 
         factory = get_session_factory()
         if factory is not None:
             async with factory() as session:
                 await ensure_platform_seed(session)
+                try:
+                    await load_runtime_overrides(session)
+                except Exception:
+                    # Table may not exist until migrations run; continue boot.
+                    pass
                 await session.commit()
     yield
 
