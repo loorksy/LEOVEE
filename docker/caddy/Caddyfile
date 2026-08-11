@@ -10,19 +10,32 @@
 	handle /health* {
 		reverse_proxy api:8000
 	}
+
+	# /metrics is not public: only private/internal networks (Prometheus on the host/VPC).
+	# Also set METRICS_BEARER_TOKEN on the API for staging/production.
+	@metrics_external {
+		path /metrics
+		not remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1 ::1
+	}
+	respond @metrics_external "Forbidden" 403
+
 	handle /metrics {
 		reverse_proxy api:8000
 	}
+
 	handle /api/v1/mcp/* {
 		reverse_proxy leovee-mcp:8001
 	}
 	handle /api/* {
+		# API CSP is enforced by FastAPI SecurityHeadersMiddleware (default-src 'none').
 		reverse_proxy api:8000
 	}
 	handle /ws/* {
 		reverse_proxy api:8000
 	}
 	handle {
+		# SPA CSP (looser connect-src for same-origin API + WS).
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'none'; base-uri 'self'"
 		reverse_proxy web:80
 	}
 

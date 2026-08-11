@@ -489,8 +489,8 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 1 | **COMPLETE** | Design docs in repo root |
 | 2 | **CODE-DONE** | Scaffolding + CI + Docker; sidebar routes still incremental |
 | 3 | **CODE-DONE** | Tenant foundation + RLS tests; checklist evidence pending |
-| 4 | **CODE-DONE** | Auth flows; password-reset/rate-limit evidence gaps |
-| 5 | **CODE-DONE** | Alembic + pgvector + RLS; clean up/down evidence pending |
+| 4 | **COMPLETE** | Auth flows + password-reset/rate-limit §99 (`test_password_reset_and_metrics_auth.py`, `test_auth.py`) |
+| 5 | **COMPLETE** | Alembic + pgvector + RLS; up/down on clean DB (`test_alembic_up_down.py`) |
 | 6 | **CODE-DONE** | Workspaces + seed |
 | 7 | **CODE-DONE** | OANDA practice REST/stream/backfill; Markets UI not routed |
 | 8 | **CODE-DONE** | Candle normalize/upsert/retention; Markets UI not routed |
@@ -524,11 +524,11 @@ Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers liv
 | 36 | **CODE-DONE** | Admin API (`/admin/me`, `/audit/summary`, `/overview`, `/conversations`, `/observability/agent-runs`); `AdminPage` routed at `/admin` with `AdminEntitlementsPanel` + `AdminOverviewPanel`/`AdminConversationsPanel`/`AdminObservabilityPanel`; UI permission matrix via `useAdminAccess`/`/admin/me` hides support-only vs platform-admin sections client-side ahead of backend 403s (Batch 6); not all 28 spec §36 sections implemented — remaining sections are future scope, checklist evidence in `docs/CHECKLIST_PR_36_38.md` |
 | 37 | **CODE-DONE** | Manual billing default; Stripe test adapter; entitlements now visible in UI via `AdminEntitlementsPanel` at `/admin` for every workspace member (Batch 6); Stripe checkout UI still not wired |
 | 38 | **COMPLETE** | Entitlement hard limits on analysis/chat/MCP; isolated unit-level hard-limit tests per metric (`backend/app/tests/test_entitlement_hard_limits.py`, Batch 6) plus integration coverage in `test_admin_billing_phases_36_38.py`; limits are enforced on the already-routed Analysis/Chat/MCP surfaces |
-| 39 | **CODE-DONE** | Request ID, metrics, Sentry bridge (DSN owner) |
-| 40 | **PARTIAL** | Headers/API keys; `/metrics` still public at edge |
-| 41 | **PARTIAL** | Replay API + panel unwired |
-| 42 | **CODE-DONE** | Compose/Caddy/deploy/backup scripts; staging exercised |
-| 43 | **PARTIAL** | Launch readiness doc; owner sign-off open |
+| 39 | **CODE-DONE** | Request ID, metrics auth, Sentry bridge (real DSN owner-blocked) |
+| 40 | **CODE-DONE** | Headers/API keys; `/metrics` private CIDR at Caddy + bearer in staging/prod |
+| 41 | **COMPLETE** | Replay API + `/replay` UI route + temporal §101 |
+| 42 | **CODE-DONE** | Compose/Caddy/deploy/backup + leovee-mcp + metrics edge contract tests |
+| 43 | **PARTIAL** | Launch readiness doc; owner sign-off still open (`BLOCKED_ON_OWNER.md`) |
 
 **Next action:** Batches 1–7 completion track (`cursor/batches-1-7-completion-199e`) — truth/cleanup → LLM tests → frontend wiring → product surface → MCP → admin/billing → hardening.
 

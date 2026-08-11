@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     sentry_environment: str | None = Field(default=None, alias="SENTRY_ENVIRONMENT")
     sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
 
+    # When set, GET /metrics requires Authorization: Bearer <token>.
+    # Staging/production should always set this (or rely on Caddy basic auth).
+    metrics_bearer_token: str | None = Field(default=None, alias="METRICS_BEARER_TOKEN")
+
     billing_provider: str = Field(default="manual", alias="BILLING_PROVIDER")
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
