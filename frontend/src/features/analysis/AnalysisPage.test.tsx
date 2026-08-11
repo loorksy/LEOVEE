@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { AnalysisPage } from "./AnalysisPage";
+import { AnalysisPage, formatAnalysisNarrative } from "./AnalysisPage";
 import * as analysisApi from "@/api/analysis";
 import * as chartApi from "@/api/chart";
 
@@ -52,5 +52,33 @@ describe("AnalysisPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
 
     expect(await screen.findByText("entitlement limit reached")).toBeInTheDocument();
+  });
+
+  it("renders llm_unavailable narrative objects without crashing", async () => {
+    vi.spyOn(analysisApi, "runAnalysis").mockResolvedValue({
+      ...runResponse,
+      narrative: { llm_unavailable: "No LLM provider API key configured" },
+    });
+    vi.spyOn(chartApi, "buildSemanticModel").mockResolvedValue({
+      model: { version: 1, operations: [] },
+    });
+
+    renderWithProviders(<AnalysisPage />);
+    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+
+    expect(await screen.findByText(/EURUSD · H1 — BUY/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Narrative unavailable: No LLM provider API key configured/),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("formatAnalysisNarrative", () => {
+  it("formats string and llm_unavailable object shapes", () => {
+    expect(formatAnalysisNarrative("plain")).toBe("plain");
+    expect(formatAnalysisNarrative({ llm_unavailable: "missing key" })).toBe(
+      "Narrative unavailable: missing key",
+    );
+    expect(formatAnalysisNarrative({ llm: { summary: "Bias bullish" } })).toBe("Bias bullish");
   });
 });

@@ -8,11 +8,12 @@ from app.agents.orchestrator import run_analysis_orchestrator
 from app.core.tenant import TenantContext
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
+from app.models.memory import MemoryType
 from app.providers.market.base import MarketDataProvider
 from app.services import entitlement_service, market_data, recommendation_service
 from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market_intelligence_service import build_mtf_intelligence
-from app.services.memory_service import retrieve_memories_for_symbol
+from app.services.memory_service import retrieve_memories_for_symbol, store_memory
 
 
 def map_decision_to_recommendation_status(decision: dict[str, Any]) -> RecommendationStatus:
@@ -114,9 +115,31 @@ async def run_analysis(
             rec,
             statement=str(reasoning.get("summary")),
         )
+        # Persist a symbol-scoped memory so subsequent runs recall prior analysis.
+        memory = await store_memory(
+            session,
+            tenant_id=tenant.tenant_id,
+            workspace_id=tenant.workspace_id,
+            key=f"symbol:{symbol.upper()}:analysis:{result.agent_run_id}",
+            content={
+                "symbol": symbol.upper(),
+                "timeframe": timeframe.value,
+                "decision": result.decision,
+                "recommendation_id": str(rec.id),
+                "thesis_id": str(thesis.id),
+                "summary": str(
+                    reasoning.get("summary") or f"{symbol.upper()} {direction_value}"
+                ),
+                "confidence": float(result.decision.get("confidence") or 0),
+                "sample_size": 1,
+                "agent_run_id": str(result.agent_run_id),
+            },
+            memory_type=MemoryType.SEMANTIC,
+        )
         payload["reasoning"] = reasoning
         payload["recommendation_id"] = str(rec.id)
         payload["thesis_id"] = str(thesis.id)
+        payload["memory_id"] = str(memory.id)
 
     await entitlement_service.record_usage(session, tenant, "analysis.run")
     return payload

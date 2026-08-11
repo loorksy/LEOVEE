@@ -5,6 +5,33 @@ import { runAnalysis, type AnalysisRunResponse } from "@/api/analysis";
 import { buildSemanticModel, persistSemanticModel } from "@/api/chart";
 import { BACKEND_TIMEFRAMES } from "@/features/chart/timeframe";
 
+/** Backend narrative is a dict (llm summary or llm_unavailable); never render raw objects. */
+export function formatAnalysisNarrative(narrative: unknown): string | null {
+  if (narrative == null) return null;
+  if (typeof narrative === "string") {
+    const trimmed = narrative.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof narrative !== "object") {
+    return String(narrative);
+  }
+  const obj = narrative as Record<string, unknown>;
+  if (typeof obj.llm_unavailable === "string") {
+    return `Narrative unavailable: ${obj.llm_unavailable}`;
+  }
+  const llm = obj.llm;
+  if (llm && typeof llm === "object") {
+    const summary = (llm as Record<string, unknown>).summary;
+    if (typeof summary === "string" && summary.trim()) return summary;
+  }
+  if (typeof obj.summary === "string" && obj.summary.trim()) return obj.summary;
+  try {
+    return JSON.stringify(narrative);
+  } catch {
+    return null;
+  }
+}
+
 async function tryPublishChartAnnotations(response: AnalysisRunResponse): Promise<string> {
   const { model } = await buildSemanticModel({
     symbol: response.symbol,
@@ -112,42 +139,66 @@ export function AnalysisPage() {
       )}
 
       {result && (
-        <section className="rounded-lg border border-slate-800 bg-leovee-panel p-6">
-          <h2 className="text-lg font-semibold text-slate-100">
-            {result.symbol} · {result.timeframe} — {String(result.decision.direction ?? "N/A")}
-          </h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Confidence {(Number(result.decision.confidence ?? 0) * 100).toFixed(0)}% · recalled{" "}
-            {result.recall.count} memories · as of {result.as_of}
-          </p>
-          {result.narrative && <p className="mt-3 text-sm text-slate-300">{result.narrative}</p>}
-          {chartStatus && (
-            <p className="mt-3 text-xs text-slate-500" data-testid="chart-status">
-              {chartStatus}
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                navigate(`/analyst?symbol=${result.symbol}&timeframe=${result.timeframe}`)
-              }
-              className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              View chart
-            </button>
-            {result.recommendation_id && (
-              <button
-                type="button"
-                onClick={() => navigate("/recommendations")}
-                className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-              >
-                View recommendation
-              </button>
-            )}
-          </div>
-        </section>
+        <AnalysisResult
+          result={result}
+          chartStatus={chartStatus}
+          onViewChart={() =>
+            navigate(`/analyst?symbol=${result.symbol}&timeframe=${result.timeframe}`)
+          }
+          onViewRecommendation={
+            result.recommendation_id ? () => navigate("/recommendations") : undefined
+          }
+        />
       )}
     </div>
+  );
+}
+
+function AnalysisResult({
+  result,
+  chartStatus,
+  onViewChart,
+  onViewRecommendation,
+}: {
+  result: AnalysisRunResponse;
+  chartStatus: string | null;
+  onViewChart: () => void;
+  onViewRecommendation?: () => void;
+}) {
+  const narrativeText = formatAnalysisNarrative(result.narrative);
+  return (
+    <section className="rounded-lg border border-slate-800 bg-leovee-panel p-6">
+      <h2 className="text-lg font-semibold text-slate-100">
+        {result.symbol} · {result.timeframe} — {String(result.decision.direction ?? "N/A")}
+      </h2>
+      <p className="mt-1 text-sm text-slate-400">
+        Confidence {(Number(result.decision.confidence ?? 0) * 100).toFixed(0)}% · recalled{" "}
+        {result.recall.count} memories · as of {result.as_of}
+      </p>
+      {narrativeText && <p className="mt-3 text-sm text-slate-300">{narrativeText}</p>}
+      {chartStatus && (
+        <p className="mt-3 text-xs text-slate-500" data-testid="chart-status">
+          {chartStatus}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={onViewChart}
+          className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
+        >
+          View chart
+        </button>
+        {onViewRecommendation && (
+          <button
+            type="button"
+            onClick={onViewRecommendation}
+            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
+          >
+            View recommendation
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
