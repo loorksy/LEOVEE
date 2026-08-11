@@ -2,15 +2,11 @@
 
 ## Option A — GitHub Actions (recommended)
 
-Add repository secrets:
+**Use `docs/DEPLOY_FROM_GITHUB.md`** (phone-friendly). Workflow: **Actions → Deploy staging**.
 
-| Secret | Example |
-|--------|---------|
-| `VPS_HOST` | `72.60.83.140` |
-| `VPS_SSH_PRIVATE_KEY` | PEM for `root` (or deploy user) |
-| `VPS_USER` | optional, default `root` |
+Required secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `OANDA_API_TOKEN`, `OANDA_ACCOUNT_ID`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SECRET_KEY`.
 
-Then: **Actions → Deploy staging (VPS) → Run workflow** (branch `main`).
+The workflow writes `/opt/leovee/.env` from secrets, deploys, health-checks, then runs live Playwright.
 
 ## Option B — From your laptop
 

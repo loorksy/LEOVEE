@@ -5,8 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketsPage } from "./MarketsPage";
 
 const getCandles = vi.fn();
+const getProvidersStatus = vi.fn();
 vi.mock("../../api/markets", () => ({
   getCandles: (...args: unknown[]) => getCandles(...args),
+}));
+vi.mock("../../api/providers", () => ({
+  getProvidersStatus: (...args: unknown[]) => getProvidersStatus(...args),
 }));
 
 function renderPage() {
@@ -21,6 +25,30 @@ function renderPage() {
 describe("MarketsPage", () => {
   beforeEach(() => {
     getCandles.mockReset();
+    getProvidersStatus.mockReset();
+  });
+
+  it("shows not-configured state when OANDA is missing", async () => {
+    getProvidersStatus.mockResolvedValue({
+      finnhub: { configured: false, status: "not_configured" },
+      oanda: { configured: false, status: "not_configured", environment: "practice" },
+      anthropic: { configured: true, status: "ok" },
+      openai: { configured: true, status: "ok" },
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("oanda-provider-not-configured")).toBeInTheDocument(),
+    );
+    expect(getCandles).not.toHaveBeenCalled();
+  });
+
+  it("lists candles when OANDA is configured", async () => {
+    getProvidersStatus.mockResolvedValue({
+      finnhub: { configured: false, status: "not_configured" },
+      oanda: { configured: true, status: "ok", environment: "practice" },
+      anthropic: { configured: true, status: "ok" },
+      openai: { configured: true, status: "ok" },
+    });
     getCandles.mockResolvedValue({
       symbol: "EURUSD",
       timeframe: "H1",
@@ -35,9 +63,6 @@ describe("MarketsPage", () => {
         },
       ],
     });
-  });
-
-  it("lists candles from markets API", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("1.105")).toBeInTheDocument());
     expect(getCandles).toHaveBeenCalledWith("EURUSD", "H1", 50);

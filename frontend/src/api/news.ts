@@ -8,7 +8,14 @@ export type NewsItem = {
   url: string | null;
 };
 
-export async function listNews(currency?: string): Promise<{ items: NewsItem[] }> {
+export type NewsListResponse = {
+  items: NewsItem[];
+  provider: string;
+  provider_configured: boolean;
+  provider_status: string;
+};
+
+export async function listNews(currency?: string): Promise<NewsListResponse> {
   return apiFetch("/api/v1/news", {
     query: currency ? { currency, limit: 30 } : { limit: 30 },
   });

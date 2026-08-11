@@ -21,7 +21,27 @@ function renderPage() {
 describe("ResearchPage", () => {
   beforeEach(() => {
     listNews.mockReset();
+  });
+
+  it("shows explicit not-configured state without Finnhub", async () => {
     listNews.mockResolvedValue({
+      provider: "finnhub",
+      provider_configured: false,
+      provider_status: "not_configured",
+      items: [],
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("news-provider-not-configured")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/News provider not configured/i)).toBeInTheDocument();
+  });
+
+  it("lists news items when provider is configured", async () => {
+    listNews.mockResolvedValue({
+      provider: "finnhub",
+      provider_configured: true,
+      provider_status: "ok",
       items: [
         {
           id: "n1",
@@ -32,9 +52,6 @@ describe("ResearchPage", () => {
         },
       ],
     });
-  });
-
-  it("lists news items", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Fed holds")).toBeInTheDocument());
   });

@@ -1,53 +1,203 @@
-name: Deploy staging (VPS)
+name: Deploy staging
 
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: Git branch to deploy
+      ref:
+        description: "Git branch or tag to deploy (e.g. main)"
         required: true
         default: main
+      run_e2e:
+        description: "Run live Playwright after deploy"
+        type: boolean
+        required: true
+        default: true
 
 concurrency:
   group: leovee-staging-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
+    outputs:
+      deployed_sha: ${{ steps.sha.outputs.sha }}
     steps:
-      - name: Require VPS secrets
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-        run: |
-          test -n "${VPS_HOST}" || (echo "Missing repository secret VPS_HOST" && exit 1)
-          test -n "${VPS_SSH_PRIVATE_KEY}" || (echo "Missing repository secret VPS_SSH_PRIVATE_KEY" && exit 1)
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch }}
-
-      - name: Configure SSH
-        env:
-          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${VPS_SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy on VPS
+      - name: Require deploy secrets
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          BRANCH: ${{ inputs.branch }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          OANDA_API_TOKEN: ${{ secrets.OANDA_API_TOKEN }}
+          OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          OANDA_ENVIRONMENT: ${{ secrets.OANDA_ENVIRONMENT }}
+          OANDA_EXECUTION: ${{ secrets.OANDA_EXECUTION }}
         run: |
-          export VPS_SSH_KEY_PATH=~/.ssh/id_ed25519
-          export VPS_USER="${VPS_USER:-root}"
-          ./scripts/remote_deploy_vps.sh
+          set -euo pipefail
+          missing=()
+          for name in VPS_HOST VPS_USER VPS_SSH_KEY OANDA_API_TOKEN OANDA_ACCOUNT_ID ANTHROPIC_API_KEY OPENAI_API_KEY SECRET_KEY; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("${name}")
+            fi
+          done
+          if ((${#missing[@]})); then
+            echo "ERROR: Missing required GitHub Actions secrets (add via Settings → Secrets → Actions):"
+            printf '  - %s\n' "${missing[@]}"
+            echo "See docs/DEPLOY_FROM_GITHUB.md"
+            exit 1
+          fi
+          # Mask every secret value so later steps cannot leak them.
+          for name in VPS_HOST VPS_USER VPS_SSH_KEY OANDA_API_TOKEN OANDA_ACCOUNT_ID ANTHROPIC_API_KEY OPENAI_API_KEY SECRET_KEY \
+            FINNHUB_API_KEY RESEND_API_KEY METRICS_BEARER_TOKEN SENTRY_DSN ENCRYPTION_KEY STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+            val="${!name-}"
+            if [[ -n "${val}" ]]; then
+              echo "::add-mask::${val}"
+            fi
+          done
+          if [[ -n "${OANDA_ENVIRONMENT}" && "${OANDA_ENVIRONMENT}" != "practice" ]]; then
+            echo "ERROR: Secret OANDA_ENVIRONMENT must be 'practice' (or unset). Got a non-practice value. Refusing to deploy."
+            exit 1
+          fi
+          case "${OANDA_EXECUTION,,}" in
+            1|true|yes|on|enabled)
+              echo "ERROR: Secret OANDA_EXECUTION is enabled. Refusing to deploy. Broker policy: practice only, execution off."
+              exit 1
+              ;;
+          esac
+          echo "All required secrets present. Broker policy: OANDA practice, execution off."
 
-      - name: Smoke check
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Configure SSH key
         env:
-          API_URL: http://${{ secrets.VPS_HOST }}:8000
-        run: ./scripts/smoke_staging.sh
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${VPS_SSH_KEY}"
+          mkdir -p ~/.ssh
+          # Support keys pasted with literal \n from the mobile UI.
+          printf '%s\n' "${VPS_SSH_KEY}" | sed 's/\r$//' | awk '
+            /\\n/ { gsub(/\\n/, "\n") }
+            { print }
+          ' > ~/.ssh/id_ed25519
+          # If the paste was a single line with embedded BEGIN/END, rewrite newlines.
+          if ! grep -q "BEGIN" ~/.ssh/id_ed25519; then
+            echo "ERROR: VPS_SSH_KEY does not look like a private key (missing BEGIN line)."
+            exit 1
+          fi
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${VPS_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY_PATH: ${{ runner.temp }}/unused
+          REF: ${{ inputs.ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_SLUG: ${{ github.repository }}
+          OANDA_API_TOKEN: ${{ secrets.OANDA_API_TOKEN }}
+          OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          METRICS_BEARER_TOKEN: ${{ secrets.METRICS_BEARER_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          OANDA_ENVIRONMENT: practice
+          OANDA_EXECUTION: "false"
+          PUBLIC_URL: https://staging.leovee.lork.cloud
+          CORS_ORIGINS: https://staging.leovee.lork.cloud
+          LEOVEE_DOMAIN: staging.leovee.lork.cloud
+        run: |
+          set -euo pipefail
+          for v in OANDA_API_TOKEN OANDA_ACCOUNT_ID ANTHROPIC_API_KEY OPENAI_API_KEY SECRET_KEY GH_TOKEN \
+            FINNHUB_API_KEY RESEND_API_KEY METRICS_BEARER_TOKEN SENTRY_DSN ENCRYPTION_KEY STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+            if [[ -n "${!v-}" ]]; then echo "::add-mask::${!v}"; fi
+          done
+          export VPS_SSH_KEY_PATH=~/.ssh/id_ed25519
+          chmod +x scripts/*.sh
+          ./scripts/ci_deploy_staging.sh
+
+      - name: Record deployed SHA
+        id: sha
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          SHA=$(ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes \
+            "${VPS_USER}@${VPS_HOST}" 'cat /opt/leovee/.deploy/last_sha')
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Deployed commit SHA: ${SHA}"
+          echo "### Deployed \`${SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Public URL: https://staging.leovee.lork.cloud" >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    name: Live Playwright (staging)
+    needs: deploy
+    if: ${{ inputs.run_e2e }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.deploy.outputs.deployed_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend + Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Wait for public staging
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS https://staging.leovee.lork.cloud/ >/dev/null; then
+              echo "staging is reachable"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "ERROR: https://staging.leovee.lork.cloud/ not reachable after deploy"
+          exit 1
+
+      - name: Run live staging E2E
+        working-directory: frontend
+        env:
+          STAGING_BASE_URL: https://staging.leovee.lork.cloud
+        run: npx playwright test --config=playwright.config.ts
+        continue-on-error: false
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-staging-${{ needs.deploy.outputs.deployed_sha }}
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
