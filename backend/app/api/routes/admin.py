@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +18,20 @@ from app.models.organization import Organization
 from app.models.recommendation import Recommendation
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.services.platform_secrets import (
+    PlatformSecretError,
+    list_secret_status,
+    status_payload,
+    upsert_secrets,
+)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+class AdminSecretsUpdateRequest(BaseModel):
+    """Only include keys to change. Empty string clears a secret; omit to keep."""
+
+    secrets: dict[str, str | None] = Field(default_factory=dict)
 
 
 @router.get("/me")
@@ -122,3 +135,33 @@ async def admin_agent_runs(
             for r in runs
         ]
     }
+
+
+@router.get("/secrets")
+async def admin_list_secrets(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(require_platform_admin)],
+) -> dict[str, Any]:
+    """Masked secret status only — never returns plaintext values."""
+    _ = tenant
+    items = await list_secret_status(session)
+    return status_payload(items)
+
+
+@router.put("/secrets")
+async def admin_upsert_secrets(
+    body: AdminSecretsUpdateRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    tenant: Annotated[TenantContext, Depends(require_platform_admin)],
+) -> dict[str, Any]:
+    """Upsert platform secrets from the admin panel. Applies immediately in-process."""
+    try:
+        items = await upsert_secrets(
+            session,
+            updates=body.secrets,
+            actor_user_id=tenant.user_id,
+        )
+        await session.commit()
+    except PlatformSecretError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return status_payload(items)

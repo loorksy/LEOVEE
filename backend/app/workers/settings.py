@@ -189,6 +189,18 @@ async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
     return f"thesis_monitor_ok:{changed}"
 
 
+async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
+    """Keep worker Settings in sync with admin-managed DB secrets."""
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.platform_secrets import load_runtime_overrides
+
+    async with factory() as session:
+        loaded = await load_runtime_overrides(session)
+    return f"platform_secrets_reloaded:{len(loaded)}"
+
+
 def _worker_redis_settings() -> RedisSettings:
     settings = get_settings()
     url = settings.redis_url or "redis://redis:6379/0"
@@ -207,6 +219,7 @@ class WorkerSettings:
         thesis_monitor_job,
         memory_decay_job,
         alert_evaluation_job,
+        reload_platform_secrets_job,
     ]
     cron_jobs = [
         cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
@@ -216,6 +229,7 @@ class WorkerSettings:
         cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
+        cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]
     ]
 
     redis_settings = _worker_redis_settings()

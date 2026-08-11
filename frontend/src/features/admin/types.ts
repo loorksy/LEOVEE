@@ -42,3 +42,17 @@ export type AdminAgentRun = {
   tool_calls: number;
   memories_retrieved: number;
 };
+
+/** Platform-admin only — `GET /api/v1/admin/secrets` (masked; never plaintext). */
+export type AdminSecretItem = {
+  key: string;
+  configured: boolean;
+  updated_at: string | null;
+};
+
+export type AdminSecretsStatus = {
+  items: AdminSecretItem[];
+  oanda_environment: string;
+  oanda_execution_enabled: boolean;
+  managed_keys: string[];
+};

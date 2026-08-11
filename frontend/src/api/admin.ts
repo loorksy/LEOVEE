@@ -5,6 +5,7 @@ import type {
   AdminAuditSummary,
   AdminConversationItem,
   AdminOverview,
+  AdminSecretsStatus,
 } from "@/features/admin/types";
 
 /** GET /api/v1/admin/me — any workspace member; never 403s (§36 permission matrix). */
@@ -30,4 +31,19 @@ export async function listAdminConversations(): Promise<{ items: AdminConversati
 /** GET /api/v1/admin/observability/agent-runs — platform-admin only. */
 export async function listAdminAgentRuns(): Promise<{ items: AdminAgentRun[] }> {
   return apiFetch<{ items: AdminAgentRun[] }>("/api/v1/admin/observability/agent-runs");
+}
+
+/** GET /api/v1/admin/secrets — platform-admin only; masked status, never plaintext. */
+export async function getAdminSecrets(): Promise<AdminSecretsStatus> {
+  return apiFetch<AdminSecretsStatus>("/api/v1/admin/secrets");
+}
+
+/** PUT /api/v1/admin/secrets — platform-admin only; omit keys to keep existing values. */
+export async function putAdminSecrets(
+  secrets: Record<string, string | null>,
+): Promise<AdminSecretsStatus> {
+  return apiFetch<AdminSecretsStatus>("/api/v1/admin/secrets", {
+    method: "PUT",
+    body: { secrets },
+  });
 }
