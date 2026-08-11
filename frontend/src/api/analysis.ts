@@ -19,7 +19,8 @@ export type AnalysisRunResponse = {
     confidence?: number;
     [key: string]: unknown;
   };
-  narrative?: string;
+  /** String in older clients; orchestrator returns `{ llm }` or `{ llm_unavailable }`. */
+  narrative?: string | Record<string, unknown>;
   as_of: string;
   persistence?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;

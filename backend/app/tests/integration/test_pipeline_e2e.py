@@ -12,9 +12,11 @@ from app.core.tenant import resolve_tenant_context
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import Timeframe
 from app.models.market_artifacts import MarketEvent
+from app.models.memory import AgentMemory
 from app.models.recommendation import Thesis
 from app.providers.market.base import NormalizedCandle
 from app.services.analysis_service import run_analysis
+from app.services.memory_service import retrieve_memories_for_symbol
 from app.services.recommendation_service import get_recommendation
 from app.tests.conftest import seed_user_org
 from app.tests.doubles.market import FakeMarketDataProvider
@@ -63,6 +65,7 @@ async def test_pipeline_market_to_thesis(db_session: AsyncSession) -> None:
 
     assert result["recommendation_id"]
     assert result["thesis_id"]
+    assert result["memory_id"]
     assert result["reasoning"]["approved"] is True
 
     rec = await get_recommendation(db_session, ctx, uuid.UUID(result["recommendation_id"]))
@@ -73,6 +76,20 @@ async def test_pipeline_market_to_thesis(db_session: AsyncSession) -> None:
     assert rec is not None
     assert thesis is not None
     assert thesis.recommendation_id == rec.id
+
+    memory = await db_session.scalar(
+        select(AgentMemory).where(AgentMemory.id == uuid.UUID(result["memory_id"]))
+    )
+    assert memory is not None
+    assert memory.key.startswith("symbol:EURUSD:analysis:")
+
+    recalled = await retrieve_memories_for_symbol(
+        db_session,
+        tenant_id=ctx.tenant_id,
+        workspace_id=ctx.workspace_id,
+        symbol="EURUSD",
+    )
+    assert any(item["id"] == result["memory_id"] for item in recalled)
 
     events = await db_session.execute(select(MarketEvent))
     assert len(events.scalars().all()) >= 1
