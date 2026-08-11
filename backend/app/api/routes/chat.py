@@ -162,11 +162,13 @@ async def post_message(
         llm = chain[0][1]
 
     if use_stream:
-        conversation_id_value = conv.id
+        # Capture primitives — the request session may close before the generator runs.
+        conversation_id_value = uuid.UUID(str(conv.id))
         if body.mode is not None:
             await session.flush()
 
         async def event_stream() -> AsyncIterator[str]:
+            from app.core.tenant_rls import bind_workspace_rls
             from app.infrastructure.database import get_session_factory
 
             factory = get_session_factory()
@@ -180,6 +182,8 @@ async def post_message(
                 yield f"data: {json.dumps(err)}\n\n"
                 return
             async with factory() as stream_session:
+                # New session has no RLS GUCs; without bind, policies cast ''::uuid and crash.
+                await bind_workspace_rls(stream_session, tenant)
                 stream_conv = await stream_session.scalar(
                     select(Conversation).where(Conversation.id == conversation_id_value)
                 )
