@@ -19,8 +19,12 @@ def validate_production_startup(settings: Settings) -> None:
         missing.append("SECRET_KEY")
     if not settings.oanda_api_token:
         missing.append("OANDA_API_TOKEN")
-    if not settings.openai_api_key and not settings.anthropic_api_key:
-        missing.append("OPENAI_API_KEY or ANTHROPIC_API_KEY")
+    if (
+        not settings.openai_api_key
+        and not settings.anthropic_api_key
+        and not settings.openrouter_api_key
+    ):
+        missing.append("OPENAI_API_KEY or ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
 
     if missing:
         raise ProviderConfigurationError(

@@ -39,4 +39,9 @@ async def provider_status(
             "configured": bool(settings.openai_api_key),
             "status": "ok" if settings.openai_api_key else "not_configured",
         },
+        "openrouter": {
+            "configured": bool(settings.openrouter_api_key),
+            "status": "ok" if settings.openrouter_api_key else "not_configured",
+            "mode": "free_rotation" if settings.openrouter_api_key else None,
+        },
     }

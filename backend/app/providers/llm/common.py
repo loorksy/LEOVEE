@@ -34,9 +34,20 @@ def normalize_provider_exception(exc: BaseException) -> LLMError:
         response = getattr(exc, "response", None)
         status = getattr(response, "status_code", None)
 
-    if status in {401, 403} or "auth" in name or "authentication" in message.lower():
+    lowered = message.lower()
+    if status in {401, 403} or "auth" in name or "authentication" in lowered:
         return LLMAuthError(message)
-    if status == 429 or "rate" in name or "rate_limit" in message.lower():
+    # OpenRouter / provider quota exhaustion — treat as retryable so free-model rotation continues.
+    if (
+        status in {402, 429}
+        or "rate" in name
+        or "rate_limit" in lowered
+        or "quota" in lowered
+        or "credit" in lowered
+        or "insufficient" in lowered
+        or "capacity" in lowered
+        or "provider returned error" in lowered
+    ):
         return LLMRateLimitError(message)
     if status is not None and int(status) >= 500:
         return LLMError(message, code="llm_upstream", retryable=True)

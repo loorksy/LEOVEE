@@ -11,6 +11,7 @@ export type ProvidersStatus = {
   oanda: ProviderStatus;
   anthropic: ProviderStatus;
   openai: ProviderStatus;
+  openrouter: ProviderStatus & { mode?: string | null };
 };
 
 export async function getProvidersStatus(): Promise<ProvidersStatus> {

@@ -17,9 +17,9 @@ from app.core.errors import ProviderConfigurationError
 from app.core.tenant import TenantContext
 from app.infrastructure.database import get_db_session
 from app.models.conversation import Conversation, ConversationMode
-from app.providers.llm.anthropic import AnthropicProvider
-from app.providers.llm.factory import get_llm_provider
-from app.providers.llm.openai import OpenAIProvider
+from app.providers.llm.common import normalize_provider_exception
+from app.providers.llm.factory import get_llm_failover_chain
+from app.providers.llm.openrouter_catalog import refresh_free_models_from_api
 from app.services import chat_service
 from app.services.chat_stream import iter_chat_turn_stream
 
@@ -36,20 +36,6 @@ class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=16000)
     stream: bool = False
     mode: ConversationMode | None = None
-
-
-def _optional_fallback_provider() -> Any | None:
-    """Secondary provider for mid-stream failure recovery when both keys exist."""
-    settings = get_settings()
-    try:
-        primary = get_llm_provider(settings)
-    except ProviderConfigurationError:
-        return None
-    if isinstance(primary, OpenAIProvider) and settings.anthropic_api_key:
-        return AnthropicProvider(settings.anthropic_api_key)
-    if isinstance(primary, AnthropicProvider) and settings.openai_api_key:
-        return OpenAIProvider(settings.openai_api_key)
-    return None
 
 
 @router.get("")
@@ -157,15 +143,25 @@ async def post_message(
 
     use_stream = stream or body.stream
     try:
-        llm = get_llm_provider()
+        chain = get_llm_failover_chain()
+        llm = chain[0][1]
     except ProviderConfigurationError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
 
+    settings = get_settings()
+    if settings.openrouter_api_key:
+        # Best-effort refresh so the free catalog stays current.
+        await refresh_free_models_from_api(
+            api_key=settings.openrouter_api_key,
+            base_url=settings.openrouter_base_url,
+        )
+        chain = get_llm_failover_chain(settings)
+        llm = chain[0][1]
+
     if use_stream:
-        fallback = _optional_fallback_provider()
         conversation_id_value = conv.id
         if body.mode is not None:
             await session.flush()
@@ -205,7 +201,7 @@ async def post_message(
                         stream_conv,
                         user_content=body.content,
                         llm=llm,
-                        fallback_llm=fallback,
+                        providers=chain,
                     ):
                         if await request.is_disconnected():
                             await stream_session.rollback()
@@ -231,13 +227,29 @@ async def post_message(
             },
         )
 
-    turn = await chat_service.run_chat_turn(
-        session,
-        tenant,
-        conv,
-        user_content=body.content,
-        llm=llm,
-    )
+    # Non-stream: walk the same failover chain (includes OpenRouter free rotation).
+    last_error: Exception | None = None
+    turn = None
+    for _label, provider in chain:
+        try:
+            turn = await chat_service.run_chat_turn(
+                session,
+                tenant,
+                conv,
+                user_content=body.content,
+                llm=provider,
+            )
+            break
+        except Exception as exc:  # noqa: BLE001
+            normalized = normalize_provider_exception(exc)
+            last_error = normalized
+            if not normalized.retryable:
+                raise normalized from exc
+            continue
+    if turn is None:
+        if last_error is not None:
+            raise last_error
+        raise ProviderConfigurationError("No LLM provider available")
     return {
         "user_message_id": str(turn.user_message.id),
         "assistant_message_id": str(turn.assistant_message.id),
