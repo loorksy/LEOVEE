@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 
-import pytest
 from sqlalchemy import create_engine, text
 
 

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createConversation,
   listConversations,
   listMessages,
-  postMessage,
+  postMessageStream,
   type RecallBundle,
 } from "@/api/conversations";
 
@@ -13,6 +13,10 @@ export function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [lastRecall, setLastRecall] = useState<RecallBundle | null>(null);
+  const [streamingText, setStreamingText] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const conversationsQuery = useQuery({
     queryKey: ["conversations"],
@@ -30,20 +34,50 @@ export function ChatPage() {
     onSuccess: async ({ id }) => {
       setActiveId(id);
       setLastRecall(null);
+      setStreamingText("");
+      setStreamError(null);
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
   });
 
-  const sendMutation = useMutation({
-    mutationFn: (content: string) => postMessage(activeId as string, content),
-    onSuccess: async (response) => {
-      setLastRecall(response.recall);
-      setDraft("");
-      await queryClient.invalidateQueries({
-        queryKey: ["conversations", activeId, "messages"],
-      });
-    },
-  });
+  const sendStreaming = async (content: string) => {
+    if (!activeId) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsStreaming(true);
+    setStreamError(null);
+    setStreamingText("");
+    setDraft("");
+    try {
+      await postMessageStream(
+        activeId,
+        content,
+        {
+          onRecall: (recall) => setLastRecall(recall),
+          onToken: (token) => setStreamingText((prev) => prev + token),
+          onStreamReset: () => setStreamingText(""),
+          onDone: async () => {
+            setStreamingText("");
+            await queryClient.invalidateQueries({
+              queryKey: ["conversations", activeId, "messages"],
+            });
+          },
+          onError: (info) => {
+            setStreamError(info.message);
+            setStreamingText("");
+          },
+        },
+        controller.signal,
+      );
+    } catch (error) {
+      if ((error as Error).name === "AbortError") return;
+      setStreamError(error instanceof Error ? error.message : "Could not send message.");
+      setStreamingText("");
+    } finally {
+      setIsStreaming(false);
+    }
+  };
 
   return (
     <div className="flex flex-1 gap-4 p-6">
@@ -64,6 +98,8 @@ export function ChatPage() {
                 onClick={() => {
                   setActiveId(conversation.id);
                   setLastRecall(null);
+                  setStreamingText("");
+                  setStreamError(null);
                 }}
                 className={`block w-full truncate rounded px-2 py-1.5 text-left ${
                   activeId === conversation.id
@@ -98,6 +134,14 @@ export function ChatPage() {
                   </p>
                 </div>
               ))}
+              {streamingText ? (
+                <div className="text-left" data-testid="streaming-assistant">
+                  <p className="inline-block max-w-lg rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
+                    {streamingText}
+                    <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-slate-400" />
+                  </p>
+                </div>
+              ) : null}
             </div>
             {lastRecall && (
               <div
@@ -116,17 +160,11 @@ export function ChatPage() {
                 )}
               </div>
             )}
-            {sendMutation.isError && (
-              <p className="mt-2 text-sm text-amber-400">
-                {sendMutation.error instanceof Error
-                  ? sendMutation.error.message
-                  : "Could not send message."}
-              </p>
-            )}
+            {streamError && <p className="mt-2 text-sm text-amber-400">{streamError}</p>}
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                if (draft.trim()) sendMutation.mutate(draft.trim());
+                if (draft.trim() && !isStreaming) void sendStreaming(draft.trim());
               }}
               className="mt-3 flex gap-2"
             >
@@ -139,13 +177,14 @@ export function ChatPage() {
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="Ask about a symbol, setup, or your history…"
                 className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                disabled={isStreaming}
               />
               <button
                 type="submit"
-                disabled={sendMutation.isPending}
+                disabled={isStreaming}
                 className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
               >
-                Send
+                {isStreaming ? "Streaming…" : "Send"}
               </button>
             </form>
           </>

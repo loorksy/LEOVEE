@@ -484,53 +484,57 @@ Integration milestones: end of Phase 19 (decision), 26 (chat E2E), 42 (deploy).
 
 Levels: **COMPLETE** / **CODE-DONE** / **PARTIAL** (see §3). Owner blockers live in `docs/BLOCKED_ON_OWNER.md`.
 
+**UI criterion (strict):** a phase with a user-facing surface is COMPLETE only when that surface is reachable and usable in the product UI (routed, not disabled, wired to real backend). Backend-only phases need no UI. Batch 8 re-audit preferred fewer trusted COMPLETE rows over lenient ones.
+
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 1 | **COMPLETE** | Design docs in repo root |
-| 2 | **CODE-DONE** | Scaffolding + CI + Docker; sidebar routes still incremental |
+| 1 | **COMPLETE** | Design docs in repo root (no UI surface) |
+| 2 | **CODE-DONE** | Scaffolding + CI + Docker; not a finished product surface |
 | 3 | **CODE-DONE** | Tenant foundation + RLS tests; checklist evidence pending |
-| 4 | **COMPLETE** | Auth flows + password-reset/rate-limit §99 (`test_password_reset_and_metrics_auth.py`, `test_auth.py`) |
-| 5 | **COMPLETE** | Alembic + pgvector + RLS; up/down on clean DB (`test_alembic_up_down.py`) |
-| 6 | **CODE-DONE** | Workspaces + seed |
-| 7 | **CODE-DONE** | OANDA practice REST/stream/backfill; Markets UI not routed |
-| 8 | **CODE-DONE** | Candle normalize/upsert/retention; Markets UI not routed |
-| 9 | **CODE-DONE** | Market intelligence + §99 unit |
-| 10 | **CODE-DONE** | MTF engine + §99 unit |
-| 11 | **CODE-DONE** | Structure/liquidity/zones/vol engines + persistence |
-| 12 | **CODE-DONE** | Scenario engine (with engines suite) |
-| 13 | **CODE-DONE** | Risk engine + tests |
-| 14 | **CODE-DONE** | Finnhub + research; needs prod key (owner) |
-| 15 | **CODE-DONE** | Anthropic generate/stream/tools/structured/retries + §99 mocks |
-| 16 | **CODE-DONE** | OpenAI generate/stream/tools/structured/retries + §99 mocks |
-| 17 | **CODE-DONE** | ModelRouter task/fallback/cost/rate + recorded primary failure |
-| 18 | **CODE-DONE** | Reasoning + adversarial + tests |
-| 19 | **CODE-DONE** | Decision path via analysis pipeline; `AnalysisPage` routed at `/analysis` (Batch 3) |
-| 20 | **CODE-DONE** | Memory foundation + hybrid recall; decay job now real |
-| 21 | **CODE-DONE** | Learning pipeline + worker |
-| 22 | **CODE-DONE** | Thesis monitor job + unit/integration |
-| 23 | **CODE-DONE** | Chart semantic engine + API/WS |
-| 24 | **CODE-DONE** | KLineChart adapter/tests; `ChartPage` routed at `/analyst` (Batch 3) |
-| 25 | **CODE-DONE** | Annotation renderer/tests; `ChartPage` subscribes to `/ws/v1/stream?channels=annotations` for incremental updates (Batch 3) |
-| 26 | **CODE-DONE** | Chat API + RECALL; `ChatPage` routed at `/chat` with RECALL panel (Batch 3); SSE still not provider-native |
-| 27 | **CODE-DONE** | Recommendations API + `RecommendationsPage` routed at `/recommendations` (Batch 3) |
-| 28 | **CODE-DONE** | Trades idea CRUD + execution gate |
-| 29 | **COMPLETE** | Watchlist API + `WatchlistPage` routed at `/watchlist`; `with_quotes=true` polling + live `/ws/v1/stream?channels=candles` quote updates; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
-| 30 | **COMPLETE** | Alerts API + `AlertsPage` + market-driven `alert_evaluation_job` fan-out; §99 unit/integration + UI |
-| 31 | **COMPLETE** | Journal API + `JournalPage` routed at `/journal`; create/list entries + promote-to-lesson flow; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_29_32.md` (Batch 4) |
-| 32 | **CODE-DONE** | Memory API + `MemoryPanel` wired at `/memory`; delete triggers recompute stats display (Batch 3) |
-| 33 | **COMPLETE** | Performance API + `PerformanceDashboard` routed at `/performance` via `PerformancePage`, calibration curve from `/api/v1/performance/summary`; §99 + smoke tests; checklist evidence in `docs/CHECKLIST_PR_33_35.md` (Batch 4) |
-| 34 | **CODE-DONE** | `leovee-mcp` compose service (`docker/mcp.Dockerfile`, port 8001) + HTTP bridge |
-| 35 | **CODE-DONE** | `ext-apps/` manifests with CSP + workspace binding; Caddy routes `/api/v1/mcp/*` |
-| 36 | **CODE-DONE** | Admin API (`/admin/me`, `/audit/summary`, `/overview`, `/conversations`, `/observability/agent-runs`); `AdminPage` routed at `/admin` with `AdminEntitlementsPanel` + `AdminOverviewPanel`/`AdminConversationsPanel`/`AdminObservabilityPanel`; UI permission matrix via `useAdminAccess`/`/admin/me` hides support-only vs platform-admin sections client-side ahead of backend 403s (Batch 6); not all 28 spec §36 sections implemented — remaining sections are future scope, checklist evidence in `docs/CHECKLIST_PR_36_38.md` |
-| 37 | **CODE-DONE** | Manual billing default; Stripe test adapter; entitlements now visible in UI via `AdminEntitlementsPanel` at `/admin` for every workspace member (Batch 6); Stripe checkout UI still not wired |
-| 38 | **COMPLETE** | Entitlement hard limits on analysis/chat/MCP; isolated unit-level hard-limit tests per metric (`backend/app/tests/test_entitlement_hard_limits.py`, Batch 6) plus integration coverage in `test_admin_billing_phases_36_38.py`; limits are enforced on the already-routed Analysis/Chat/MCP surfaces |
+| 4 | **COMPLETE** | Auth API + `LoginPage` / `SignupPage` UI; password-reset/rate-limit §99 |
+| 5 | **COMPLETE** | Alembic + pgvector + RLS; up/down on clean DB (no UI surface) |
+| 6 | **CODE-DONE** | Workspaces + seed; no dedicated workspace-management UI |
+| 7 | **CODE-DONE** | OANDA practice REST/stream/backfill; `MarketsPage` now routed (Batch 8) but phase exit/checklist still practice-ops focused — keep CODE-DONE until market-ops checklist is filled |
+| 8 | **CODE-DONE** | Candle normalize/upsert/retention; consumed by Markets/Chart UI; checklist evidence still thin |
+| 9 | **CODE-DONE** | Market intelligence + §99 unit (engine; no dedicated UI) |
+| 10 | **CODE-DONE** | MTF engine + §99 unit (engine; no dedicated UI) |
+| 11 | **CODE-DONE** | Structure/liquidity/zones/vol engines + persistence (engine) |
+| 12 | **CODE-DONE** | Scenario engine (engine) |
+| 13 | **CODE-DONE** | Risk engine + tests (engine) |
+| 14 | **CODE-DONE** | Finnhub + `ResearchPage` routed (Batch 8); empty without owner Finnhub key — not COMPLETE |
+| 15 | **CODE-DONE** | Anthropic provider + §99 mocks (no UI surface) |
+| 16 | **CODE-DONE** | OpenAI provider + §99 mocks (no UI surface) |
+| 17 | **CODE-DONE** | ModelRouter task/fallback/cost/rate (no UI surface) |
+| 18 | **CODE-DONE** | Reasoning + adversarial + tests (engine) |
+| 19 | **COMPLETE** | Decision path via analysis pipeline; `AnalysisPage` routed + runnable at `/analysis` |
+| 20 | **CODE-DONE** | Memory foundation + hybrid recall + real decay job; browse UI is phase 32 |
+| 21 | **CODE-DONE** | Learning pipeline + worker (no dedicated UI) |
+| 22 | **CODE-DONE** | Thesis monitor job + unit/integration (no dedicated UI) |
+| 23 | **CODE-DONE** | Chart semantic engine + API/WS (UI in 24–25) |
+| 24 | **COMPLETE** | KLineChart adapter; `ChartPage` routed at `/analyst` and usable |
+| 25 | **COMPLETE** | Annotation renderer; `ChartPage` WS annotations incremental updates |
+| 26 | **COMPLETE** | Provider-native `LLMProvider.stream()` → chat service → SSE → incremental `ChatPage` (Batch 8); parity/fallback/disconnect tests in `test_chat_streaming.py` |
+| 27 | **COMPLETE** | Recommendations API + `RecommendationsPage` routed and usable |
+| 28 | **COMPLETE** | Trades idea CRUD + execution gate + `TradesPage` routed (ideas only; `OANDA_EXECUTION` off) |
+| 29 | **COMPLETE** | Watchlist API + `WatchlistPage` routed; quotes + WS; §99 + checklist |
+| 30 | **COMPLETE** | Alerts API + `AlertsPage` + `alert_evaluation_job`; §99 + UI |
+| 31 | **COMPLETE** | Journal API + `JournalPage`; promote-to-lesson; §99 + UI |
+| 32 | **COMPLETE** | Memory API + `MemoryPage`/`MemoryPanel` at `/memory`; delete + recompute stats |
+| 33 | **COMPLETE** | Performance API + `PerformancePage`; calibration curve; §99 + UI |
+| 34 | **CODE-DONE** | `leovee-mcp` compose sidecar + HTTP bridge (operator/integration surface, not sidebar) |
+| 35 | **CODE-DONE** | `ext-apps/` manifests + Caddy `/api/v1/mcp/*` (no first-party sidebar UI) |
+| 36 | **COMPLETE** | Against **amended** LEOVEE_SPEC §70 / SAAS_ARCHITECTURE §9 reduced admin scope: entitlements, overview, conversations, observability + permission matrix UI. Remaining 28-section list is out of scope (not debt). |
+| 37 | **CODE-DONE** | Manual billing default; entitlements visible at `/admin` and `/settings` (Batch 8); Stripe checkout UI still not wired |
+| 38 | **COMPLETE** | Entitlement hard limits on analysis/chat/MCP; §99 unit + integration; enforced on routed surfaces; Settings shows plan limits |
 | 39 | **CODE-DONE** | Request ID, metrics auth, Sentry bridge (real DSN owner-blocked) |
-| 40 | **CODE-DONE** | Headers/API keys; `/metrics` private CIDR at Caddy + bearer in staging/prod |
+| 40 | **CODE-DONE** | Headers/API keys; `/metrics` private CIDR + bearer |
 | 41 | **COMPLETE** | Replay API + `/replay` UI route + temporal §101 |
 | 42 | **CODE-DONE** | Compose/Caddy/deploy/backup + leovee-mcp + metrics edge contract tests |
 | 43 | **PARTIAL** | Launch readiness doc; owner sign-off still open (`BLOCKED_ON_OWNER.md`) |
 
-**Next action:** Batches 1–7 completion track (`cursor/batches-1-7-completion-199e`) — truth/cleanup → LLM tests → frontend wiring → product surface → MCP → admin/billing → hardening.
+**Batch 8 COMPLETE re-audit notes:** Downgraded none of the prior COMPLETE product rows that already had routed UI (29–31, 33, 38, 41). Promoted 19/24/25/26/27/28/32/36 only where UI is now reachable and usable (26 streaming + sidebar wiring + amended admin scope). Left 7/8/14 CODE-DONE despite Markets/Research routes because ops/key/checklist gaps remain. Left 4 COMPLETE after adding `SignupPage` (login alone was previously thin for “sign up → workspace”).
+
+**Next action:** Batch 8 closeout (`cursor/batch-8-closeout-199e`) — streaming, sidebar wiring, strict COMPLETE audit, amended admin scope, live staging Playwright.
 
 ---
 

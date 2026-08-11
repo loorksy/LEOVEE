@@ -19,9 +19,7 @@ async def test_readiness_reports_infra_checks() -> None:
     body = response.json()
     assert body["status"] in {"ok", "degraded"}
     db_check = body["checks"]["database"]
-    if db_check.get("skipped"):
-        assert body["status"] == "ok"
-    elif db_check.get("ok"):
+    if db_check.get("skipped") or db_check.get("ok"):
         assert body["status"] == "ok"
     else:
         assert body["status"] == "degraded"

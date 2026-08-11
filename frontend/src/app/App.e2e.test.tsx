@@ -182,6 +182,35 @@ describe("Batch 3 mocked end-to-end flow", () => {
           return jsonResponse({ items: [], summary_text: null });
         }
         if (pathname === "/api/v1/conversations/conv-1/messages" && method === "POST") {
+          const wantsStream =
+            search.get("stream") === "true" ||
+            (typeof init.body === "string" && init.body.includes('"stream":true'));
+          if (wantsStream) {
+            const events = [
+              {
+                event: "recall",
+                label: "HISTORICAL_MEMORY",
+                symbol: "EURUSD",
+                count: 2,
+                items: [{ key: "eurusd.sweep.bias" }, { key: "eurusd.htf.trend" }],
+              },
+              { event: "user_message", id: "msg-user" },
+              { event: "token", data: "EURUSD is showing a bullish structure break, " },
+              { event: "token", data: "consistent with your prior notes." },
+              {
+                event: "done",
+                assistant_message_id: "msg-assistant",
+                actions: [],
+                provider: "test",
+                via: "primary",
+              },
+            ];
+            const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+            return new Response(body, {
+              status: 200,
+              headers: { "Content-Type": "text/event-stream" },
+            });
+          }
           return jsonResponse({
             user_message_id: "msg-user",
             assistant_message_id: "msg-assistant",
