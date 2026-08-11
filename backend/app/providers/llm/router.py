@@ -16,6 +16,7 @@ from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.providers.llm.errors import LLMError, LLMRateLimitError
 from app.providers.llm.factory import get_llm_provider
 from app.providers.llm.openai import OpenAIProvider
+from app.providers.llm.openrouter import FreeModelRotatingProvider, openrouter_provider
 
 
 @dataclass
@@ -68,6 +69,19 @@ class ModelRouter:
             return AnthropicProvider(
                 self._settings.anthropic_api_key,
                 model=model or "claude-3-5-haiku-latest",
+            )
+        if name == "openrouter":
+            if not self._settings.openrouter_api_key:
+                raise ProviderConfigurationError("OpenRouter API key not configured")
+            if model:
+                return openrouter_provider(
+                    self._settings.openrouter_api_key,
+                    model=model,
+                    base_url=self._settings.openrouter_base_url,
+                )
+            return FreeModelRotatingProvider(
+                self._settings.openrouter_api_key,
+                base_url=self._settings.openrouter_base_url,
             )
         raise ProviderConfigurationError(f"Unknown provider: {name}")
 

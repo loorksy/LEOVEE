@@ -22,19 +22,38 @@ class OpenAIProvider:
         *,
         model: str = "gpt-4o-mini",
         client: Any | None = None,
+        base_url: str | None = None,
+        default_headers: dict[str, str] | None = None,
+        provider_name: str = "openai",
     ) -> None:
         if not api_key:
             raise ProviderConfigurationError("OpenAI API key is not configured")
         self._api_key = api_key
         self._model = model
         self._client = client
+        self._base_url = base_url
+        self._default_headers = default_headers
+        self._provider_name = provider_name
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider_name
 
     def _get_client(self) -> Any:
         if self._client is not None:
             return self._client
         from openai import AsyncOpenAI
 
-        self._client = AsyncOpenAI(api_key=self._api_key)
+        kwargs: dict[str, Any] = {"api_key": self._api_key}
+        if self._base_url:
+            kwargs["base_url"] = self._base_url
+        if self._default_headers:
+            kwargs["default_headers"] = self._default_headers
+        self._client = AsyncOpenAI(**kwargs)
         return self._client
 
     async def complete(
@@ -87,7 +106,7 @@ class OpenAIProvider:
         return LLMResponse(
             content=text,
             model=response.model,
-            provider="openai",
+            provider=self._provider_name,
             usage=usage_from_openai(response.usage),
             structured=structured,
             tool_calls=tool_calls,
@@ -127,5 +146,11 @@ class OpenAIProvider:
             delta = choices[0].delta
             text = getattr(delta, "content", None) or ""
             if text:
-                yield LLMStreamChunk(text=text, model=model, provider="openai")
-        yield LLMStreamChunk(text="", model=model, provider="openai", done=True, usage=usage)
+                yield LLMStreamChunk(text=text, model=model, provider=self._provider_name)
+        yield LLMStreamChunk(
+            text="",
+            model=model,
+            provider=self._provider_name,
+            done=True,
+            usage=usage,
+        )

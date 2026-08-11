@@ -7,6 +7,7 @@ const LABELS: Record<string, string> = {
   OANDA_ENVIRONMENT: "OANDA environment",
   ANTHROPIC_API_KEY: "Anthropic API key",
   OPENAI_API_KEY: "OpenAI API key",
+  OPENROUTER_API_KEY: "OpenRouter API key (free-model rotation)",
   FINNHUB_API_KEY: "Finnhub API key",
   RESEND_API_KEY: "Resend API key",
   SECRET_KEY: "App SECRET_KEY",

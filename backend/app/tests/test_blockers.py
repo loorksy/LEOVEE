@@ -29,9 +29,24 @@ def test_production_startup_refuses_missing_credentials() -> None:
         OANDA_API_TOKEN=None,
         OPENAI_API_KEY=None,
         ANTHROPIC_API_KEY=None,
+        OPENROUTER_API_KEY=None,
     )
     with pytest.raises(ProviderConfigurationError):
         validate_production_startup(settings)
+
+
+def test_production_startup_accepts_openrouter_as_llm() -> None:
+    settings = Settings(
+        ENVIRONMENT="production",
+        DATABASE_URL="postgresql+asyncpg://leovee_app:p@localhost/db",
+        REDIS_URL="redis://localhost:6379/0",
+        SECRET_KEY="x" * 32,
+        OANDA_API_TOKEN="practice-token",
+        OPENAI_API_KEY=None,
+        ANTHROPIC_API_KEY=None,
+        OPENROUTER_API_KEY="sk-or-test",
+    )
+    validate_production_startup(settings)
 
 
 @pytest.mark.asyncio

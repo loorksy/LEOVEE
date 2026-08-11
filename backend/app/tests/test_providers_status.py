@@ -64,6 +64,7 @@ async def test_providers_status_shape(
     monkeypatch.setenv("OANDA_ENVIRONMENT", "practice")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
     monkeypatch.setenv("OPENAI_API_KEY", "oai-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
     get_settings.cache_clear()
 
@@ -95,6 +96,8 @@ async def test_providers_status_shape(
         assert body["finnhub"]["status"] == "not_configured"
         assert body["anthropic"]["configured"] is True
         assert body["openai"]["configured"] is True
+        assert body["openrouter"]["configured"] is True
+        assert body["openrouter"]["mode"] == "free_rotation"
     finally:
         app.dependency_overrides.clear()
         get_settings.cache_clear()

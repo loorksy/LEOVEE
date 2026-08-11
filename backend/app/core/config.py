@@ -38,6 +38,11 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        alias="OPENROUTER_BASE_URL",
+    )
     finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
     sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")

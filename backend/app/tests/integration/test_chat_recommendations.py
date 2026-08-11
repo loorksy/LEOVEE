@@ -51,7 +51,11 @@ async def test_chat_message_injects_recall(
     db_session.add(conv)
     await db_session.commit()
 
-    monkeypatch.setattr("app.api.routes.chat.get_llm_provider", lambda: FakeLLMProvider())
+    fake = FakeLLMProvider()
+    monkeypatch.setattr(
+        "app.api.routes.chat.get_llm_failover_chain",
+        lambda settings=None: [("fake", fake)],
+    )
 
     async def override_user() -> uuid.UUID:
         return user.id

@@ -136,12 +136,13 @@ async def iter_chat_turn_stream(
     user_content: str,
     llm: LLMProvider,
     fallback_llm: LLMProvider | None = None,
+    providers: list[tuple[str, LLMProvider]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Stream recall + tokens, then persist a single assistant message.
 
     Failure / disconnect rules:
     - Partial tokens from a failed primary are **discarded** (not persisted).
-    - Fallback (if provided) starts a clean stream; client receives ``stream_reset``.
+    - Fallback providers start a clean stream; client receives ``stream_reset``.
     - On cancel/disconnect, no assistant row is written (user message remains).
     - Successful completion writes exactly one assistant message.
     """
@@ -158,17 +159,25 @@ async def iter_chat_turn_stream(
         "id": str(state.user_message.id),
     }
 
-    providers: list[tuple[str, LLMProvider]] = [("primary", llm)]
-    if fallback_llm is not None:
-        providers.append(("fallback", fallback_llm))
+    if providers is None:
+        chain: list[tuple[str, LLMProvider]] = [("primary", llm)]
+        if fallback_llm is not None:
+            chain.append(("fallback", fallback_llm))
+    else:
+        chain = providers
 
     last_error: Exception | None = None
-    for index, (label, provider) in enumerate(providers):
+    for index, (label, provider) in enumerate(chain):
         state.parts.clear()
         state.usage = {}
         try:
             async for event in _consume_provider_stream(provider, state.llm_messages, state):
                 yield event
+            # Advance OpenRouter free-model cursor after a successful stream.
+            if label.startswith("openrouter:"):
+                from app.providers.llm.openrouter_catalog import advance_cursor
+
+                advance_cursor(label.split("openrouter:", 1)[-1])
             assistant = await finalize_assistant_message(session, tenant, conversation, state)
             yield {
                 "event": "done",
@@ -185,7 +194,11 @@ async def iter_chat_turn_stream(
             last_error = exc
             # Discard partial tokens so a fallback cannot produce a duplicated/truncated msg.
             state.parts.clear()
-            has_more = index < len(providers) - 1
+            if label.startswith("openrouter:"):
+                from app.providers.llm.openrouter_catalog import advance_cursor
+
+                advance_cursor(label.split("openrouter:", 1)[-1])
+            has_more = index < len(chain) - 1
             if has_more:
                 yield {
                     "event": "stream_reset",
