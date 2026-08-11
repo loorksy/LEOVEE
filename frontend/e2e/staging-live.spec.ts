@@ -15,7 +15,8 @@ const STAGING = process.env.STAGING_BASE_URL ?? "https://staging.leovee.lork.clo
 test.describe("Staging live product path", () => {
   test("signup through memory recall on second analysis", async ({ page }) => {
     const stamp = Date.now();
-    const email = `batch8.e2e.${stamp}@leovee.test`;
+    // email-validator rejects reserved TLDs like .test — use a real-looking domain.
+    const email = `batch8.e2e.${stamp}@users.leovee.lork.cloud`;
     const password = `Batch8!${stamp}`;
     const org = `Batch8 Desk ${stamp}`;
 
@@ -27,8 +28,8 @@ test.describe("Staging live product path", () => {
     await page.getByRole("button", { name: /sign up/i }).click();
 
     // Signup creates a default workspace; land authenticated on home/shell.
-    await expect(page.getByText("Leovee").first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("link", { name: "Analysis" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analysis" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Welcome to Leovee/i)).toBeVisible();
 
     await page.getByRole("link", { name: "Analysis" }).click();
     await expect(page.getByRole("heading", { name: "Analysis" })).toBeVisible();
