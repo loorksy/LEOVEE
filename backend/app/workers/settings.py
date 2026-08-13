@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
+
+import structlog
 from arq import cron
 from arq.connections import RedisSettings
 
@@ -9,6 +13,8 @@ from app.core.timeframes import ACTIVE_TIMEFRAMES
 from app.infrastructure.database import get_session_factory
 from app.services.learning.outcome_recorder import TerminalOutcome
 from app.services.learning.pipeline import run_learning_pipeline
+
+logger = structlog.get_logger(__name__)
 
 
 async def process_learning_outcome(ctx: dict[str, object], payload: dict[str, object]) -> str:
@@ -63,6 +69,27 @@ async def candle_backfill_job(_ctx: dict[str, object]) -> str:
                 )
         await session.commit()
     return f"candle_backfill_ok:{repaired}"
+
+
+async def history_backfill_job(_ctx: dict[str, object]) -> str:
+    """Keep a full year of candles present for every active timeframe.
+
+    Resumable: each run continues from the newest stored candle, so the first
+    run fills a year and every later run costs one page.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.providers.market.oanda import get_market_provider
+    from app.services.market.history import backfill_all
+
+    provider = get_market_provider()
+    written: dict[str, int] = {}
+    async with factory() as session:
+        for symbol in TRADABLE_SYMBOLS:
+            written |= await backfill_all(session, symbol_code=symbol, provider=provider)
+        await session.commit()
+    return f"history_backfill_ok:{written}"
 
 
 async def candle_retention_job(_ctx: dict[str, object]) -> str:
@@ -217,6 +244,7 @@ class WorkerSettings:
         process_learning_outcome,
         oanda_stream_consumer_job,
         candle_backfill_job,
+        history_backfill_job,
         candle_retention_job,
         news_ingestion_job,
         memory_embedding_index_job,
@@ -227,8 +255,9 @@ class WorkerSettings:
         reload_platform_secrets_job,
     ]
     cron_jobs = [
-        cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
+        # Hourly: the first run fills a year, later runs cost one page each.
+        cron(history_backfill_job, minute={7}),  # type: ignore[arg-type]
         cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
         cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
         cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
@@ -236,5 +265,27 @@ class WorkerSettings:
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
         cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]
     ]
+
+    @staticmethod
+    async def on_startup(ctx: dict[str, object]) -> None:
+        """Open the live price feed and fill any history gap on boot.
+
+        The feed is the reason a scalp can be decided on the current candle
+        rather than one up to fifteen minutes old, so it starts with the worker
+        rather than waiting for a scheduled tick.
+        """
+        from app.workers.stream_runner import start_stream_supervisor
+
+        ctx["stream_task"] = start_stream_supervisor()
+        logger.info("live_stream_started")
+
+    @staticmethod
+    async def on_shutdown(ctx: dict[str, object]) -> None:
+        task = ctx.get("stream_task")
+        if isinstance(task, asyncio.Task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            logger.info("live_stream_stopped")
 
     redis_settings = _worker_redis_settings()

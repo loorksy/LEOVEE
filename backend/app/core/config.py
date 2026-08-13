@@ -73,7 +73,10 @@ class Settings(BaseSettings):
     )
     strategy_decay_min_trades: int = Field(default=10, alias="STRATEGY_DECAY_MIN_TRADES")
 
-    candle_retention_m1_days: int = Field(default=365, alias="CANDLE_RETENTION_M1_DAYS")
+    # Every active timeframe keeps at least a full year: that is the window
+    # the geometry engine, similar-case memory and calibration are built on,
+    # so purging inside it would quietly degrade all three.
+    candle_retention_m1_days: int = Field(default=400, alias="CANDLE_RETENTION_M1_DAYS")
     candle_retention_m5_days: int = Field(default=1095, alias="CANDLE_RETENTION_M5_DAYS")
     candle_retention_m15_days: int = Field(default=1095, alias="CANDLE_RETENTION_M15_DAYS")
     candle_retention_m30_days: int = Field(default=1095, alias="CANDLE_RETENTION_M30_DAYS")
