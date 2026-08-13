@@ -7,11 +7,17 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.services.auth_service as auth_service
 from app.core.config import get_settings
 from app.infrastructure.database import get_db_session
 from app.infrastructure.rate_limit import reset_rate_limiter_for_tests
 from app.main import app
-from app.providers.email.console import clear_console_outbox, get_console_outbox
+from app.providers.email.console import (
+    ConsoleEmailProvider,
+    clear_console_outbox,
+    get_console_outbox,
+)
+from app.providers.email.factory import get_email_provider
 
 
 @pytest.fixture(autouse=True)
@@ -20,8 +26,10 @@ def _test_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     get_settings.cache_clear()
     clear_console_outbox()
     reset_rate_limiter_for_tests()
+    get_email_provider.cache_clear()
     yield
     get_settings.cache_clear()
+    get_email_provider.cache_clear()
 
 
 @pytest.fixture
@@ -46,7 +54,20 @@ def _extract_token_from_outbox() -> str:
 
 
 @pytest.mark.asyncio
-async def test_password_reset_flow(api_client: AsyncClient) -> None:
+async def test_password_reset_flow(
+    api_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Signup only sends a verification email when Resend is configured;
+    # otherwise the account is auto-verified and the outbox stays empty. Set the
+    # key to take that branch, but deliver through the console provider so the
+    # token is capturable — the same arrangement test_auth.py uses.
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+    get_settings.cache_clear()
+    get_email_provider.cache_clear()
+    monkeypatch.setattr(auth_service, "get_email_provider", lambda: ConsoleEmailProvider())
+    clear_console_outbox()
+
     signup = await api_client.post(
         "/api/v1/auth/signup",
         json={"email": "resetme@example.com", "password": "oldpassword12"},

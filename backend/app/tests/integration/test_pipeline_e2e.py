@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenant import resolve_tenant_context
 from app.core.tenant_rls import bind_workspace_rls
-from app.models.enums import Timeframe
+from app.models.enums import RecommendationDirection, Timeframe
 from app.models.market_artifacts import MarketEvent
 from app.models.memory import AgentMemory
 from app.models.recommendation import Thesis
@@ -19,6 +19,7 @@ from app.services.analysis_service import run_analysis
 from app.services.memory_service import retrieve_memories_for_symbol
 from app.services.recommendation_service import get_recommendation
 from app.tests.conftest import seed_user_org
+from app.tests.doubles.llm import FakeLLMProvider
 from app.tests.doubles.market import FakeMarketDataProvider
 
 
@@ -47,7 +48,24 @@ def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_market_to_thesis(db_session: AsyncSession) -> None:
+async def test_pipeline_market_to_thesis(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Candles through to a stored recommendation, thesis and recallable memory.
+
+    This covers the *wiring*, which holds regardless of what the analysis
+    concludes. It deliberately does not assert an approved BUY/SELL: the
+    analytical engines are placeholders until M4 (app/engines/status.py), so the
+    run fails closed and the adversarial gate has nothing to approve. Forcing an
+    approval here would mean stubbing the scenario engine as well, at which
+    point the test would be checking its own stubs rather than the pipeline.
+
+    What is asserted instead is the invariant that survives M4: the adversarial
+    verdict and the decision agree with each other.
+    """
+    monkeypatch.setattr("app.agents.orchestrator.get_llm_provider", lambda: FakeLLMProvider())
+
     user, _org, _membership = await seed_user_org(db_session)
     await db_session.commit()
     ctx = await resolve_tenant_context(db_session, user.id)
@@ -66,7 +84,16 @@ async def test_pipeline_market_to_thesis(db_session: AsyncSession) -> None:
     assert result["recommendation_id"]
     assert result["thesis_id"]
     assert result["memory_id"]
-    assert result["reasoning"]["approved"] is True
+
+    # The adversarial gate must never approve a run that failed closed, and must
+    # never withhold approval from one that succeeded without raising an issue.
+    reasoning = result["reasoning"]
+    adversarial = reasoning["adversarial"]
+    decision_is_no_trade = result["decision"]["direction"] == RecommendationDirection.NO_TRADE.value
+    assert adversarial["approved"] is not decision_is_no_trade, reasoning
+    assert reasoning["approved"] == adversarial["approved"], reasoning
+    if not adversarial["approved"]:
+        assert adversarial["issues"], "a withheld approval must name its cause"
 
     rec = await get_recommendation(db_session, ctx, uuid.UUID(result["recommendation_id"]))
     await bind_workspace_rls(db_session, ctx)

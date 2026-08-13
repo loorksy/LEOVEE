@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -26,7 +27,7 @@ def _msgs() -> list[LLMMessage]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_catalog() -> None:
+def _reset_catalog() -> Iterator[None]:
     set_cached_free_models(["model-a:free", "model-b:free", "model-c:free"])
     while current_cursor() != 0:
         advance_cursor()
@@ -75,7 +76,7 @@ async def test_free_rotator_skips_exhausted_model() -> None:
             )
 
     rotator = FreeModelRotatingProvider("sk-or-test", models=["model-a:free", "model-b:free"])
-    rotator._child = lambda model: _FlakyChild(model)  # type: ignore[method-assign]
+    rotator._child = lambda model: _FlakyChild(model)  # type: ignore[method-assign,return-value,assignment]
     rotator.ensure_catalog = AsyncMock(return_value=["model-a:free", "model-b:free"])  # type: ignore[method-assign]
 
     out = await rotator.complete(_msgs())
@@ -95,7 +96,7 @@ async def test_free_rotator_raises_auth_without_rotating_all() -> None:
             raise LLMAuthError("bad key")
 
     rotator = FreeModelRotatingProvider("sk-or-test", models=["model-a:free", "model-b:free"])
-    rotator._child = lambda model: _AuthChild(model)  # type: ignore[method-assign]
+    rotator._child = lambda model: _AuthChild(model)  # type: ignore[method-assign,return-value,assignment]
     rotator.ensure_catalog = AsyncMock(return_value=["model-a:free", "model-b:free"])  # type: ignore[method-assign]
 
     with pytest.raises(LLMAuthError):

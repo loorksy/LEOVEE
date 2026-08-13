@@ -97,7 +97,9 @@ async def _run() -> None:
                 await session.execute(
                     select(WorkspaceMember).where(WorkspaceMember.user_id == user.id)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for member in members:
             member.role_id = admin_role.id

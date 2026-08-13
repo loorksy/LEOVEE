@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,11 +58,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if factory is not None:
             async with factory() as session:
                 await ensure_platform_seed(session)
-                try:
+                # The table may not exist until migrations run; continue boot.
+                with suppress(Exception):
                     await load_runtime_overrides(session)
-                except Exception:
-                    # Table may not exist until migrations run; continue boot.
-                    pass
                 await session.commit()
     yield
 

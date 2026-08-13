@@ -5,9 +5,8 @@
  * The parity test fails if the two drift apart in either direction.
  *
  * Scope note: this scaffold covers the surfaces that exist today. The bulk of
- * AiChart's ~727 keys arrive in M10 along with the component rollout, filtered
- * of the execution, broker, notification and backtest vocabulary that is out of
- * scope (ADR 0003, ADR 0005).
+ * AiChart's ~727 keys arrive in M10 along with the component rollout, minus the
+ * vocabulary belonging to the subsystems ADR 0003 and ADR 0005 rule out.
  */
 export const ar = {
   "app.name": "ليوفي",

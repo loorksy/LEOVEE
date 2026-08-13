@@ -114,6 +114,18 @@ describe("Batch 3 mocked end-to-end flow", () => {
             ],
           });
         }
+        // The analysis form is gated on provider status; without this the
+        // query fails, canRun stays false, and the form renders disabled.
+        if (pathname === "/api/v1/providers/status" && method === "GET") {
+          const ok = { configured: true, status: "ok" };
+          return jsonResponse({
+            finnhub: ok,
+            oanda: { ...ok, environment: "practice" },
+            anthropic: ok,
+            openai: ok,
+            openrouter: { ...ok, mode: "paid" },
+          });
+        }
         if (pathname === "/api/v1/analysis/run" && method === "POST") {
           return jsonResponse({
             agent_run_id: "run-1",
@@ -255,8 +267,12 @@ describe("Batch 3 mocked end-to-end flow", () => {
     // Run analysis.
     fireEvent.click(screen.getByRole("link", { name: /^analysis$/i }));
     const symbolInput = await screen.findByLabelText(/^symbol$/i);
+    // The form stays disabled until provider status loads; clicking before then
+    // silently does nothing.
+    const runButton = screen.getByRole("button", { name: /run analysis/i });
+    await waitFor(() => expect(runButton).not.toBeDisabled());
     fireEvent.change(symbolInput, { target: { value: "EURUSD" } });
-    fireEvent.click(screen.getByRole("button", { name: /run analysis/i }));
+    fireEvent.click(runButton);
 
     expect(await screen.findByText(/EURUSD · H1 — BUY/)).toBeInTheDocument();
     await screen.findByTestId("chart-status");
