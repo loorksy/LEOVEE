@@ -35,7 +35,7 @@ export async function runAnalysis(body: AnalysisRunRequest): Promise<AnalysisRun
     method: "POST",
     body: {
       symbol: body.symbol,
-      timeframe: body.timeframe ?? "H1",
+      ...(body.timeframe ? { timeframe: body.timeframe } : {}),
       complete_pipeline: body.complete_pipeline ?? false,
     },
   });

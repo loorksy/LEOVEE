@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.timeframes import MTF_CONTEXT_STACK_CODES
 from app.models.enums import Timeframe
 
 
@@ -16,7 +17,7 @@ def _bias_from_trend(trend: str) -> str:
 def run_mtf_engine(
     intelligence_by_tf: dict[str, dict[str, Any]],
     *,
-    stack: tuple[str, ...] = ("D1", "H4", "H1"),
+    stack: tuple[str, ...] = MTF_CONTEXT_STACK_CODES,
 ) -> dict[str, Any]:
     """
     HTF → LTF bias alignment pipeline (Phase 10).

@@ -20,3 +20,4 @@ gets amended alongside.
 | [0005](0005-analysis-only-no-execution.md) | No execution, brokers, or notifications | §17, §19, §57, §105 |
 | [0006](0006-float-in-engines-decimal-at-the-money-boundary.md) | Engines compute in float; Decimal at the money boundary | — |
 | [0007](0007-gold-only.md) | The tradable universe is XAUUSD alone | §17, §60 |
+| [0008](0008-scalp-only-agent-chosen-timeframe.md) | Scalp only; the agent picks M1/M5/M15 | §21, §49, §106 |

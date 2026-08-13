@@ -5,6 +5,7 @@ from arq.connections import RedisSettings
 
 from app.core.config import get_settings
 from app.core.symbols import TRADABLE_SYMBOLS
+from app.core.timeframes import ACTIVE_TIMEFRAMES
 from app.infrastructure.database import get_session_factory
 from app.services.learning.outcome_recorder import TerminalOutcome
 from app.services.learning.pipeline import run_learning_pipeline
@@ -43,20 +44,23 @@ async def candle_backfill_job(_ctx: dict[str, object]) -> str:
     factory = get_session_factory()
     if factory is None:
         raise RuntimeError("DATABASE_URL is not configured")
-    from app.models.enums import Timeframe
     from app.providers.market.oanda import get_market_provider
     from app.services.market.gaps import repair_candle_gaps
 
     provider = get_market_provider()
     repaired = 0
     async with factory() as session:
+        # Every frame the platform analyses, not just M1: a gap on H1 leaves
+        # the multi-timeframe context wrong, which is harder to notice than a
+        # gap on the frame being charted.
         for symbol in TRADABLE_SYMBOLS:
-            repaired += await repair_candle_gaps(
-                session,
-                symbol_code=symbol,
-                timeframe=Timeframe.M1,
-                provider=provider,
-            )
+            for timeframe in ACTIVE_TIMEFRAMES:
+                repaired += await repair_candle_gaps(
+                    session,
+                    symbol_code=symbol,
+                    timeframe=timeframe,
+                    provider=provider,
+                )
         await session.commit()
     return f"candle_backfill_ok:{repaired}"
 

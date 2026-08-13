@@ -10,7 +10,6 @@ import {
   isLlmConfigured,
   llmCredentialNames,
 } from "@/components/ProviderNotConfiguredBanner";
-import { BACKEND_TIMEFRAMES } from "@/features/chart/timeframe";
 
 /** Backend narrative is a dict (llm summary or llm_unavailable); never render raw objects. */
 export function formatAnalysisNarrative(narrative: unknown): string | null {
@@ -74,7 +73,6 @@ async function tryPublishChartAnnotations(response: AnalysisRunResponse): Promis
 
 export function AnalysisPage() {
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
-  const [timeframe, setTimeframe] = useState("H1");
   const [completePipeline, setCompletePipeline] = useState(true);
   const [result, setResult] = useState<AnalysisRunResponse | null>(null);
   const [chartStatus, setChartStatus] = useState<string | null>(null);
@@ -94,7 +92,6 @@ export function AnalysisPage() {
     mutationFn: async () => {
       const response = await runAnalysis({
         symbol,
-        timeframe,
         complete_pipeline: completePipeline,
       });
       setResult(response);
@@ -155,22 +152,6 @@ export function AnalysisPage() {
             disabled={!canRun}
             className="mt-1 block w-32 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100 disabled:opacity-50"
           />
-        </label>
-        <label className="text-sm text-slate-300" htmlFor="analysis-timeframe">
-          Timeframe
-          <select
-            id="analysis-timeframe"
-            value={timeframe}
-            onChange={(event) => setTimeframe(event.target.value)}
-            disabled={!canRun}
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100 disabled:opacity-50"
-          >
-            {BACKEND_TIMEFRAMES.map((tf) => (
-              <option key={tf} value={tf}>
-                {tf}
-              </option>
-            ))}
-          </select>
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input
