@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models."""
 
+from app.models.alert import Alert
 from app.models.api_key import ApiKey
 from app.models.auth_token import AuthToken
 from app.models.base import Base
@@ -8,6 +9,7 @@ from app.models.candle import Candle
 from app.models.chart_annotation import ChartAnnotation
 from app.models.conversation import Conversation, Message
 from app.models.feature_flag import FeatureFlag
+from app.models.journal import JournalEntry
 from app.models.learning import (
     AgentRun,
     AgentTrace,
@@ -17,8 +19,11 @@ from app.models.learning import (
     SymbolProfile,
 )
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
+from app.models.mcp import McpAuditEvent, McpSession
 from app.models.memory import AgentEpisode, AgentMemory, Lesson, MemoryEmbedding
+from app.models.model_config import ModelConfig
 from app.models.news import NewsEvent, ResearchItem
+from app.models.notification import Notification
 from app.models.oanda_connection import OandaConnection
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
@@ -38,6 +43,7 @@ from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 
 __all__ = [
+    "Alert",
     "AgentRun",
     "AgentTrace",
     "CalibrationBin",
@@ -55,13 +61,18 @@ __all__ = [
     "ChartAnnotation",
     "Conversation",
     "FeatureFlag",
+    "JournalEntry",
     "Lesson",
     "MemoryEmbedding",
     "MarketEvent",
+    "McpAuditEvent",
+    "McpSession",
+    "ModelConfig",
     "Message",
     "PriceZone",
     "Structure",
     "NewsEvent",
+    "Notification",
     "Organization",
     "OrganizationMember",
     "Permission",
