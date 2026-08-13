@@ -19,17 +19,11 @@ from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
 from app.services.learning.calibration import apply_calibration
 from app.services.market.candle_aggregator import CandleAggregator, PriceTick
+from app.tests.bars import rising_bars
 
 
 def _bars() -> list[OHLCBar]:
-    return [
-        OHLCBar(
-            open=Decimal("1.1"), high=Decimal("1.2"), low=Decimal("1.0"), close=Decimal("1.15")
-        ),
-        OHLCBar(
-            open=Decimal("1.15"), high=Decimal("1.25"), low=Decimal("1.1"), close=Decimal("1.2")
-        ),
-    ]
+    return rising_bars(20)
 
 
 def test_volatility_engine_is_implemented() -> None:

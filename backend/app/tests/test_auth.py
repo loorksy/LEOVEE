@@ -84,8 +84,8 @@ async def test_signup_requires_verify_when_resend_configured(
     assert get_settings().resend_api_key
 
     # Keep Resend key for the auto-verify gate, but capture mail via console.
-    from app.providers.email.console import ConsoleEmailProvider
     import app.services.auth_service as auth_service
+    from app.providers.email.console import ConsoleEmailProvider
 
     monkeypatch.setattr(auth_service, "get_email_provider", lambda: ConsoleEmailProvider())
     clear_console_outbox()

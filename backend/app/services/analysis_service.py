@@ -88,9 +88,7 @@ async def run_analysis(
         except Exception as exc:  # noqa: BLE001 — fail closed when adversarial cannot run
             # Preserve an earlier fail-closed reason (e.g. LLM_UNAVAILABLE).
             if not result.decision.get("degraded"):
-                result.decision = fail_closed_no_trade(
-                    "ADVERSARIAL_UNAVAILABLE", detail=str(exc)
-                )
+                result.decision = fail_closed_no_trade("ADVERSARIAL_UNAVAILABLE", detail=str(exc))
                 payload["decision"] = result.decision
                 narrative = result.narrative if isinstance(result.narrative, dict) else {}
                 payload["narrative"] = {
@@ -155,9 +153,7 @@ async def run_analysis(
                 "decision": result.decision,
                 "recommendation_id": str(rec.id),
                 "thesis_id": str(thesis.id),
-                "summary": str(
-                    reasoning.get("summary") or f"{symbol.upper()} {direction_value}"
-                ),
+                "summary": str(reasoning.get("summary") or f"{symbol.upper()} {direction_value}"),
                 "confidence": None if conf is None else float(conf),
                 "sample_size": 1,
                 "agent_run_id": str(result.agent_run_id),

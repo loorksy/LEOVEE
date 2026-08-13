@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 
 import pytest
 from sqlalchemy import func, select
@@ -14,22 +13,11 @@ from app.engines.zones import run_zones_engine
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
 from app.services import market_data
 from app.services.market.engine_persistence import persist_engine_outputs
+from app.tests.bars import rising_bars
 
 
 def _bars(n: int = 30) -> list[OHLCBar]:
-    bars: list[OHLCBar] = []
-    price = Decimal("1.1000")
-    for i in range(n):
-        o = price + Decimal(i) * Decimal("0.0001")
-        bars.append(
-            OHLCBar(
-                open=o,
-                high=o + Decimal("0.0005"),
-                low=o - Decimal("0.0003"),
-                close=o + Decimal("0.0002"),
-            )
-        )
-    return bars
+    return rising_bars(n)
 
 
 @pytest.mark.asyncio

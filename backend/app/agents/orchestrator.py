@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from app.core.errors import ProviderConfigurationError
+from app.engines.bar import bars_from_candles
 from app.engines.decision import run_decision_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
@@ -14,7 +15,7 @@ from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
 from app.engines.status import unavailable_engines
 from app.engines.structure import run_structure_engine
-from app.engines.volatility import OHLCBar, run_volatility_engine
+from app.engines.volatility import run_volatility_engine
 from app.engines.zones import run_zones_engine
 from app.models.enums import RecommendationDirection
 from app.providers.llm.base import LLMMessage, LLMProvider
@@ -37,10 +38,6 @@ class OrchestratorResult:
     engines: dict[str, Any] = field(default_factory=dict)
     decision: dict[str, Any] = field(default_factory=dict)
     narrative: dict[str, Any] = field(default_factory=dict)
-
-
-def bars_from_candles(candles: list[Any]) -> list[OHLCBar]:
-    return [OHLCBar(open=c.open, high=c.high, low=c.low, close=c.close) for c in candles]
 
 
 def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str, Any]:
@@ -115,7 +112,9 @@ async def run_analysis_orchestrator(
             },
         )
 
-    entry = bars[-1].close
+    # Back to Decimal at the money boundary: engines compute in float to match
+    # the reference implementation, prices are persisted and sized in Decimal.
+    entry = Decimal(str(bars[-1].close))
     stop = entry - Decimal("0.0020")
     risk = run_risk_engine(entry=entry, stop=stop)
     decision = run_decision_engine(scenarios, risk)

@@ -4,10 +4,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.orchestrator import bars_from_candles
+from app.engines.bar import OHLCBar, bars_from_candles
 from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import default_mtf_stack, run_mtf_engine
-from app.engines.volatility import OHLCBar
 from app.models.enums import Timeframe
 from app.providers.market.base import MarketDataProvider
 from app.services import market_data
