@@ -29,6 +29,7 @@ from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
 from app.models.plan import Plan
 from app.models.platform_secret import PlatformSecret
+from app.models.prompt import PromptVersion
 from app.models.rbac import Permission, Role, RolePermission
 from app.models.recommendation import Recommendation, Thesis
 from app.models.session import Session
@@ -77,6 +78,7 @@ __all__ = [
     "OrganizationMember",
     "Permission",
     "Plan",
+    "PromptVersion",
     "PlatformSecret",
     "Recommendation",
     "ResearchItem",

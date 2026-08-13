@@ -86,9 +86,10 @@ class MemoryEmbedding(Base, WorkspaceOwnedMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     memory_id: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
-    model: Mapped[str] = mapped_column(
-        String(128), nullable=False, default="text-embedding-3-small"
-    )
+    #: What produced this vector. Required, not defaulted: the column used to
+    #: claim ``text-embedding-3-small`` while every row held a SHA-256 hash, and
+    #: a wrong provenance label cannot be recovered from downstream.
+    model: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

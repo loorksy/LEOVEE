@@ -50,6 +50,11 @@ BOUNDARY_TABLES: dict[str, str] = {
 # Tables that are deliberately NOT workspace-scoped. Every entry needs a reason:
 # if you cannot write one, the table probably wants a workspace_id instead.
 PLATFORM_GLOBAL_TABLES: dict[str, str] = {
+    # Prompts are platform assets: identical text for every tenant, and a
+    # per-workspace copy would fragment the grouping the learning loop needs
+    # ("how did runs under this prompt perform" is a question about the
+    # prompt). Nothing tenant-derived is stored in it.
+    "prompt_versions": "platform-global prompt catalogue; no tenant data",
     # Identity and tenancy live above the workspace boundary.
     "organizations": "tenancy root",
     "organization_members": "tenant-scoped; guards workspace access itself",

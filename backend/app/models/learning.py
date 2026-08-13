@@ -33,6 +33,11 @@ class AgentRun(Base, WorkspaceOwnedMixin, TimestampMixin):
     decision: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: SHA-256 of the exact system prompt this run was given, into
+    #: ``prompt_versions``. The learning loop attributes outcomes to decisions;
+    #: without it, a calibration curve spanning a prompt change averages two
+    #: different analysts together and calls the spread noise.
+    prompt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     tool_calls_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     memories_retrieved_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
