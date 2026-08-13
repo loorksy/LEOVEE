@@ -37,6 +37,8 @@ __all__ = [
     "stochastic",
     "atr",
     "adx",
+    "directional_movement",
+    "DirectionalMovement",
 ]
 
 
@@ -45,6 +47,15 @@ class MacdResult:
     macd: float
     signal: float
     histogram: float
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionalMovement:
+    adx: float
+    plus_di: float
+    minus_di: float
+    #: |+DI - -DI|: how lopsided the directional pressure is.
+    spread: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +224,19 @@ def atr(bars: list[OHLCBar], period: int = 14) -> float | None:
 
 
 def adx(bars: list[OHLCBar], period: int = 14) -> float | None:
-    """Wilder's ADX: trend *strength* in [0, 100], blind to direction.
+    """Wilder's ADX: trend *strength* in [0, 100], blind to direction."""
+    full = directional_movement(bars, period)
+    return full.adx if full is not None else None
+
+
+def directional_movement(bars: list[OHLCBar], period: int = 14) -> DirectionalMovement | None:
+    """ADX together with the +DI/-DI it is built from.
+
+    Strength and direction come out of the same smoothing pass, and the regime
+    classifier needs both: ADX says whether there *is* a trend, and the spread
+    between the directional indices says which way. Recomputing them separately
+    would run Wilder's smoothing twice over the same bars and invite the two
+    answers to drift apart.
 
     Needs ``2 * period + 1`` bars: one span to seed the directional indices and
     another to seed the ADX average on top of them.
@@ -238,6 +261,8 @@ def adx(bars: list[OHLCBar], period: int = 14) -> float | None:
         plus_dms.append(up_move if up_move > down_move and up_move > 0 else 0.0)
         minus_dms.append(down_move if down_move > up_move and down_move > 0 else 0.0)
 
+    last_plus_di = 0.0
+    last_minus_di = 0.0
     sm_tr = sum(trs[:period])
     sm_plus = sum(plus_dms[:period])
     sm_minus = sum(minus_dms[:period])
@@ -247,10 +272,12 @@ def adx(bars: list[OHLCBar], period: int = 14) -> float | None:
         sm_plus = sm_plus - sm_plus / period + plus_dms[i]
         sm_minus = sm_minus - sm_minus / period + minus_dms[i]
         if sm_tr == 0:
+            last_plus_di = last_minus_di = 0.0
             dxs.append(0.0)
             continue
         plus_di = (sm_plus / sm_tr) * 100
         minus_di = (sm_minus / sm_tr) * 100
+        last_plus_di, last_minus_di = plus_di, minus_di
         di_sum = plus_di + minus_di
         dxs.append((abs(plus_di - minus_di) / di_sum) * 100 if di_sum > 0 else 0.0)
 
@@ -259,4 +286,10 @@ def adx(bars: list[OHLCBar], period: int = 14) -> float | None:
     value = sum(dxs[:period]) / period
     for i in range(period, len(dxs)):
         value = (value * (period - 1) + dxs[i]) / period
-    return value
+    di_sum = last_plus_di + last_minus_di
+    return DirectionalMovement(
+        adx=value,
+        plus_di=last_plus_di,
+        minus_di=last_minus_di,
+        spread=abs(last_plus_di - last_minus_di) if di_sum > 0 else 0.0,
+    )

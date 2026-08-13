@@ -13,7 +13,7 @@ from typing import Any
 from app.core.timeframes import MIN_CANDLES_FOR_ANALYSIS
 from app.engines.bar import OHLCBar
 from app.engines.geometry.detect import detect_chart_geometry
-from app.engines.status import engine_unavailable
+from app.engines.status import INSUFFICIENT_DATA, engine_unavailable
 
 __all__ = ["detect_chart_geometry", "run_geometry_engine"]
 
@@ -28,5 +28,5 @@ def run_geometry_engine(bars: list[OHLCBar]) -> dict[str, Any]:
     through structure.
     """
     if len(bars) < MIN_CANDLES_FOR_ANALYSIS:
-        return engine_unavailable("geometry")
+        return engine_unavailable("geometry", INSUFFICIENT_DATA)
     return detect_chart_geometry(bars).to_dict()

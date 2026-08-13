@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from app.core.errors import ProviderConfigurationError
+from app.core.timeframes import INTERIM_DECISION_TIMEFRAME
 from app.engines.bar import bars_from_candles
 from app.engines.decision import run_decision_engine
 from app.engines.geometry import run_geometry_engine
@@ -81,8 +82,12 @@ async def run_analysis_orchestrator(
         mtf = mtf_context["mtf"]
         intelligence_by_tf = mtf_context.get("intelligence_by_tf", {})
     else:
-        intelligence_by_tf = {"H1": intelligence}
-        mtf = run_mtf_engine(intelligence_by_tf)
+        # One frame is not a multi-timeframe read. Rather than compare the
+        # analysed frame with itself and report perfect alignment, the engine is
+        # handed exactly what exists and declines when that is not enough — the
+        # caller that loads the ladder is `build_mtf_intelligence`.
+        intelligence_by_tf = {INTERIM_DECISION_TIMEFRAME.value: intelligence}
+        mtf = run_mtf_engine({INTERIM_DECISION_TIMEFRAME.value: bars})
 
     # Scenarios run last among the evidence engines: their confidence is the
     # agreement between the others, so they need all of them.

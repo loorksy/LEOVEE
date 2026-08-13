@@ -16,7 +16,7 @@ from typing import Any
 from app.core.timeframes import MIN_CANDLES_FOR_ANALYSIS
 from app.engines.bar import OHLCBar
 from app.engines.primitives.structure import detect_structure_levels, level_to_dict
-from app.engines.status import engine_unavailable
+from app.engines.status import INSUFFICIENT_DATA, engine_unavailable
 
 _BIAS_BY_SHAPE = {
     "uptrend": "BULLISH",
@@ -30,7 +30,7 @@ def run_structure_engine(bars: list[OHLCBar]) -> dict[str, Any]:
     if len(bars) < MIN_CANDLES_FOR_ANALYSIS:
         # Too few bars to confirm swings. Abstaining is the honest answer; a
         # bias derived from a handful of bars is noise wearing a label.
-        return engine_unavailable("structure")
+        return engine_unavailable("structure", INSUFFICIENT_DATA)
 
     analysis = detect_structure_levels(bars)
     return {

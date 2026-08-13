@@ -31,6 +31,9 @@ from typing import Any, Literal
 from app.core.numeric import js_round
 from app.engines.bar import OHLCBar
 
+#: Moves smaller than this share of price are not moves.
+STRUCTURE_TOLERANCE = 0.001
+
 __all__ = [
     "LevelType",
     "StructureShape",
@@ -234,36 +237,46 @@ def _cluster_levels(
 
 
 def _infer_structure(swing_highs: list[float], swing_lows: list[float]) -> StructureShape:
+    """Uptrend, downtrend or range, from the last three swings on each side.
+
+    The tolerance is a **neutral band**, and getting that backwards is a trap
+    worth naming. An earlier version tested ``high >= previous * 0.999``, which
+    reads as "allow a little slack" but actually accepts a two-point *drop* on
+    gold as a higher high. Flat highs and flat lows then satisfied the uptrend
+    test and the downtrend test at once, and since uptrend was checked first,
+    every dead-flat range was reported as an uptrend — confidently, with the
+    swing prices right there in the payload contradicting it.
+
+    So the band is checked first and separately: a move smaller than 0.1% of
+    price is *no move*, and only what clears it in the same direction on both
+    sides is a trend.
+    """
     if len(swing_highs) < 2 or len(swing_lows) < 2:
         return "unknown"
 
     recent_highs = swing_highs[-3:]
     recent_lows = swing_lows[-3:]
+    high_move = recent_highs[-1] - recent_highs[0]
+    low_move = recent_lows[-1] - recent_lows[0]
 
-    # 0.1% tolerance: strict comparisons flip on a single tick, which on a
+    # 0.1% of price: a strict comparison flips on a single tick, which on a
     # 1-minute gold chart is most bars.
-    higher_highs = all(
-        h >= recent_highs[i - 1] * 0.999 for i, h in enumerate(recent_highs) if i > 0
-    )
-    higher_lows = all(
-        low >= recent_lows[i - 1] * 0.999 for i, low in enumerate(recent_lows) if i > 0
-    )
-    if higher_highs and higher_lows:
-        return "uptrend"
+    reference = (recent_highs[-1] + recent_lows[-1]) / 2
+    if reference <= 0:
+        return "unknown"
+    band = reference * STRUCTURE_TOLERANCE
 
-    lower_highs = all(h <= recent_highs[i - 1] * 1.001 for i, h in enumerate(recent_highs) if i > 0)
-    lower_lows = all(
-        low <= recent_lows[i - 1] * 1.001 for i, low in enumerate(recent_lows) if i > 0
-    )
-    if lower_highs and lower_lows:
-        return "downtrend"
-
-    high_range = max(recent_highs) - min(recent_highs)
-    low_range = max(recent_lows) - min(recent_lows)
-    average = (recent_highs[-1] + recent_lows[-1]) / 2
-    if average > 0 and (high_range + low_range) / average < 0.01:
+    high_flat = abs(high_move) <= band
+    low_flat = abs(low_move) <= band
+    if high_flat and low_flat:
         return "range"
-
+    if high_move > band and low_move > band:
+        return "uptrend"
+    if high_move < -band and low_move < -band:
+        return "downtrend"
+    # One side trending while the other holds a level is a wedge or a
+    # consolidation, not a trend. Naming it "unknown" is honest; naming it after
+    # whichever side moved would be a guess.
     return "unknown"
 
 

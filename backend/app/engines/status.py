@@ -28,6 +28,7 @@ __all__ = [
     "EngineStatus",
     "ENGINE_STATUS",
     "ENGINE_NOT_IMPLEMENTED",
+    "INSUFFICIENT_DATA",
     "engine_unavailable",
     "is_unavailable",
     "unavailable_engines",
@@ -39,7 +40,13 @@ class EngineStatus(StrEnum):
     PLACEHOLDER = "PLACEHOLDER"
 
 
+#: The engine has not been ported yet — it has no answer of any kind.
 ENGINE_NOT_IMPLEMENTED = "ENGINE_NOT_IMPLEMENTED"
+#: The engine is real but was handed too little (or malformed) data to answer.
+#: A different fact from the one above, and the operator needs to tell them
+#: apart: one is a migration gap that a release fixes, the other is a market or
+#: feed condition that will clear on its own.
+INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 # Every engine the orchestrator runs, and whether its output can be trusted.
 #
@@ -68,15 +75,24 @@ ENGINE_STATUS: dict[str, EngineStatus] = {
     # Two directional scenarios plus an invalidation scenario (ADR 0002), with
     # confidence derived from evidence agreement rather than chosen by hand.
     "scenarios": EngineStatus.IMPLEMENTED,
-    # M4 — derived from the placeholder engines above.
-    "market_intelligence": EngineStatus.PLACEHOLDER,
-    "mtf": EngineStatus.PLACEHOLDER,
+    # M4: the normalised regime classifier — trending, ranging, volatile or
+    # illiquid, each measured against the instrument's own recent behaviour
+    # rather than a constant.
+    "market_intelligence": EngineStatus.IMPLEMENTED,
+    # M4: bias measured per frame from the bars, with conflict reported rather
+    # than averaged away, and the three constitutional roles named.
+    "mtf": EngineStatus.IMPLEMENTED,
 }
 
 
-def engine_unavailable(engine: str) -> dict[str, Any]:
-    """The output a placeholder engine returns instead of an invented answer."""
-    return {"status": "unavailable", "reason": ENGINE_NOT_IMPLEMENTED, "engine": engine}
+def engine_unavailable(
+    engine: str, reason: str = ENGINE_NOT_IMPLEMENTED, *, detail: str | None = None
+) -> dict[str, Any]:
+    """The output an engine returns instead of an invented answer."""
+    payload: dict[str, Any] = {"status": "unavailable", "reason": reason, "engine": engine}
+    if detail:
+        payload["detail"] = detail
+    return payload
 
 
 def is_unavailable(output: Any) -> bool:
