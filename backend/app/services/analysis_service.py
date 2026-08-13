@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import fail_closed_no_trade, run_analysis_orchestrator
 from app.agents.prompts import Prompt, PromptNotFound, constitution
+from app.agents.tools.registry import ToolContext
 from app.core.tenant import TenantContext
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
@@ -90,6 +91,10 @@ async def run_analysis(
         # timeframe choice costs no extra fetch (D11).
         bars_by_timeframe=mtf_snapshot.get("bars_by_timeframe"),
         visual_evidence=[s.as_payload() for s in visual.snapshots],
+        # Gives the decision stage the read-only tools: the digest it is sent is
+        # deliberately partial, and this is how the elided detail stays
+        # reachable instead of being reasoned around.
+        tool_context=ToolContext(session=session, symbol=symbol),
     )
     # The run is written before anything downstream can fail: a recommendation
     # that references an agent_run_id has to be able to find it, and a degraded

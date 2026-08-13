@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
     sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
+    #: Telegram is a conversation transport (ADR 0009). The bot token is a
+    #: platform secret so it rotates without a redeploy and never sits in a
+    #: process listing.
+    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
+    #: Set on the webhook when it is registered, and sent back by Telegram in
+    #: `X-Telegram-Bot-Api-Secret-Token`. Without it the endpoint is a public
+    #: URL anyone can POST an arbitrary "message" to.
+    telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
     sentry_environment: str | None = Field(default=None, alias="SENTRY_ENVIRONMENT")
     sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
 

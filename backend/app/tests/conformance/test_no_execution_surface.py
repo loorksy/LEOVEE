@@ -39,7 +39,9 @@ FORBIDDEN_TERMS: dict[str, str] = {
     "submit_order": "D4 — trade execution is out of scope",
     "close_position": "D4 — trade execution is out of scope",
     "modify_sl_tp": "D4 — trade execution is out of scope",
-    "telegram": "D5 — external notifications are out of scope",
+    # Telegram is a conversation transport (ADR 0009), so the term itself is no
+    # longer forbidden — the *proactive send* is, and that is enforced by
+    # `test_no_outbound_telegram_send` below rather than by a substring.
     "webpush": "D5 — external notifications are out of scope",
     "pywebpush": "D5 — external notifications are out of scope",
     "web-push": "D5 — external notifications are out of scope",
@@ -55,6 +57,32 @@ ALLOWED_OCCURRENCES: dict[str, str] = {
     # The gate that proves execution stays impossible has to name it.
     "backend/app/tests/test_trade_execution_gate.py": "asserts execution is refused",
 }
+
+#: Where Telegram may be mentioned at all. A transport, nothing more (ADR 0009).
+TELEGRAM_ALLOWED_PREFIXES = (
+    "backend/app/services/telegram/",
+    "backend/app/api/routes/telegram.py",
+    "backend/app/models/telegram.py",
+    "backend/app/schemas/telegram.py",
+    "backend/app/tests/",
+    "backend/alembic/versions/",
+    "frontend/src/features/telegram/",
+    # Registration points. Each mentions the transport in order to wire it up,
+    # and none of them can send anything.
+    "backend/app/main.py",
+    "backend/app/core/config.py",
+    "backend/app/models/__init__.py",
+    "backend/app/services/platform_secrets.py",
+)
+
+#: Verbs that name an outbound action. Matched at a word boundary rather than as
+#: a substring: `resolve_sender` contains "send" and sends nothing, and a guard
+#: that cannot tell the difference gets weakened by the first false positive it
+#: produces.
+OUTBOUND_VERBS = ("send", "notify", "broadcast", "push", "announce", "alert")
+
+#: The single function permitted to send to Telegram, and it can only reply.
+TELEGRAM_REPLY_FUNCTION = "reply_to"
 
 SCANNED_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".jsx"}
 SKIPPED_DIRECTORIES = {
@@ -134,3 +162,69 @@ def test_no_broker_execution_dependency_is_installed() -> None:
             if name in content
         ]
         assert not found_js, f"out-of-scope packages in frontend/package.json: {found_js}"
+
+
+# --- Telegram: a transport, and only a transport (ADR 0009) ------------------
+
+
+def _telegram_files() -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    for path in _scanned_files():
+        relative = _relative(path)
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if "telegram" in content.lower():
+            out.append((relative, content))
+    return out
+
+
+def test_telegram_stays_inside_the_transport() -> None:
+    """The term is allowed now, but not everywhere.
+
+    D5's reason for excluding Telegram was that a *proactive* channel creates an
+    operational commitment — a send time, a retry policy, a queue, a question
+    about what happens when delivery fails. A reply carries none of that. So the
+    transport is confined to its own modules, and a mention anywhere else means
+    the notification channel is growing back somewhere it will not be noticed.
+    """
+    strays = [
+        relative
+        for relative, _ in _telegram_files()
+        if not relative.startswith(TELEGRAM_ALLOWED_PREFIXES)
+    ]
+    assert not strays, (
+        "Telegram is a conversation transport (ADR 0009) and belongs in "
+        f"{TELEGRAM_ALLOWED_PREFIXES}; found mentions in: {strays}"
+    )
+
+
+def test_the_only_way_to_send_to_telegram_is_to_reply() -> None:
+    """The shape forbids notification, not a comment saying not to.
+
+    Every outbound call goes through one function that takes its chat id from
+    the inbound message it is answering. There is no way to *start* a
+    conversation, so a proactive notification cannot be written by accident — it
+    would have to be a new function, and this test is what notices.
+    """
+    senders: list[str] = []
+    for relative, content in _telegram_files():
+        if not relative.startswith("backend/app/services/telegram/"):
+            continue
+        for number, line in enumerate(content.splitlines(), start=1):
+            stripped = line.strip()
+            if not stripped.startswith(("def ", "async def ")):
+                continue
+            name = stripped.split("(")[0].removeprefix("async def ").removeprefix("def ").strip()
+            # A private helper cannot be reached from outside the module, so it
+            # cannot become an entry point for an unsolicited send.
+            if name.startswith("_") or name == TELEGRAM_REPLY_FUNCTION:
+                continue
+            words = name.lower().split("_")
+            if any(verb in words for verb in OUTBOUND_VERBS):
+                senders.append(f"{relative}:{number}: {name}")
+    assert not senders, (
+        "these look like outbound senders that do not require an inbound message "
+        f"(D5 stands: nothing is ever sent unprompted): {senders}"
+    )

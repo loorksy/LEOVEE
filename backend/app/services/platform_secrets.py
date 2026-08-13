@@ -35,6 +35,8 @@ MANAGED_SECRET_KEYS: tuple[str, ...] = (
     "SECRET_KEY",
     "METRICS_BEARER_TOKEN",
     "SENTRY_DSN",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_WEBHOOK_SECRET",
 )
 
 # Map env key → Settings field name
@@ -43,6 +45,8 @@ _ENV_TO_FIELD: dict[str, str] = {
     "OANDA_ACCOUNT_ID": "oanda_account_id",
     "OANDA_ENVIRONMENT": "oanda_environment",
     "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
+    "TELEGRAM_WEBHOOK_SECRET": "telegram_webhook_secret",
     "OPENAI_API_KEY": "openai_api_key",
     "OPENROUTER_API_KEY": "openrouter_api_key",
     "FINNHUB_API_KEY": "finnhub_api_key",

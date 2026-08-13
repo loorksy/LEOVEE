@@ -35,6 +35,7 @@ from app.models.recommendation import Recommendation, Thesis
 from app.models.session import Session
 from app.models.subscription import Subscription
 from app.models.symbol import Symbol
+from app.models.telegram import TelegramLink, TelegramLinkCode
 from app.models.thesis_event import ThesisEvent
 from app.models.trade import Trade
 from app.models.usage_record import UsageRecord
@@ -87,6 +88,8 @@ __all__ = [
     "Session",
     "Subscription",
     "Symbol",
+    "TelegramLink",
+    "TelegramLinkCode",
     "Thesis",
     "ThesisEvent",
     "Trade",

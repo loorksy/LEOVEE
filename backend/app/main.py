@@ -27,6 +27,7 @@ from app.api.routes import (
     providers,
     recommendations,
     replay,
+    telegram,
     tenant,
     theses,
     trades,
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
     application.include_router(trades.router)
     application.include_router(theses.router)
     application.include_router(chat.router)
+    application.include_router(telegram.router)
     application.include_router(ws_router.router)
     return application
 

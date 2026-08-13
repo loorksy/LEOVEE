@@ -44,6 +44,8 @@ from app.agents.timeframe import (
     TimeframeChoice,
     select_decision_timeframe,
 )
+from app.agents.tools.loop import run_tool_loop
+from app.agents.tools.registry import ToolContext
 from app.core.errors import ProviderConfigurationError
 from app.core.timeframes import INTERIM_DECISION_TIMEFRAME
 from app.engines.bar import OHLCBar, bars_from_candles
@@ -60,7 +62,7 @@ from app.engines.structure import run_structure_engine
 from app.engines.volatility import run_volatility_engine
 from app.engines.zones import run_zones_engine
 from app.models.enums import RecommendationDirection, Timeframe
-from app.providers.llm.base import LLMMessage, LLMProvider
+from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.providers.llm.factory import get_llm_provider
 
 __all__ = [
@@ -143,6 +145,7 @@ async def run_analysis_orchestrator(
     mtf_context: dict[str, Any] | None = None,
     bars_by_timeframe: dict[str, list[OHLCBar]] | None = None,
     visual_evidence: list[dict[str, Any]] | None = None,
+    tool_context: ToolContext | None = None,
 ) -> OrchestratorResult:
     if not candles:
         raise ValueError("Analysis requires at least one stored candle")
@@ -310,9 +313,31 @@ async def run_analysis_orchestrator(
             )
 
     resolved = provider
+    tool_calls_made = 0
+    loop_truncated: str | None = None
 
-    async def _complete(messages: list[LLMMessage]) -> Any:
-        return await resolved.complete(messages)
+    async def _complete(messages: list[LLMMessage]) -> LLMResponse:
+        """One turn — with the browse loop attached when a session is available.
+
+        The digest sent to the model is deliberately partial: a geometry
+        snapshot alone is thousands of tokens of anchor coordinates. The tools
+        are how the elided detail stays reachable, so the model can look at the
+        candles or the chart it needs rather than reasoning around a summary.
+
+        Without a session there is nothing to browse, and the stage falls back
+        to a single completion rather than pretending the tools exist.
+        """
+        nonlocal tool_calls_made, loop_truncated
+        if tool_context is None:
+            return await resolved.complete(messages)
+
+        async def _turn(conversation: list[LLMMessage], tools: list[dict[str, Any]]) -> LLMResponse:
+            return await resolved.complete(conversation, tools=tools or None)
+
+        loop = await run_tool_loop(complete=_turn, messages=messages, context=tool_context)
+        tool_calls_made += len(loop.calls)
+        loop_truncated = loop.stopped_on or loop_truncated
+        return loop.response
 
     outcome = await synthesize_decision(
         complete=_complete,
@@ -366,6 +391,10 @@ async def run_analysis_orchestrator(
             "contradicting_evidence": model_plan.evidence.get("contradicting_evidence"),
             "attempts": outcome.attempts,
             "repairs": outcome.repairs,
+            "tool_calls": tool_calls_made,
+            # Never silent: a caller has to be able to tell a considered answer
+            # from one the loop cut short.
+            "tools_truncated": loop_truncated,
         }
     else:
         model_name = provider_name = None
@@ -378,6 +407,8 @@ async def run_analysis_orchestrator(
             "failure_kind": outcome.kind.value if outcome.kind else None,
             "attempts": outcome.attempts,
             "repairs": outcome.repairs,
+            "tool_calls": tool_calls_made,
+            "tools_truncated": loop_truncated,
         }
 
     return OrchestratorResult(
