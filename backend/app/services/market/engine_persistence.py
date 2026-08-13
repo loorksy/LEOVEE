@@ -20,7 +20,19 @@ async def persist_engine_outputs(
     as_of: datetime,
     engines: dict[str, Any],
 ) -> dict[str, int]:
-    """Persist deterministic engine snapshots for episodic memory / retrieval (Phase 11)."""
+    """Persist deterministic engine snapshots for episodic memory / retrieval.
+
+    **Only engines whose output is a market artifact are written here.** A
+    structure, a zone, a pattern and a sweep describe the market and outlive the
+    run that found them; `plan_sanity`, `risk`, `scenarios` and
+    `timeframe_selection` describe *this run's reasoning* and belong to the
+    agent trace, where they are written. The distinction is not cosmetic —
+    storing run-scoped reasoning as a market artifact would let a later
+    retrieval treat one run's opinion as an observed fact about the market.
+
+    The omission is listed rather than implied: an engine that appears in
+    neither list is a gap, and there is a conformance test that says so.
+    """
     counts = {"market_events": 0, "structures": 0, "price_zones": 0}
     ts = as_of if as_of.tzinfo else as_of.replace(tzinfo=UTC)
 
@@ -114,6 +126,34 @@ async def persist_engine_outputs(
                 ts=ts,
                 strength=Decimal("0.7"),
                 evidence_json={"sweep": sweep, **liquidity},
+            )
+        )
+        counts["market_events"] += 1
+
+    # Chart patterns are market facts with a timestamp: they were there before
+    # this run and will be there after it. Persisting them is what lets a later
+    # analysis say "this level has been the neckline of a double top since
+    # Tuesday" instead of rediscovering it every time.
+    geometry = engines.get("geometry") or {}
+    for pattern in geometry.get("patterns") or []:
+        target = pattern.get("projected_target")
+        session.add(
+            MarketEvent(
+                symbol_id=symbol_id,
+                timeframe=timeframe,
+                event_type=f"PATTERN_{str(pattern.get('pattern_type', 'UNKNOWN')).upper()}",
+                ts=ts,
+                price=Decimal(str(target)) if isinstance(target, int | float) else None,
+                confidence=Decimal(str(pattern.get("confidence", 0))) / Decimal("100"),
+                evidence_json={
+                    "status": pattern.get("status"),
+                    "stage": pattern.get("stage"),
+                    "completion_ratio": pattern.get("completion_ratio"),
+                    "break_direction": pattern.get("break_direction"),
+                    "break_level": pattern.get("break_level"),
+                    "evidence": pattern.get("evidence"),
+                },
+                invalidation_json={"break_level": pattern.get("break_level")},
             )
         )
         counts["market_events"] += 1

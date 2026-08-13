@@ -1,19 +1,36 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import fail_closed_no_trade, run_analysis_orchestrator
+from app.agents.prompts import Prompt, PromptNotFound, constitution
 from app.core.tenant import TenantContext
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
 from app.models.memory import MemoryType
 from app.providers.market.base import MarketDataProvider
 from app.services import entitlement_service, market_data, recommendation_service
+from app.services.agent_run_service import persist_agent_run
+from app.services.chart.visual_evidence import collect_visual_evidence
 from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol, store_memory
+
+
+def _constitution_or_none() -> Prompt | None:
+    """The prompt to catalogue, or nothing if it could not be read.
+
+    Never raises: a prompt-registry problem has already failed the analysis
+    upstream, and failing the *write* here would additionally lose the trace
+    that explains why.
+    """
+    try:
+        return constitution()
+    except PromptNotFound:
+        return None
 
 
 def map_decision_to_recommendation_status(decision: dict[str, Any]) -> RecommendationStatus:
@@ -36,6 +53,7 @@ async def run_analysis(
     market_provider: MarketDataProvider | None = None,
     complete_pipeline: bool = False,
 ) -> dict[str, Any]:
+    started_at = datetime.now(UTC)
     await entitlement_service.check_metric_limit(session, tenant, "analysis.run")
     symbol_row, candles = await market_data.fetch_and_store_candles(
         session,
@@ -54,6 +72,15 @@ async def run_analysis(
         symbol=symbol,
         provider=market_provider,
     )
+    # Charts for the decision stage, drawn from the same candle rows the engines
+    # read (never a browser screenshot: two ways of seeing produce two answers).
+    # Best-effort by contract — a missing frame is reported, and the analysis
+    # proceeds on numbers alone rather than being lost with the pictures.
+    visual = await collect_visual_evidence(
+        session,
+        symbol=symbol,
+        timeframe=timeframe,
+    )
     result = await run_analysis_orchestrator(
         symbol=symbol,
         candles=candles,
@@ -62,6 +89,21 @@ async def run_analysis(
         # The ladder is already loaded for the MTF read, so the agent's own
         # timeframe choice costs no extra fetch (D11).
         bars_by_timeframe=mtf_snapshot.get("bars_by_timeframe"),
+        visual_evidence=[s.as_payload() for s in visual.snapshots],
+    )
+    # The run is written before anything downstream can fail: a recommendation
+    # that references an agent_run_id has to be able to find it, and a degraded
+    # run is exactly the one whose trace is worth keeping.
+    await persist_agent_run(
+        session,
+        tenant,
+        result=result,
+        symbol=symbol,
+        started_at=started_at,
+        user_id=tenant.user_id,
+        # Catalogue the prompt text alongside the hash, or prompt_hash is a
+        # pointer into an empty table and M8 cannot resolve it.
+        prompt=_constitution_or_none(),
     )
     payload: dict[str, Any] = {
         "agent_run_id": str(result.agent_run_id),
@@ -73,6 +115,8 @@ async def run_analysis(
         "engines": result.engines,
         "decision": result.decision,
         "narrative": result.narrative,
+        "pipeline": result.pipeline,
+        "visual": {"frames": [s.timeframe for s in visual.snapshots], "missing": visual.missing},
         "as_of": candles[-1].ts.isoformat(),
     }
     if persist_engines:

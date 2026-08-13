@@ -37,7 +37,8 @@ from typing import Any
 
 from app.agents.errors import AgentStage, StageFailure, stage_failure_from_error
 from app.agents.pipeline import PipelineLedger
-from app.agents.prompts import PromptNotFound, constitution, load_prompt, render
+from app.agents.prompts import PromptNotFound, constitution
+from app.agents.synthesizer import synthesize_decision
 from app.agents.timeframe import (
     NoViableTimeframeError,
     TimeframeChoice,
@@ -84,6 +85,11 @@ class OrchestratorResult:
     pipeline: dict[str, Any] = field(default_factory=dict)
     #: The prompt this run was given, by content hash.
     prompt_hash: str | None = None
+    #: Which model actually answered. Without it a run cannot be attributed to
+    #: an LLM after the fact, which is most of what run-level observability is
+    #: for when several providers rotate behind one router.
+    model: str | None = None
+    provider: str | None = None
 
 
 def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str, Any]:
@@ -136,6 +142,7 @@ async def run_analysis_orchestrator(
     llm: LLMProvider | None = None,
     mtf_context: dict[str, Any] | None = None,
     bars_by_timeframe: dict[str, list[OHLCBar]] | None = None,
+    visual_evidence: list[dict[str, Any]] | None = None,
 ) -> OrchestratorResult:
     if not candles:
         raise ValueError("Analysis requires at least one stored candle")
@@ -272,30 +279,105 @@ async def run_analysis_orchestrator(
     narrative: dict[str, Any] = {}
     prompt_hash: str | None = None
     try:
-        system = constitution()
-        prompt_hash = system.hash
-        stage = render(
-            load_prompt("stages/analysis"), symbol=symbol, evidence=_evidence_digest(engines)
+        prompt_hash = constitution().hash
+    except PromptNotFound as exc:
+        # A missing constitution is not a degraded run, it is an unguided model.
+        # Nothing below should execute.
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines=engines,
+            decision=fail_closed_no_trade("PROMPT_UNAVAILABLE", detail=str(exc)),
+            narrative={"degraded_reason": "PROMPT_UNAVAILABLE", "detail": str(exc)},
+            pipeline=ledger.to_dict(),
         )
-        provider = llm or get_llm_provider()
-        llm_out = await provider.complete(
-            [
-                LLMMessage(role="system", content=system.body),
-                LLMMessage(role="user", content=stage),
-            ]
+
+    provider = llm
+    if provider is None:
+        try:
+            provider = get_llm_provider()
+        except ProviderConfigurationError as exc:
+            return OrchestratorResult(
+                agent_run_id=run_id,
+                perceive=perceive,
+                recall=recall,
+                engines=engines,
+                decision=fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc)),
+                narrative={"llm_unavailable": str(exc), "degraded_reason": "LLM_UNAVAILABLE"},
+                pipeline=ledger.to_dict(),
+                prompt_hash=prompt_hash,
+            )
+
+    resolved = provider
+
+    async def _complete(messages: list[LLMMessage]) -> Any:
+        return await resolved.complete(messages)
+
+    outcome = await synthesize_decision(
+        complete=_complete,
+        symbol=symbol,
+        evidence=_evidence_digest(engines),
+        timeframe=decision_timeframe.value,
+        visual=visual_evidence,
+        engines=engines,
+        atr=atr,
+    )
+
+    if outcome.ok and outcome.decision is not None:
+        # The model's plan replaces the geometric placeholder, then goes through
+        # the same cost gate: a plan the model wrote is not exempt from the
+        # arithmetic that would have rejected it from anyone else.
+        model_plan = outcome.decision
+        assert model_plan.levels is not None
+        model_sanity = run_plan_sanity_engine(
+            entry=model_plan.levels.entry,
+            stop=model_plan.levels.stop,
+            targets=list(model_plan.levels.targets),
+            atr=atr,
+            symbol=symbol,
+            moment=as_of,
         )
-        narrative = {"llm": llm_out.structured or {"summary": llm_out.content}}
-    except (ProviderConfigurationError, PromptNotFound) as exc:
-        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
-        narrative = {"llm_unavailable": str(exc), "degraded_reason": "LLM_UNAVAILABLE"}
-    except Exception as exc:  # noqa: BLE001 — analysis path must fail closed
-        failure = stage_failure_from_error(AgentStage.FINAL_DECISION, exc)
-        ledger.failures.append(failure)
-        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
+        engines["plan_sanity"] = model_sanity
+        if not model_sanity["viable"]:
+            return OrchestratorResult(
+                agent_run_id=run_id,
+                perceive=perceive,
+                recall=recall,
+                engines=engines,
+                decision=fail_closed_no_trade(
+                    "PLAN_NOT_VIABLE", detail=", ".join(model_sanity["failures"])
+                ),
+                narrative={
+                    "degraded_reason": "PLAN_NOT_VIABLE",
+                    "plan_failures": model_sanity["failures"],
+                    "repairs": outcome.repairs,
+                },
+                pipeline=ledger.to_dict(),
+                prompt_hash=prompt_hash,
+            )
+        decision = model_plan.model_dump(mode="json")
+        decision["timeframe_rationale"] = choice.rationale
+        model_name, provider_name = outcome.model, outcome.provider
         narrative = {
-            "llm_unavailable": str(exc),
+            "rationale": model_plan.rationale,
+            "invalidation": model_plan.evidence.get("invalidation"),
+            "condition": model_plan.evidence.get("condition"),
+            "contradicting_evidence": model_plan.evidence.get("contradicting_evidence"),
+            "attempts": outcome.attempts,
+            "repairs": outcome.repairs,
+        }
+    else:
+        model_name = provider_name = None
+        if outcome.failure is not None:
+            ledger.failures.append(outcome.failure)
+        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=outcome.detail)
+        narrative = {
+            "llm_unavailable": outcome.detail,
             "degraded_reason": "LLM_UNAVAILABLE",
-            "failure_code": failure.code.value,
+            "failure_kind": outcome.kind.value if outcome.kind else None,
+            "attempts": outcome.attempts,
+            "repairs": outcome.repairs,
         }
 
     return OrchestratorResult(
@@ -307,6 +389,8 @@ async def run_analysis_orchestrator(
         narrative=narrative,
         pipeline=ledger.to_dict(),
         prompt_hash=prompt_hash,
+        model=model_name,
+        provider=provider_name,
     )
 
 

@@ -119,10 +119,23 @@ def test_the_three_axes_stay_separate() -> None:
         _buy(
             plan_type=PlanType.CONDITIONAL,
             execution_state=ExecutionState.AWAITING_ACTIVATION,
+            condition="a close above 2005",
         )
     )
     assert decision.direction is RecommendationDirection.BUY
     assert decision.confidence == 0.72
+
+
+def test_a_conditional_plan_must_say_what_it_waits_on() -> None:
+    """Told to wait without being told for what is worse than no plan: the
+    reader has nothing to judge and nothing to watch."""
+    with pytest.raises(ValidationError, match="must state the condition"):
+        DecisionOutput.model_validate(
+            _buy(
+                plan_type=PlanType.CONDITIONAL,
+                execution_state=ExecutionState.AWAITING_ACTIVATION,
+            )
+        )
 
 
 # --- the engine contract -----------------------------------------------------

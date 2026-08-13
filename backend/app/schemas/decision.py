@@ -117,6 +117,13 @@ class DecisionOutput(BaseModel):
     degraded: bool = False
     degraded_reason: DegradedReason | None = None
     detail: str | None = None
+    #: What must happen before a conditional plan is live. Required for one —
+    #: see the validator.
+    condition: str | None = None
+    #: How many candles the plan stays meaningful for. A plan with no lifetime
+    #: is a plan that is still "valid" three sessions after the structure that
+    #: justified it stopped existing.
+    validity_candles: int | None = Field(default=None, ge=1, le=96)
     evidence: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -150,4 +157,9 @@ class DecisionOutput(BaseModel):
             raise ValueError("a completed analysis must carry a full plan")
         if self.plan_type is None or self.execution_state is None:
             raise ValueError("plan type and execution state travel with every direction")
+        if self.plan_type is PlanType.CONDITIONAL and not (self.condition or "").strip():
+            # A conditional plan whose condition is not stated is unactionable:
+            # the reader is told to wait without being told for what, which is
+            # strictly worse than an immediate plan they can judge.
+            raise ValueError("a conditional plan must state the condition it waits on")
         return self

@@ -71,3 +71,41 @@ def test_progress_is_visible() -> None:
     print(f"\nengines implemented ({len(implemented)}): {', '.join(implemented)}")
     print(f"engines still placeholder ({len(placeholders)}): {', '.join(placeholders)}")
     assert implemented, "no engine is implemented — the ledger is certainly wrong"
+
+
+#: Engines whose output describes the *market* and outlives the run that found
+#: it. These are written to market artifact tables.
+MARKET_ARTIFACT_ENGINES = {
+    "structure",
+    "volatility",
+    "market_intelligence",
+    "mtf",
+    "liquidity",
+    "zones",
+    "geometry",
+}
+
+#: Engines whose output describes *this run's reasoning*. These belong to the
+#: agent trace. Storing them as market artifacts would let a later retrieval
+#: treat one run's opinion as an observed fact about the market.
+RUN_SCOPED_ENGINES = {"scenarios", "risk", "plan_sanity", "decision"}
+
+
+def test_every_engine_has_a_persistence_destination() -> None:
+    """An engine in neither list is a gap, not a decision.
+
+    Engine output that is written nowhere is invisible to episodic memory and to
+    the learning loop, and nothing fails when it goes missing — which is how
+    four engines' output was silently dropped until someone went looking.
+    """
+    classified = MARKET_ARTIFACT_ENGINES | RUN_SCOPED_ENGINES
+    unclassified = set(ENGINE_STATUS) - classified
+    assert not unclassified, (
+        f"{sorted(unclassified)} produce output with no stated destination; add them to "
+        "MARKET_ARTIFACT_ENGINES (written to market artifacts) or RUN_SCOPED_ENGINES "
+        "(written to the agent trace)"
+    )
+
+
+def test_the_two_destinations_do_not_overlap() -> None:
+    assert not (MARKET_ARTIFACT_ENGINES & RUN_SCOPED_ENGINES)
