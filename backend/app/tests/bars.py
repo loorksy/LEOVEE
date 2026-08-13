@@ -15,6 +15,7 @@ during M2 and M3.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.engines.bar import OHLCBar
@@ -26,6 +27,7 @@ __all__ = [
     "rising_bars",
     "falling_bars",
     "swinging_bars",
+    "path_bars",
 ]
 
 # A fixed start time: fixtures must be reproducible, so nothing here reads the
@@ -127,23 +129,43 @@ def swinging_bars(
     points that each drift by `drift` per cycle: higher highs and higher lows
     for a positive drift, lower ones for a negative drift.
 
-    Two construction details are load-bearing, both learned by getting them
-    wrong:
-
-    - the path is *continuous*, each leg starting where the last ended. Building
-      legs independently let a pullback begin above the peak it was retracing,
-      which is not a pullback;
-    - wicks *vary*. A turning price is the close of one bar and the open of the
-      next, so a constant wick gives both the same high and they disqualify each
-      other under the plateau rule — the series then reads as having no swings
-      at all. Real candles have unequal wicks; these do too, deterministically.
+    The construction details that make this work are documented on `path_bars`,
+    which builds the series once the turning points are known.
     """
     turns: list[float] = []
     for cycle in range(legs):
         base = start + drift * cycle
         turns.append(base)
         turns.append(base + swing)
+    return path_bars(turns, bars_per_leg=bars_per_leg, spread=spread, interval=interval)
 
+
+def path_bars(
+    turns: Sequence[float],
+    *,
+    bars_per_leg: int = 6,
+    spread: float = 0.5,
+    interval: timedelta = timedelta(minutes=15),
+) -> list[OHLCBar]:
+    """A continuous candle series that turns at each price in `turns`.
+
+    The geometry detectors are template matchers: a double top needs two highs
+    at the same level with a trough between, a head and shoulders needs five
+    alternating turns in a specific proportion. Describing those shapes as a
+    list of turning prices is how the test says what it is testing; building
+    them bar by bar buries the shape in arithmetic.
+
+    Two construction details are load-bearing, both learned by getting them
+    wrong:
+
+    - the path is *continuous*, each leg starting where the last ended. Legs
+      built independently let a pullback begin above the peak it was retracing,
+      which is not a pullback;
+    - wicks *vary*. A turning price is the close of one bar and the open of the
+      next, so a constant wick gives both the same high and they disqualify each
+      other under the plateau rule — the series then reads as having no swings
+      at all. Real candles have unequal wicks; these do too, deterministically.
+    """
     path: list[float] = [turns[0]]
     for index in range(len(turns) - 1):
         origin = turns[index]

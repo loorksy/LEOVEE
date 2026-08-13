@@ -20,6 +20,7 @@ pytestmark = pytest.mark.no_db
 EXPECTED_ENGINES = {
     "volatility",
     "structure",
+    "geometry",
     "liquidity",
     "zones",
     "scenarios",

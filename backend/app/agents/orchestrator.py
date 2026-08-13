@@ -8,6 +8,7 @@ from typing import Any
 from app.core.errors import ProviderConfigurationError
 from app.engines.bar import bars_from_candles
 from app.engines.decision import run_decision_engine
+from app.engines.geometry import run_geometry_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import run_mtf_engine
@@ -72,6 +73,7 @@ async def run_analysis_orchestrator(
     bars = bars_from_candles(candles)
     volatility = run_volatility_engine(bars)
     structure = run_structure_engine(bars)
+    geometry = run_geometry_engine(bars)
     liquidity = run_liquidity_engine(bars)
     zones = run_zones_engine(bars)
     intelligence = run_market_intelligence_engine(bars)
@@ -89,6 +91,7 @@ async def run_analysis_orchestrator(
     evidence = {
         "volatility": volatility,
         "structure": structure,
+        "geometry": geometry,
         "liquidity": liquidity,
         "zones": zones,
         "scenarios": scenarios,

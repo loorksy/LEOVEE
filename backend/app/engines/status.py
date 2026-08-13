@@ -55,6 +55,10 @@ ENGINE_STATUS: dict[str, EngineStatus] = {
     # Ported in M4 over the M2 primitives: swing detection, level clustering
     # and trend inference.
     "structure": EngineStatus.IMPLEMENTED,
+    # M3: trendlines, channels, chart patterns and candlestick shapes, bounded
+    # to the documented caps so one snapshot serves the decision, the drawing
+    # and the model's context without any of them disagreeing.
+    "geometry": EngineStatus.IMPLEMENTED,
     # Sweep detection and equal-level clustering, with the tolerance derived
     # from gold's pip size rather than a constant.
     "liquidity": EngineStatus.IMPLEMENTED,
