@@ -14,6 +14,37 @@ Multi-User → Workspace Isolation → Authentication
 → Billing → Usage → Permissions → Admin → Audit → Observability
 
 ============================================================
+AMENDMENTS — READ BEFORE ANY SECTION BELOW
+============================================================
+
+This specification was written as a greenfield brief. It is no longer accurate
+in nine places, and the sections below have NOT been rewritten — the amendments
+are listed here instead so the original intent stays readable alongside what was
+actually decided. Where this table and a section disagree, THIS TABLE WINS.
+
+Full reasoning: docs/adr/ (one record per decision) and
+docs/AICHART_MIGRATION_PLAN.md.
+
+| Section | The spec says | Actual decision | ADR |
+|---------|---------------|-----------------|-----|
+| §0 | Greenfield; no legacy system; produce no migration plan | SUPERSEDED. loorksy/AiChart implements this product and is the reference implementation being ported from. Leovee's architecture is final. | 0001 |
+| §110 step 17 | Generate a "no-trade" scenario alongside bullish and bearish | Two directional scenarios plus an INVALIDATION scenario. A successful analysis always carries a direction; NO_TRADE is reserved for operational failure with a named cause. | 0002 |
+| §64 | Backtesting and replay | Backtesting and statistical validation are OUT OF SCOPE. Chart replay survives as a visual review tool only. | 0003 |
+| §43, §44 | KLineChart is mandatory and must not be replaced | TradingView Advanced Charts, vendored in-repo under Git LFS rather than fetched at build time. | 0004 |
+| §19, §57 | Execution safety; trades section | No execution of any kind. The trades section becomes a manual journal of user-reported fills, feeding outcome learning. | 0005 |
+| §105 | Notifications | No external notifications. Transactional email (verification, password reset) only. | 0005 |
+| §17, §18 | OANDA data plus user account connection | OANDA market data stays. Broker account linking is out of scope. | 0005 |
+| §82 | Frontend architecture, no i18n mentioned | Arabic is the default locale and RTL is the primary direction. | — |
+| §3 | Pydantic/SQLAlchemy stack, no numeric policy | Deterministic engines compute in float to match the JavaScript reference; Decimal is confined to the money boundary. | 0006 |
+
+A note on why this banner exists rather than an edited spec. §0 instructed the
+build to treat the product as having no prior implementation. The engine layer
+was therefore written against prose instead of ported from working code, and
+shipped as placeholders — some of which fabricated evidence and presented it to
+users as measurement. A specification that contradicts the code is not a
+harmless inconsistency; that contradiction is what produced the gap.
+
+============================================================
 0. PROJECT IDENTITY
 ============================================================
 
@@ -21,7 +52,9 @@ Product name: Leovee
 
 Use "Leovee" consistently in: branding, UI, package names, repository naming, documentation, emails, and the MCP server name (leovee-mcp).
 
-This is a GREENFIELD project. There is NO existing repository, NO existing code, and NO legacy system to migrate. Do not search for existing code. Do not produce migration plans.
+SUPERSEDED (see AMENDMENTS above, ADR 0001). This was written as a greenfield brief; in fact loorksy/AiChart implements this product and is the reference implementation the domain logic is ported from. Leovee's architecture — FastAPI, SQLAlchemy, Postgres with row-level security, React/Vite — is final and is not replaced by AiChart's.
+
+Original text, kept for the record: "This is a GREENFIELD project. There is NO existing repository, NO existing code, and NO legacy system to migrate. Do not search for existing code. Do not produce migration plans."
 
 This is a FULL PRODUCTION build — not an MVP, not a prototype, not a proof of concept. Every feature described in this specification is in scope. Nothing may be stubbed, mocked, or left as "TODO for later" unless this specification explicitly marks it optional. Quality bar: production-grade, tested, secure, observable.
 
