@@ -23,6 +23,7 @@ __all__ = [
     "BREAK_BUFFER_ATR",
     "BreakoutCheck",
     "BoundedResolution",
+    "constant_level",
     "first_close_beyond",
     "resolve_bounded_pattern",
     "project_measured_move",
@@ -30,6 +31,20 @@ __all__ = [
 ]
 
 BREAK_BUFFER_ATR = 0.25
+
+
+def constant_level(level: float) -> Callable[[int], float]:
+    """A fixed horizontal level, as the callable `first_close_beyond` expects.
+
+    Sloped boundaries (a neckline, a trendline) vary with the bar, so the level
+    is a function of index everywhere. Horizontal ones are the same function
+    with a constant.
+    """
+
+    def at(_index: int) -> float:
+        return level
+
+    return at
 
 
 @dataclass(frozen=True, slots=True)

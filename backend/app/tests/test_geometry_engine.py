@@ -44,6 +44,10 @@ DOUBLE_TOP = [1975, 1982, 1974, 1980, 1972, 2000, 1988, 2000.4, 1978, 1974]
 HEAD_SHOULDERS = [1972, 1978, 1970, 1995, 1985, 2015, 1984, 1996, 1965, 1962]
 #: Flat highs at 2000, lows climbing 1980 → 1988 → 1993. Still inside.
 ASCENDING_TRIANGLE = [1968, 1974, 1966, 2000, 1980, 2000, 1988, 2000, 1993, 2000]
+#: Four defended touches of a 2000–2010 band, still unresolved.
+RECTANGLE = [2000, 2010, 2000, 2010, 2000, 2010, 2000, 2010, 2000]
+#: Rim 2010, rounded base 1990 in the middle of the span, handle to 2004, break.
+CUP_AND_HANDLE = [2005, 2010, 2002, 1994, 1990, 1994, 2002, 2010, 2004, 2016]
 
 
 def _rising_channel() -> list[float]:
@@ -205,6 +209,99 @@ def test_channel_needs_two_opposite_touches() -> None:
     assert detect_channels([], trendlines, atr) == []
 
 
+def _flag_bars() -> list[OHLCBar]:
+    """Fifty quiet bars, a six-bar impulse, a six-bar pause, then a breakout.
+
+    Built bar by bar rather than from turning points: a flag's consolidation is
+    a *drift*, not a swing, and describing it as turns would give it pivots it
+    does not have.
+    """
+    bars: list[OHLCBar] = []
+    for i in range(50):
+        low_first = i % 2 == 0
+        bars.append(
+            bar(
+                open=2000.0 + (-0.8 if low_first else 0.8),
+                high=2001.1,
+                low=1998.9,
+                close=2000.0 + (0.8 if low_first else -0.8),
+            )
+        )
+    price = 2000.0
+    for _ in range(6):
+        bars.append(bar(open=price, high=price + 2.7, low=price - 0.3, close=price + 2.4))
+        price += 2.4
+    for _ in range(6):
+        bars.append(bar(open=price, high=price + 0.3, low=price - 0.65, close=price - 0.35))
+        price -= 0.35
+    bars.append(bar(open=price, high=price + 4.3, low=price - 0.3, close=price + 4.0))
+    return bars
+
+
+def test_rectangle_is_named_by_what_it_lacks() -> None:
+    """Two flat boundaries, no slope and no convergence.
+
+    The shape most detectors misfile — a triangle detector reads convergence
+    that is not there, a channel detector wants a slope. Every boundary pivot
+    must sit on its line, because one stray pivot means the structure is
+    something else and calling it a rectangle anyway is the invented-name
+    failure the doctrine forbids.
+    """
+    snapshot = detect_chart_geometry(_bars(RECTANGLE))
+    pattern = next(p for p in snapshot.patterns if p.pattern_type is PatternType.RECTANGLE)
+
+    assert pattern.status is PatternStatus.FORMING
+    # Direction is read off the break, never presumed: rectangles break both ways.
+    assert pattern.break_direction is None
+    assert pattern.projected_target is None
+
+
+def test_cup_and_handle_outranks_the_looser_template_on_the_same_bars() -> None:
+    """Specificity, not confidence, decides an overlap.
+
+    A cup's two rims also satisfy the double-top template, and the double often
+    scores higher. Letting confidence win would replace a four-anchor claim —
+    rounded base, handle holding the upper half — with a two-touch one about the
+    same bars, which describes less and is no more likely to be right.
+    """
+    snapshot = detect_chart_geometry(_bars(CUP_AND_HANDLE, bars_per_leg=7))
+    types = [p.pattern_type for p in snapshot.patterns]
+
+    assert PatternType.CUP_AND_HANDLE in types
+    assert PatternType.DOUBLE_TOP not in types
+
+
+def test_flag_completes_on_the_close_that_escapes_its_consolidation() -> None:
+    """The consolidation is grown adaptively, and that is what makes flags work.
+
+    Measuring a fixed window instead swallows the breakout candles into the
+    "consolidation", widening its range past the shallowness test and rejecting
+    the whole structure at the exact moment it becomes tradeable — silently, with
+    nothing reporting a reason.
+    """
+    bars = _flag_bars()
+    pattern = next(
+        p for p in detect_chart_geometry(bars).patterns if p.pattern_type is PatternType.FLAG
+    )
+
+    assert pattern.status is PatternStatus.COMPLETED
+    assert pattern.break_direction == "up"
+    assert pattern.break_index == len(bars) - 1
+    assert pattern.projected_target is not None
+    assert pattern.break_level is not None
+    assert pattern.projected_target > pattern.break_level
+
+
+def test_a_deep_pullback_is_not_a_flag() -> None:
+    bars = _flag_bars()[:56]
+    # Give back most of the impulse rather than pausing above it.
+    price = bars[-1].close
+    for _ in range(6):
+        bars.append(bar(open=price, high=price + 0.3, low=price - 2.9, close=price - 2.6))
+        price -= 2.6
+    assert all(p.pattern_type is not PatternType.FLAG for p in detect_chart_geometry(bars).patterns)
+
+
 # --- the shared state machine ------------------------------------------------
 
 
@@ -246,7 +343,8 @@ def test_measured_move_projects_the_height_from_the_break() -> None:
         ("wedge", 4),
         ("rectangle", 4),
         ("cup_and_handle", 4),
-        ("bull_flag", 3),
+        ("flag", 3),
+        ("pennant", 3),
     ],
 )
 def test_expected_anchor_counts_match_each_template(pattern_type: str, expected: int) -> None:

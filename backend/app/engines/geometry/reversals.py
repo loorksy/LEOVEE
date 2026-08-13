@@ -12,10 +12,9 @@ later moved. Checking only for completion would report the former.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from app.engines.bar import OHLCBar
 from app.engines.geometry.pattern_state import (
+    constant_level,
     first_close_beyond,
     project_measured_move,
     state_confidence,
@@ -98,12 +97,12 @@ def _scan_double(
 
         break_direction = "down" if variant == "top" else "up"
         completion = first_close_beyond(
-            bars, second.index, _constant(neckline_price), break_direction, atr
+            bars, second.index, constant_level(neckline_price), break_direction, atr
         )
         invalidation = first_close_beyond(
             bars,
             second.index,
-            _constant(extreme_price),
+            constant_level(extreme_price),
             "up" if variant == "top" else "down",
             atr,
         )
@@ -187,12 +186,12 @@ def _scan_triple(
 
         break_direction = "down" if variant == "top" else "up"
         completion = first_close_beyond(
-            bars, third.index, _constant(neckline_price), break_direction, atr
+            bars, third.index, constant_level(neckline_price), break_direction, atr
         )
         invalidation = first_close_beyond(
             bars,
             third.index,
-            _constant(extreme_price),
+            constant_level(extreme_price),
             "up" if variant == "top" else "down",
             atr,
         )
@@ -236,15 +235,6 @@ def detect_triple_extremes(
         return []
     found = [_scan_triple(bars, zigzag, atr, variant) for variant in ("top", "bottom")]
     return [pattern for pattern in found if pattern is not None]
-
-
-def _constant(level: float) -> Callable[[int], float]:
-    """A fixed horizontal level, as the callable `first_close_beyond` expects."""
-
-    def at(_index: int) -> float:
-        return level
-
-    return at
 
 
 def _line_price_at_ts(a: Pivot, b: Pivot, ts: float) -> float:
@@ -293,7 +283,7 @@ def _scan_head_shoulders(
         invalidation = first_close_beyond(
             bars,
             p2.index,
-            _constant(head.price),
+            constant_level(head.price),
             "down" if inverse else "up",
             atr,
         )

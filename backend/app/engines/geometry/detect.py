@@ -16,6 +16,15 @@ also satisfies the looser double-top template, because it does have equal highs.
 The converging-boundary claim carries strictly more structure — two fitted
 lines, an apex, break rules — so template richness wins the overlap and
 confidence only breaks ties.
+
+The reference implementation ranked only head-and-shoulders and the converging
+family, leaving cups, rectangles and flags in the same bucket as a double top.
+That is not a ranking of structure, it is a ranking of the two families someone
+happened to write down: a four-anchor cup with a roundedness test and a handle
+rule would lose its own bars to a double bottom scoring two points higher, and a
+rectangle — which asserts *both* boundaries — would lose them to a triple bottom
+that only asserts one. The table below ranks every template the engine can emit
+by what it actually claims, in three tiers.
 """
 
 from __future__ import annotations
@@ -24,7 +33,10 @@ from app.core.timeframes import ANALYSIS_WINDOW_BARS, MIN_CANDLES_FOR_ANALYSIS
 from app.engines.bar import OHLCBar
 from app.engines.geometry.candlesticks import detect_candlesticks
 from app.engines.geometry.channels import detect_channels
+from app.engines.geometry.cup_handle import detect_cup_handle
+from app.engines.geometry.flags import detect_flags
 from app.engines.geometry.pattern_stage import assess_pattern_stage
+from app.engines.geometry.rectangles import detect_rectangles
 from app.engines.geometry.reversals import (
     detect_double_extremes,
     detect_head_shoulders,
@@ -46,12 +58,28 @@ MAX_PATTERNS = 3
 
 #: How much structure a template asserts. Higher wins an overlap outright.
 _SPECIFICITY: dict[PatternType, int] = {
+    # Five-anchor asymmetric templates with proportion rules of their own: a
+    # head that must clear both shoulders, a base that must be rounded and a
+    # handle that must hold the upper half.
     PatternType.HEAD_AND_SHOULDERS: 3,
     PatternType.INVERSE_HEAD_AND_SHOULDERS: 3,
+    PatternType.CUP_AND_HANDLE: 3,
+    PatternType.INVERSE_CUP_AND_HANDLE: 3,
+    # Two-boundary structures: both sides are fitted and both are claimed.
     PatternType.ASCENDING_TRIANGLE: 2,
     PatternType.DESCENDING_TRIANGLE: 2,
     PatternType.SYMMETRICAL_TRIANGLE: 2,
     PatternType.WEDGE: 2,
+    PatternType.RECTANGLE: 2,
+    PatternType.PENNANT: 2,
+    PatternType.FLAG: 2,
+    # Single-level templates: a count of defended touches at one price, plus a
+    # neckline. The weakest claim that is still a claim, so it yields to any
+    # richer description of the same bars.
+    PatternType.DOUBLE_TOP: 1,
+    PatternType.DOUBLE_BOTTOM: 1,
+    PatternType.TRIPLE_TOP: 1,
+    PatternType.TRIPLE_BOTTOM: 1,
 }
 
 
@@ -122,6 +150,11 @@ def detect_chart_geometry(
         # Triples run alongside doubles: where three touches exist the triple
         # wins the dedup, because three defended touches score above two.
         *detect_triple_extremes(window, zigzag, resolved_atr),
+        *detect_cup_handle(window, zigzag, resolved_atr),
+        *detect_rectangles(window, zigzag, resolved_atr),
+        # Flags read the bars directly rather than the pivots: the impulse and
+        # the pause are both too short to have produced confirmed swings.
+        *detect_flags(window, resolved_atr),
     ]
     raw = [pattern for pattern in raw if pattern.confidence >= min_confidence]
 

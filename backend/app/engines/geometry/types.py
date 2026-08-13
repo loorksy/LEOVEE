@@ -53,6 +53,20 @@ class PatternStage(StrEnum):
 
 
 class PatternType(StrEnum):
+    """The canonical pattern vocabulary.
+
+    These strings are the *only* names for these shapes anywhere in the system:
+    the detector emits them, the pattern-atlas skill teaches them, the semantic
+    drawing layer draws them and the frontend labels them. They are taken
+    verbatim from AiChart's ``PatternTypeName`` so the vocabulary survives the
+    port unchanged — renaming a shape here means renaming it across three
+    layers, which is exactly the drift the migration exists to stop.
+
+    Note ``FLAG``/``PENNANT`` carry no direction in the name: which way the
+    structure resolves lives on ``break_direction``, where every other pattern
+    keeps it.
+    """
+
     HEAD_AND_SHOULDERS = "head_and_shoulders"
     INVERSE_HEAD_AND_SHOULDERS = "inverse_head_and_shoulders"
     ASCENDING_TRIANGLE = "ascending_triangle"
@@ -65,8 +79,9 @@ class PatternType(StrEnum):
     TRIPLE_BOTTOM = "triple_bottom"
     RECTANGLE = "rectangle"
     CUP_AND_HANDLE = "cup_and_handle"
-    BULL_FLAG = "bull_flag"
-    BEAR_FLAG = "bear_flag"
+    INVERSE_CUP_AND_HANDLE = "inverse_cup_and_handle"
+    FLAG = "flag"
+    PENNANT = "pennant"
 
 
 @dataclass(frozen=True, slots=True)
