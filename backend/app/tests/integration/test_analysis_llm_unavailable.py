@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -18,31 +17,34 @@ from app.main import app
 from app.models.enums import RecommendationDirection, Timeframe
 from app.models.symbol import Symbol
 from app.providers.market.base import NormalizedCandle
+from app.tests.bars import swinging_bars
 from app.tests.conftest import seed_user_org
 
 
-def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
-    start = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
-    candles: list[NormalizedCandle] = []
-    price = Decimal("1.1000")
-    for i in range(count):
-        ts = start + timedelta(hours=i)
-        o = price + Decimal(i) * Decimal("0.0002")
-        candles.append(
-            NormalizedCandle(
-                symbol="XAUUSD",
-                timeframe=Timeframe.H1,
-                ts=ts,
-                open=o,
-                high=o + Decimal("0.0010"),
-                low=o - Decimal("0.0008"),
-                close=o + Decimal("0.0005"),
-                volume=Decimal("0"),
-                complete=True,
-                source="test_double",
-            )
+def _synthetic_gold_series(count: int = 140) -> list[NormalizedCandle]:
+    """A gold series a real analysis would accept.
+
+    Forty forex-priced bars used to reach the narrative stage because the
+    engines were placeholders. They no longer are, and the gates in front of the
+    model layer are real: the geometry engine needs sixty bars, and the agent
+    refuses a frame whose volatility cannot clear the round-trip cost. Testing
+    the LLM guarantee needs candles that get that far.
+    """
+    return [
+        NormalizedCandle(
+            symbol="XAUUSD",
+            timeframe=Timeframe.M15,
+            ts=bar.ts,
+            open=Decimal(str(bar.open)),
+            high=Decimal(str(bar.high)),
+            low=Decimal(str(bar.low)),
+            close=Decimal(str(bar.close)),
+            volume=Decimal("0"),
+            complete=True,
+            source="test_double",
         )
-    return candles
+        for bar in swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+    ]
 
 
 @pytest.mark.asyncio
@@ -74,7 +76,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     ctx = await resolve_tenant_context(db_session, user.id)
     assert ctx.workspace_id is not None
 
-    candles = _synthetic_h1_series()
+    candles = _synthetic_gold_series()
 
     async def fake_fetch(
         session: AsyncSession,

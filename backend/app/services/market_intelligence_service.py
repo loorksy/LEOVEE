@@ -58,4 +58,11 @@ async def build_mtf_intelligence(
         decision_timeframe=decision_timeframe.value,
         stack=timeframes,
     )
-    return {"intelligence_by_tf": intelligence_by_tf, "mtf": mtf}
+    return {
+        "intelligence_by_tf": intelligence_by_tf,
+        "mtf": mtf,
+        # Returned so the orchestrator's timeframe selection reads the same
+        # bars this pass already loaded, rather than fetching the ladder twice
+        # and risking two passes that disagree about the same market.
+        "bars_by_timeframe": bars_by_timeframe,
+    }

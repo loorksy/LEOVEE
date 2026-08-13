@@ -59,6 +59,9 @@ async def run_analysis(
         candles=candles,
         memories=memories,
         mtf_context=mtf_snapshot,
+        # The ladder is already loaded for the MTF read, so the agent's own
+        # timeframe choice costs no extra fetch (D11).
+        bars_by_timeframe=mtf_snapshot.get("bars_by_timeframe"),
     )
     payload: dict[str, Any] = {
         "agent_run_id": str(result.agent_run_id),
