@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import PlanCode
@@ -57,16 +58,27 @@ FREE_PLAN_LIMITS = {
 
 
 async def ensure_platform_seed(session: AsyncSession) -> Role:
-    """Idempotent seed for roles, permissions, and FREE plan. Returns USER workspace role."""
-    perm_by_code: dict[str, Permission] = {}
-    for code in PERMISSION_CODES:
-        existing = await session.scalar(select(Permission).where(Permission.code == code))
-        if existing is None:
-            perm = Permission(id=uuid.uuid4(), code=code)
-            session.add(perm)
-            perm_by_code[code] = perm
-        else:
-            perm_by_code[code] = existing
+    """Idempotent seed for roles, permissions, and FREE plan. Returns USER workspace role.
+
+    Idempotent **under concurrency and under autoflush**, which a
+    select-then-add is not. Two workers starting together both see no row and
+    both insert; and within one session, an ORM object added but not yet flushed
+    is invisible to the next query's own autoflush ordering, so the same code
+    can be queued twice and the unique index rejects the pair.
+
+    The insert declares the conflict instead, and the read that follows returns
+    whichever row won. Both are the same row — the code *is* the identity.
+    """
+    if PERMISSION_CODES:
+        await session.execute(
+            pg_insert(Permission)
+            .values([{"id": uuid.uuid4(), "code": code} for code in PERMISSION_CODES])
+            .on_conflict_do_nothing(index_elements=["code"])
+        )
+    rows = (
+        await session.execute(select(Permission).where(Permission.code.in_(PERMISSION_CODES)))
+    ).scalars()
+    perm_by_code: dict[str, Permission] = {row.code: row for row in rows}
 
     user_role: Role | None = None
     for role_code, scope in ROLE_DEFINITIONS:

@@ -221,6 +221,29 @@ async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
     return f"thesis_monitor_ok:{changed}"
 
 
+async def recommendation_tracker_job(_ctx: dict[str, object]) -> str:
+    """Advance every open plan. Without it the lifecycle is a story told once.
+
+    A conditional plan sits at "awaiting activation" through the entire move it
+    was waiting for; a plan whose invalidation level broke keeps its READY
+    badge; an idea from three sessions ago still reads as live. Every one of
+    those is the product being confidently wrong in the user's favour.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.recommendations.worker import run_recommendation_tracker_cycle
+
+    async with factory() as session:
+        report = await run_recommendation_tracker_cycle(session)
+        await session.commit()
+    return (
+        "recommendation_tracker_ok:"
+        f"evaluated={report.evaluated},changed={report.changed},"
+        f"failed_workspaces={len(report.failures)}"
+    )
+
+
 async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
     """Keep worker Settings in sync with admin-managed DB secrets."""
     factory = get_session_factory()
@@ -253,6 +276,7 @@ class WorkerSettings:
         memory_decay_job,
         alert_evaluation_job,
         reload_platform_secrets_job,
+        recommendation_tracker_job,
     ]
     cron_jobs = [
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
@@ -261,6 +285,10 @@ class WorkerSettings:
         cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
         cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
         cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
+        # Every five minutes. A scalp plan's condition can fire and its stop can
+        # break inside one M15 candle, so an hourly sweep would routinely record
+        # the outcome after the move it describes is over.
+        cron(recommendation_tracker_job, minute=set(range(0, 60, 5))),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
         cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]

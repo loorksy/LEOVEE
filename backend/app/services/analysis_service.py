@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -18,8 +18,58 @@ from app.services import entitlement_service, market_data, recommendation_servic
 from app.services.agent_run_service import persist_agent_run
 from app.services.chart.visual_evidence import collect_visual_evidence
 from app.services.market.engine_persistence import persist_engine_outputs
+from app.services.market.history import TIMEFRAME_MINUTES
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol, store_memory
+
+
+def _plan_columns(decision: dict[str, Any], *, tenant_timeframe: Timeframe) -> dict[str, Any]:
+    """The plan's own columns, from a completed decision.
+
+    Empty for a degraded run: a NO_TRADE has no levels, and writing zeros or the
+    last price into those columns would give the tracker a stop to watch on a
+    plan that was never made.
+    """
+    if decision.get("degraded") or decision.get("direction") in {
+        RecommendationDirection.NO_TRADE.value,
+        RecommendationDirection.WAIT.value,
+    }:
+        return {}
+
+    levels = decision.get("levels") or {}
+    plan_type = decision.get("plan_type")
+    return {
+        "entry": _as_decimal(levels.get("entry")),
+        "stop": _as_decimal(levels.get("stop")),
+        "targets": [float(t) for t in (levels.get("targets") or [])],
+        "timeframe": decision.get("timeframe") or tenant_timeframe.value,
+        "plan_type": plan_type,
+        "execution_state": decision.get("execution_state"),
+        "activation_rule": decision.get("activation_rule"),
+        "activation_condition": decision.get("condition"),
+        "expires_at": _validity_deadline(decision, tenant_timeframe),
+    }
+
+
+def _as_decimal(value: Any) -> Decimal | None:
+    return None if value is None else Decimal(str(value))
+
+
+def _validity_deadline(decision: dict[str, Any], timeframe: Timeframe) -> datetime | None:
+    """When the plan stops being worth showing.
+
+    Derived from the frame it was made on, because "twelve candles" is a
+    different amount of time on M1 and M15 — and a plan with no deadline is one
+    that still reads as live three sessions after the structure that justified
+    it stopped existing.
+    """
+    candles = decision.get("validity_candles")
+    if not isinstance(candles, int) or candles <= 0:
+        return None
+    minutes = TIMEFRAME_MINUTES.get(timeframe)
+    if minutes is None:
+        return None
+    return datetime.now(UTC) + timedelta(minutes=minutes * candles)
 
 
 def _constitution_or_none() -> Prompt | None:
@@ -193,6 +243,11 @@ async def run_analysis(
                 if result.decision.get("confidence") is None
                 else Decimal(str(result.decision["confidence"]))
             ),
+            # The plan itself, not just its direction. Before this, the levels
+            # the analysis produced lived only inside evidence_json — so the
+            # tracker had no stop to watch and no condition to evaluate, and a
+            # recommendation could never resolve on its own.
+            **_plan_columns(result.decision, tenant_timeframe=timeframe),
         )
         thesis = await recommendation_service.spawn_thesis_from_recommendation(
             session,

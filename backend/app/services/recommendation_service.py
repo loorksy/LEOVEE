@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -13,6 +14,7 @@ from app.models.enums import RecommendationDirection, RecommendationStatus, Thes
 from app.models.recommendation import Recommendation, Thesis
 from app.services import market_data
 from app.services.recommendation_lifecycle import assert_recommendation_transition
+from app.services.recommendations.repository import assert_axes_coherent
 
 
 async def create_recommendation(
@@ -25,7 +27,22 @@ async def create_recommendation(
     evidence: dict[str, Any] | None = None,
     agent_run_id: uuid.UUID | None = None,
     confidence: Decimal | None = None,
+    entry: Decimal | None = None,
+    stop: Decimal | None = None,
+    targets: list[float] | None = None,
+    timeframe: str | None = None,
+    plan_type: str | None = None,
+    execution_state: str | None = None,
+    activation_rule: dict[str, Any] | None = None,
+    activation_condition: str | None = None,
+    expires_at: datetime | None = None,
+    tradability: str | None = None,
+    tradability_reason: str | None = None,
 ) -> Recommendation:
+    # The one cross-layer rule: a conditional plan cannot be valid *now*, which
+    # is the entire meaning of the word. The pairing reads as immediate to
+    # everything downstream while the user is told to wait.
+    assert_axes_coherent(plan_type=plan_type, execution_state=execution_state)
     await bind_workspace_rls(session, tenant)
     symbol = await market_data.get_or_create_symbol(session, symbol_code)
     rec = Recommendation(
@@ -42,6 +59,17 @@ async def create_recommendation(
         # opinion when it is the absence of one. A missing confidence is a fact
         # the column can express; an invented one is not.
         confidence_calibrated=confidence,
+        entry=entry,
+        stop=stop,
+        targets_json=targets or [],
+        timeframe=timeframe,
+        plan_type=plan_type,
+        execution_state=execution_state,
+        activation_rule_json=activation_rule,
+        activation_condition=activation_condition,
+        expires_at=expires_at,
+        tradability=tradability,
+        tradability_reason=tradability_reason,
     )
     session.add(rec)
     await session.flush()
