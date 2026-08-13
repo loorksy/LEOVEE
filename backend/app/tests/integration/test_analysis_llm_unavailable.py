@@ -50,7 +50,14 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec §95: missing LLM must fail closed to NO_TRADE — never BUY/SELL with confidence."""
+    """Spec §95: missing LLM must fail closed to NO_TRADE — never BUY/SELL with confidence.
+
+    The engine gate is lifted for this test. The analytical engines are still
+    placeholders and degrade the run before the narrative stage is reached
+    (app/engines/status.py), which would mask the LLM contract rather than test
+    it. The engines-are-placeholders path is covered separately below.
+    """
+    monkeypatch.setattr("app.agents.orchestrator.unavailable_engines", lambda _engines: [])
     for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "")

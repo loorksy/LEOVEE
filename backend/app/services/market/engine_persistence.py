@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.engines.status import is_unavailable
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
 
 
@@ -22,6 +23,13 @@ async def persist_engine_outputs(
     """Persist deterministic engine snapshots for episodic memory / retrieval (Phase 11)."""
     counts = {"market_events": 0, "structures": 0, "price_zones": 0}
     ts = as_of if as_of.tzinfo else as_of.replace(tzinfo=UTC)
+
+    # An engine that declined to answer has nothing to persist. Without this,
+    # `structure.get("bias", "NEUTRAL")` would store a NEUTRAL structure row
+    # derived from an "unavailable" payload — a fabricated artifact that later
+    # reads (episodic memory, retrieval) could not tell apart from a measured
+    # one.
+    engines = {name: payload for name, payload in engines.items() if not is_unavailable(payload)}
 
     structure = engines.get("structure") or {}
     if structure:

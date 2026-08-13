@@ -12,12 +12,21 @@ from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import run_mtf_engine
 from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
+from app.engines.status import unavailable_engines
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
 from app.models.enums import RecommendationDirection
 from app.providers.llm.base import LLMMessage, LLMProvider
 from app.providers.llm.factory import get_llm_provider
+
+__all__ = [
+    "OrchestratorResult",
+    "bars_from_candles",
+    "fail_closed_no_trade",
+    "run_analysis_orchestrator",
+    "unavailable_engines",
+]
 
 
 @dataclass
@@ -70,11 +79,6 @@ async def run_analysis_orchestrator(
     zones = run_zones_engine(bars)
     scenarios = run_scenario_engine(structure, volatility, liquidity)
 
-    entry = bars[-1].close
-    stop = entry - Decimal("0.0020")
-    risk = run_risk_engine(entry=entry, stop=stop)
-    decision = run_decision_engine(scenarios, risk)
-
     intelligence = run_market_intelligence_engine(bars)
     if mtf_context and "mtf" in mtf_context:
         mtf = mtf_context["mtf"]
@@ -83,17 +87,40 @@ async def run_analysis_orchestrator(
         intelligence_by_tf = {"H1": intelligence}
         mtf = run_mtf_engine(intelligence_by_tf)
 
-    engines = {
+    evidence = {
         "volatility": volatility,
         "structure": structure,
         "liquidity": liquidity,
         "zones": zones,
         "scenarios": scenarios,
-        "risk": risk,
         "market_intelligence": intelligence,
         "mtf": mtf,
-        "intelligence_by_tf": intelligence_by_tf,
     }
+
+    # Evidence first, decision second. An engine that cannot answer must stop the
+    # run here: pricing risk and writing a narrative on top of missing evidence
+    # produces a confident, plausible, unfounded recommendation, which is exactly
+    # what the fail-closed contract exists to prevent (spec §95).
+    missing = unavailable_engines(evidence)
+    if missing:
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines={**evidence, "intelligence_by_tf": intelligence_by_tf},
+            decision=fail_closed_no_trade("ENGINE_UNAVAILABLE", detail=", ".join(missing)),
+            narrative={
+                "degraded_reason": "ENGINE_UNAVAILABLE",
+                "unavailable_engines": missing,
+            },
+        )
+
+    entry = bars[-1].close
+    stop = entry - Decimal("0.0020")
+    risk = run_risk_engine(entry=entry, stop=stop)
+    decision = run_decision_engine(scenarios, risk)
+
+    engines = {**evidence, "risk": risk, "intelligence_by_tf": intelligence_by_tf}
 
     narrative: dict[str, Any] = {}
     try:

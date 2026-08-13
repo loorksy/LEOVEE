@@ -2,22 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.engines.status import engine_unavailable
 from app.engines.volatility import OHLCBar
 
 
 def run_liquidity_engine(bars: list[OHLCBar]) -> dict[str, Any]:
-    if len(bars) < 2:
-        return {"sweeps": [], "equal_highs": False, "equal_lows": False}
-    last = bars[-1]
-    prev_high = max(b.high for b in bars[:-1])
-    prev_low = min(b.low for b in bars[:-1])
-    sweeps: list[str] = []
-    if last.high > prev_high and last.close < prev_high:
-        sweeps.append("BUY_SIDE")
-    if last.low < prev_low and last.close > prev_low:
-        sweeps.append("SELL_SIDE")
-    return {
-        "sweeps": sweeps,
-        "equal_highs": abs(float(last.high) - float(prev_high)) < 1e-5,
-        "equal_lows": abs(float(last.low) - float(prev_low)) < 1e-5,
-    }
+    """Liquidity — not implemented yet (M4).
+
+    The previous stub looked only at the final bar against the running extreme,
+    and compared equal highs with a fixed ``1e-5`` absolute tolerance — which is
+    a fraction of a pip on EURUSD and larger than a pip on a JPY cross, so the
+    same code meant different things per instrument.
+
+    M4 ports sweep detection and equal-high/low clustering with per-instrument
+    tolerances derived from pip size.
+    """
+    del bars
+    return engine_unavailable("liquidity")

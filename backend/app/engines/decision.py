@@ -15,7 +15,16 @@ def run_decision_engine(
             "confidence": 0.0,
             "rationale": risk.get("reason", "risk_rejected"),
         }
-    best = max(scenarios.get("scenarios", []), key=lambda s: s.get("confidence", 0))
+    candidates = scenarios.get("scenarios") or []
+    if not candidates:
+        # No scenarios means no analytical basis. Raising here would turn a
+        # missing input into a 500; the analysis path fails closed instead.
+        return {
+            "direction": RecommendationDirection.NO_TRADE.value,
+            "confidence": None,
+            "rationale": "no_scenarios",
+        }
+    best = max(candidates, key=lambda s: s.get("confidence", 0))
     label = best.get("label", "NO_TRADE")
     direction_map = {
         "BULLISH": RecommendationDirection.BUY.value,

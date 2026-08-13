@@ -1,10 +1,19 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
+
+import pytest
 
 from app.engines.decision import run_decision_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
+from app.engines.status import (
+    ENGINE_NOT_IMPLEMENTED,
+    ENGINE_STATUS,
+    EngineStatus,
+    is_unavailable,
+)
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
@@ -23,25 +32,56 @@ def _bars() -> list[OHLCBar]:
     ]
 
 
-def test_volatility_and_structure_engines() -> None:
-    bars = _bars()
-    vol = run_volatility_engine(bars)
-    structure = run_structure_engine(bars)
+def test_volatility_engine_is_implemented() -> None:
+    """ATR is genuine arithmetic over the bars, not a placeholder."""
+    vol = run_volatility_engine(_bars())
     assert vol["regime"]
-    assert structure["bias"]
+    assert not is_unavailable(vol)
 
 
-def test_liquidity_zones_scenario_decision_chain() -> None:
-    bars = _bars()
-    structure = run_structure_engine(bars)
-    vol = run_volatility_engine(bars)
-    liquidity = run_liquidity_engine(bars)
-    zones = run_zones_engine(bars)
-    scenarios = run_scenario_engine(structure, vol, liquidity)
+@pytest.mark.parametrize(
+    ("name", "run"),
+    [
+        ("structure", lambda: run_structure_engine(_bars())),
+        ("liquidity", lambda: run_liquidity_engine(_bars())),
+        ("zones", lambda: run_zones_engine(_bars())),
+        ("scenarios", lambda: run_scenario_engine({}, {}, {})),
+    ],
+)
+def test_placeholder_engines_report_unavailable_rather_than_inventing(
+    name: str, run: Callable[[], dict[str, object]]
+) -> None:
+    """Until M4 these must decline to answer, not fabricate evidence.
+
+    The earlier stubs returned confident-looking output — a supply and a demand
+    zone at a hardcoded strength of 0.5, scenario confidences picked by hand —
+    which reached the user as measured evidence. A missing answer is recoverable;
+    an invented one is not detectable.
+    """
+    output = run()
+    assert is_unavailable(output), f"{name} still returns a fabricated answer: {output}"
+    assert output["reason"] == ENGINE_NOT_IMPLEMENTED
+    assert ENGINE_STATUS[name] is EngineStatus.PLACEHOLDER
+
+
+def test_decision_engine_fails_closed_without_scenarios() -> None:
+    """A missing input must degrade the decision, never raise out of the pipeline."""
     risk = run_risk_engine(entry=Decimal("1.2"), stop=Decimal("1.18"))
+    decision = run_decision_engine({"status": "unavailable"}, risk)
+    assert decision["direction"] == "NO_TRADE"
+    assert decision["confidence"] is None
+
+
+def test_decision_engine_maps_scenarios_when_they_exist() -> None:
+    risk = run_risk_engine(entry=Decimal("1.2"), stop=Decimal("1.18"))
+    scenarios = {
+        "scenarios": [
+            {"label": "BULLISH", "confidence": 0.7},
+            {"label": "BEARISH", "confidence": 0.2},
+        ]
+    }
     decision = run_decision_engine(scenarios, risk)
-    assert zones["zones"]
-    assert decision["direction"] in {"BUY", "SELL", "WAIT", "NO_TRADE"}
+    assert decision["direction"] == "BUY"
 
 
 def test_calibration_never_returns_raw_only() -> None:
