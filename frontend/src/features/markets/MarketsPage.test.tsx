@@ -52,7 +52,7 @@ describe("MarketsPage", () => {
       openai: { configured: true, status: "ok" },
     });
     getCandles.mockResolvedValue({
-      symbol: "EURUSD",
+      symbol: "XAUUSD",
       timeframe: "H1",
       workspace_id: "w1",
       candles: [
@@ -67,6 +67,6 @@ describe("MarketsPage", () => {
     });
     renderPage();
     await waitFor(() => expect(screen.getByText("1.105")).toBeInTheDocument());
-    expect(getCandles).toHaveBeenCalledWith("EURUSD", "H1", 50);
+    expect(getCandles).toHaveBeenCalledWith("XAUUSD", "H1", 50);
   });
 });

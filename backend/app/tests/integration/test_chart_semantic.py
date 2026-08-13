@@ -36,7 +36,7 @@ async def test_chart_semantic_persist_and_list(db_session: AsyncSession) -> None
         "decision": {"direction": "BUY"},
     }
     model = build_chart_semantic_model(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe="H1",
         as_of=as_of,
         engines=engines,
@@ -100,7 +100,7 @@ async def test_semantic_model_adapter_contract_shape() -> None:
     """§99: semantic operations must expose timestamp+price anchors for the chart adapter."""
     as_of = datetime(2024, 1, 1, tzinfo=UTC)
     model = build_chart_semantic_model(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe="H1",
         as_of=as_of,
         engines={

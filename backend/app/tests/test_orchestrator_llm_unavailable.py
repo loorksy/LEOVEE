@@ -46,7 +46,7 @@ async def test_orchestrator_fail_closed_when_llm_not_configured(
 
     monkeypatch.setattr("app.agents.orchestrator.get_llm_provider", boom)
 
-    result = await run_analysis_orchestrator(symbol="EURUSD", candles=_candles())
+    result = await run_analysis_orchestrator(symbol="XAUUSD", candles=_candles())
 
     assert result.decision["direction"] == RecommendationDirection.NO_TRADE.value
     assert result.decision["confidence"] is None
@@ -57,7 +57,7 @@ async def test_orchestrator_fail_closed_when_llm_not_configured(
 @pytest.mark.asyncio
 async def test_orchestrator_fail_closed_while_engines_are_placeholders() -> None:
     """A placeholder engine must degrade the run, not be quietly analysed around."""
-    result = await run_analysis_orchestrator(symbol="EURUSD", candles=_candles())
+    result = await run_analysis_orchestrator(symbol="XAUUSD", candles=_candles())
 
     assert result.decision["direction"] == RecommendationDirection.NO_TRADE.value
     assert result.decision["confidence"] is None

@@ -19,3 +19,4 @@ gets amended alongside.
 | [0004](0004-tradingview-not-klinechart.md) | TradingView Advanced Charts, vendored in-repo | §43, §44 |
 | [0005](0005-analysis-only-no-execution.md) | No execution, brokers, or notifications | §17, §19, §57, §105 |
 | [0006](0006-float-in-engines-decimal-at-the-money-boundary.md) | Engines compute in float; Decimal at the money boundary | — |
+| [0007](0007-gold-only.md) | The tradable universe is XAUUSD alone | §17, §60 |

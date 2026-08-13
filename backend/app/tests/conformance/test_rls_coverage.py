@@ -67,13 +67,13 @@ PLATFORM_GLOBAL_TABLES: dict[str, str] = {
     "feature_flags": "platform configuration",
     "platform_secrets": "platform configuration, admin-only",
     "model_configs": "platform LLM routing catalog",
-    # Shared market reference data: the candles for EURUSD are the same candles
+    # Shared market reference data: the candles for XAUUSD are the same candles
     # for every workspace, and copying them per tenant would multiply storage by
     # the tenant count for no isolation benefit.
     "symbols": "platform market reference data",
     "candles": "platform market data, partitioned by timeframe",
     "news_events": "global market news, deliberately shared",
-    # Deterministic engine artifacts: a swing high on EURUSD H1 is a fact about
+    # Deterministic engine artifacts: a swing high on XAUUSD H1 is a fact about
     # the market, identical for every workspace, so it is computed once and
     # shared. M4 rewrites these engines — if their outputs ever become
     # workspace-specific (per-workspace thresholds, user-tuned parameters),

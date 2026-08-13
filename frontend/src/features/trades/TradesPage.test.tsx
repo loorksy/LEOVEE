@@ -28,7 +28,7 @@ describe("TradesPage", () => {
       items: [
         {
           id: "t1",
-          symbol: "EURUSD",
+          symbol: "XAUUSD",
           direction: "BUY",
           status: "IDEA",
         },

@@ -7,7 +7,7 @@ export type KLineChartAdapterOptions = {
 
 export class KLineChartAdapter {
   private readonly chart: KLineChartLike;
-  private symbol = "EURUSD";
+  private symbol = "XAUUSD";
   private timeframe = "1H";
   private candles: NormalizedCandle[] = [];
 

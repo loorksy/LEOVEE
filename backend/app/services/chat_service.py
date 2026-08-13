@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.datetime_utils import utc_now
+from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import TenantContext
 from app.models.conversation import Conversation, Message, MessageRole
 from app.providers.llm.base import LLMMessage, LLMProvider
@@ -38,7 +39,7 @@ async def build_recall_bundle(
 ) -> dict[str, Any]:
     if tenant.workspace_id is None:
         return {"label": RECALL_CONTEXT_LABEL, "items": [], "count": 0}
-    sym = (symbol or "EURUSD").upper()
+    sym = (symbol or DEFAULT_SYMBOL).upper()
     items = await retrieve_memories_hybrid(
         session,
         tenant_id=tenant.tenant_id,

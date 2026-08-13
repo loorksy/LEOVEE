@@ -27,7 +27,7 @@ vi.mock("@/chart", async () => {
 describe("ChartPage", () => {
   it("loads candles + annotations and feeds them into the chart engine", async () => {
     vi.spyOn(marketsApi, "getCandles").mockResolvedValue({
-      symbol: "EURUSD",
+      symbol: "XAUUSD",
       timeframe: "H1",
       workspace_id: "ws-1",
       candles: [

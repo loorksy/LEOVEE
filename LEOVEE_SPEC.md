@@ -18,7 +18,7 @@ AMENDMENTS — READ BEFORE ANY SECTION BELOW
 ============================================================
 
 This specification was written as a greenfield brief. It is no longer accurate
-in nine places, and the sections below have NOT been rewritten — the amendments
+in ten places, and the sections below have NOT been rewritten — the amendments
 are listed here instead so the original intent stays readable alongside what was
 actually decided. Where this table and a section disagree, THIS TABLE WINS.
 
@@ -34,6 +34,7 @@ docs/AICHART_MIGRATION_PLAN.md.
 | §19, §57 | Execution safety; trades section | No execution of any kind. The trades section becomes a manual journal of user-reported fills, feeding outcome learning. | 0005 |
 | §105 | Notifications | No external notifications. Transactional email (verification, password reset) only. | 0005 |
 | §17, §18 | OANDA data plus user account connection | OANDA market data stays. Broker account linking is out of scope. | 0005 |
+| §17, §60 | A multi-instrument Forex platform with a watchlist | The tradable universe is XAUUSD alone. Everything else is rejected at the data layer. | 0007 |
 | §82 | Frontend architecture, no i18n mentioned | Arabic is the default locale and RTL is the primary direction. | — |
 | §3 | Pydantic/SQLAlchemy stack, no numeric policy | Deterministic engines compute in float to match the JavaScript reference; Decimal is confined to the money boundary. | 0006 |
 

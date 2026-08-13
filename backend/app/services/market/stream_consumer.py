@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.symbols import TRADABLE_SYMBOLS
 from app.infrastructure.realtime import candle_broadcaster
 from app.models.enums import Timeframe
 from app.providers.market.base import NormalizedCandle
@@ -120,6 +121,6 @@ async def run_market_stream_cycle(
     from app.core.config import get_settings
 
     settings = get_settings()
-    symbols = instruments or ["EURUSD"]
+    symbols = instruments or list(TRADABLE_SYMBOLS)
     consumer = OandaCandleStreamConsumer(settings, symbols)
     return await consumer.run_cycle(session, max_ticks=max_ticks)

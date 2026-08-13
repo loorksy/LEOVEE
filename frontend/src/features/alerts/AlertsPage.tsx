@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAlert, listAlerts, triggerAlert } from "@/api/alerts";
 import { useWorkspaceId } from "@/hooks/useWorkspaceId";
@@ -9,7 +10,7 @@ export function AlertsPage() {
   const queryClient = useQueryClient();
   const workspaceQuery = useWorkspaceId();
 
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [op, setOp] = useState<"gte" | "lte" | "eq">("gte");
   const [threshold, setThreshold] = useState("1.10");
   const [triggerPrices, setTriggerPrices] = useState<Record<string, string>>({});

@@ -32,7 +32,7 @@ def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
         o = price + Decimal(i) * Decimal("0.0002")
         candles.append(
             NormalizedCandle(
-                symbol="EURUSD",
+                symbol="XAUUSD",
                 timeframe=Timeframe.H1,
                 ts=ts,
                 open=o,
@@ -74,7 +74,7 @@ async def test_pipeline_market_to_thesis(
     result = await run_analysis(
         db_session,
         ctx,
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe=Timeframe.H1,
         market_provider=provider,
         complete_pipeline=True,
@@ -108,13 +108,13 @@ async def test_pipeline_market_to_thesis(
         select(AgentMemory).where(AgentMemory.id == uuid.UUID(result["memory_id"]))
     )
     assert memory is not None
-    assert memory.key.startswith("symbol:EURUSD:analysis:")
+    assert memory.key.startswith("symbol:XAUUSD:analysis:")
 
     recalled = await retrieve_memories_for_symbol(
         db_session,
         tenant_id=ctx.tenant_id,
         workspace_id=ctx.workspace_id,
-        symbol="EURUSD",
+        symbol="XAUUSD",
     )
     assert any(item["id"] == result["memory_id"] for item in recalled)
 

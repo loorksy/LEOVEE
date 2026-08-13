@@ -4,6 +4,7 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
+from app.core.symbols import TRADABLE_SYMBOLS
 from app.infrastructure.database import get_session_factory
 from app.services.learning.outcome_recorder import TerminalOutcome
 from app.services.learning.pipeline import run_learning_pipeline
@@ -49,7 +50,7 @@ async def candle_backfill_job(_ctx: dict[str, object]) -> str:
     provider = get_market_provider()
     repaired = 0
     async with factory() as session:
-        for symbol in ("EURUSD", "GBPUSD", "USDJPY"):
+        for symbol in TRADABLE_SYMBOLS:
             repaired += await repair_candle_gaps(
                 session,
                 symbol_code=symbol,

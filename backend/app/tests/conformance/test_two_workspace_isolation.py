@@ -135,7 +135,7 @@ async def workspace_pair(
         sa.insert(symbols).values(
             id=pair.symbol_id,
             code=f"S{pair.symbol_id.hex[:6].upper()}",
-            base_currency="EUR",
+            base_currency="XAU",
             quote_currency="USD",
             asset_class="FOREX",
             pip_location=-4,

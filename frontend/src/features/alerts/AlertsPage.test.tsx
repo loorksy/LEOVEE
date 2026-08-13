@@ -63,7 +63,7 @@ describe("AlertsPage", () => {
     await waitFor(() =>
       expect(createSpy).toHaveBeenCalledWith({
         type: "PRICE",
-        symbol: "EURUSD",
+        symbol: "XAUUSD",
         condition: { op: "gte", price: 1.1 },
         channels: { in_app: true },
       }),

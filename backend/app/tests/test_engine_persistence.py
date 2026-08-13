@@ -28,7 +28,7 @@ async def test_persist_engine_outputs_writes_artifacts(db_session: AsyncSession)
     supplies the payload shapes they will produce rather than calling them —
     otherwise the persistence logic would sit untested until the port lands.
     """
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     engines = {
         "structure": {"bias": "BULLISH", "swing_high": 1.1050, "swing_low": 1.0980},
         "volatility": run_volatility_engine(_bars()),
@@ -67,7 +67,7 @@ async def test_unavailable_engines_persist_nothing(db_session: AsyncSession) -> 
     write a structure row that later retrieval could not distinguish from a
     measured one.
     """
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     bars = _bars()
     engines = {
         "structure": run_structure_engine(bars),

@@ -231,7 +231,7 @@ async def test_analysis_run_blocked_when_monthly_limit_exceeded(db_session: Asyn
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/analysis/run",
-            json={"symbol": "EURUSD", "complete_pipeline": False},
+            json={"symbol": "XAUUSD", "complete_pipeline": False},
             headers={
                 "X-Tenant-Id": str(org.id),
                 "X-Workspace-Id": str(ctx.workspace_id),

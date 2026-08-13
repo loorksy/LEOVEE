@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { runAnalysis, type AnalysisRunResponse } from "@/api/analysis";
@@ -72,7 +73,7 @@ async function tryPublishChartAnnotations(response: AnalysisRunResponse): Promis
 }
 
 export function AnalysisPage() {
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState("H1");
   const [completePipeline, setCompletePipeline] = useState(true);
   const [result, setResult] = useState<AnalysisRunResponse | null>(null);

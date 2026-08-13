@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
+from app.core.symbols import DEFAULT_SYMBOL
 from app.models.conversation import ConversationMode
 
 
@@ -26,7 +27,7 @@ def propose_chat_actions(
         actions.append(
             {
                 "type": ChatActionType.RUN_ANALYSIS.value,
-                "symbol": (symbol or "EURUSD").upper(),
+                "symbol": (symbol or DEFAULT_SYMBOL).upper(),
             }
         )
     return actions

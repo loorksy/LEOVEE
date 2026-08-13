@@ -21,7 +21,7 @@ async def test_performance_summary_matches_db_aggregates(db_session: AsyncSessio
     await recommendation_service.create_recommendation(
         db_session,
         ctx,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         direction=RecommendationDirection.BUY,
         status=RecommendationStatus.READY,
     )

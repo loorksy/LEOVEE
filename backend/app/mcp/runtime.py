@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.datetime_utils import utc_now
+from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import TenantContext
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.mcp import McpAuditEvent, McpSession
@@ -129,7 +130,7 @@ async def _dispatch_tool(
             "user_id": str(tenant.user_id),
         }
     if tool_name == "market.get_candles":
-        symbol = str(arguments.get("symbol", "EURUSD")).upper()
+        symbol = str(arguments.get("symbol", DEFAULT_SYMBOL)).upper()
         from app.models.enums import Timeframe
 
         tf = Timeframe(str(arguments.get("timeframe", "H1")))

@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTradeIdea, listTrades } from "@/api/trades";
 
 export function TradesPage() {
   const queryClient = useQueryClient();
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [direction, setDirection] = useState<"BUY" | "SELL">("BUY");
   const tradesQuery = useQuery({ queryKey: ["trades"], queryFn: listTrades });
 

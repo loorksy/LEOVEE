@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import TenantContext, resolve_tenant_context
 from app.infrastructure.rls import set_rls_session_context
 from app.models.symbol import Symbol
@@ -43,7 +44,7 @@ async def run_thesis_monitor_cycle(
         pairs = await list_active_theses(session)
         for thesis, recommendation in pairs:
             symbol_row = await session.get(Symbol, recommendation.symbol_id)
-            symbol_code = symbol_row.code if symbol_row else "EURUSD"
+            symbol_code = symbol_row.code if symbol_row else DEFAULT_SYMBOL
             last_price = prices.get(symbol_code, Decimal("1.1000"))
             structure = structures.get(symbol_code, {})
             result = await monitor_thesis_row(

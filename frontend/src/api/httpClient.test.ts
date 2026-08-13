@@ -62,7 +62,7 @@ describe("apiFetch", () => {
 
     await apiFetch("/api/v1/recommendations", {
       method: "POST",
-      body: { symbol: "EURUSD" },
+      body: { symbol: "XAUUSD" },
       query: { cards: true, unused: undefined },
     });
 
@@ -70,7 +70,7 @@ describe("apiFetch", () => {
     expect(url).toContain("?cards=true");
     expect(url).not.toContain("unused");
     expect(init.method).toBe("POST");
-    expect(init.body).toBe(JSON.stringify({ symbol: "EURUSD" }));
+    expect(init.body).toBe(JSON.stringify({ symbol: "XAUUSD" }));
   });
 
   it("throws ApiError with parsed detail on failure and clears tokens on 401", async () => {

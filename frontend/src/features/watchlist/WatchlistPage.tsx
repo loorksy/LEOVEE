@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addWatchlistSymbol,
@@ -152,7 +153,7 @@ export function WatchlistPage() {
                     [wl.id]: event.target.value.toUpperCase(),
                   }))
                 }
-                placeholder="EURUSD"
+                placeholder={DEFAULT_SYMBOL}
                 className="w-32 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
               />
               <button

@@ -65,7 +65,7 @@ async def test_analysis_never_uses_synthetic_provider_candles(db_session: AsyncS
     with pytest.raises(DataUnavailableError):
         await market_data.fetch_and_store_candles(
             db_session,
-            symbol_code="EURUSD",
+            symbol_code="XAUUSD",
             timeframe=Timeframe.H1,
             provider=fake,
         )
@@ -76,13 +76,13 @@ async def test_learning_pipeline_updates_recall(db_session: AsyncSession) -> Non
     user, org, _ = await seed_user_org(db_session, email="learn@example.com", slug="learn")
     ctx = await resolve_tenant_context(db_session, user.id)
     assert ctx.workspace_id is not None
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
 
     await store_memory(
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"confidence": 0.7, "sample_size": 5},
         memory_type=MemoryType.SEMANTIC,
     )
@@ -113,9 +113,9 @@ async def test_learning_pipeline_updates_recall(db_session: AsyncSession) -> Non
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        symbol="EURUSD",
+        symbol="XAUUSD",
     )
     assert recalled
     profile_entry = recalled[0]
-    assert profile_entry["key"] == "symbol:EURUSD"
+    assert profile_entry["key"] == "symbol:XAUUSD"
     assert profile_entry["low_sample"] is True

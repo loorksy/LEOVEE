@@ -12,18 +12,18 @@ describe("WatchlistPage", () => {
         {
           id: "wl-1",
           name: "Majors",
-          symbols: [{ code: "EURUSD", item_id: "item-1", last_price: 1.0812 }],
+          symbols: [{ code: "XAUUSD", item_id: "item-1", last_price: 1.0812 }],
         },
       ],
-      ws_symbols: ["EURUSD"],
+      ws_symbols: ["XAUUSD"],
     });
     vi.spyOn(watchlistStreamHook, "useWatchlistQuotesStream").mockImplementation(() => undefined);
 
     renderWithProviders(<WatchlistPage />);
 
     expect(await screen.findByText("Majors")).toBeInTheDocument();
-    expect(screen.getByText("EURUSD")).toBeInTheDocument();
-    expect(await screen.findByTestId("quote-EURUSD")).toHaveTextContent("1.0812");
+    expect(screen.getByText("XAUUSD")).toBeInTheDocument();
+    expect(await screen.findByTestId("quote-XAUUSD")).toHaveTextContent("1.0812");
     expect(watchlistApi.listWatchlists).toHaveBeenCalledWith(true);
   });
 

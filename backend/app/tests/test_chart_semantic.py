@@ -41,7 +41,7 @@ def test_semantic_model_lifecycle_fields_in_schema() -> None:
     model = validate_semantic_model(
         {
             "version": 1,
-            "symbol": "EURUSD",
+            "symbol": "XAUUSD",
             "timeframe": "H1",
             "operations": [
                 {
@@ -53,7 +53,7 @@ def test_semantic_model_lifecycle_fields_in_schema() -> None:
             ],
         }
     )
-    assert model.symbol == "EURUSD"
+    assert model.symbol == "XAUUSD"
     assert model.operations[0].semantic_type == ChartSemanticType.DRAW_LEVEL
 
 
@@ -68,7 +68,7 @@ def test_build_chart_semantic_model_from_engines() -> None:
         "decision": {"direction": "BUY"},
     }
     model = build_chart_semantic_model(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe="H1",
         as_of=as_of,
         engines=engines,

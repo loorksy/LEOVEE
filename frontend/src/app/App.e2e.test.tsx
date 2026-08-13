@@ -51,11 +51,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 const RECOMMENDATION_CARD = {
   id: "rec-1",
-  symbol: "EURUSD",
+  symbol: "XAUUSD",
   direction: "BUY",
   status: "READY",
   confidence: 0.71,
-  headline: "EURUSD BUY",
+  headline: "XAUUSD BUY",
   thesis: "Liquidity sweep then structure break, aligned with HTF bias.",
   badges: ["READY", "conf:71%"],
 };
@@ -130,10 +130,10 @@ describe("Batch 3 mocked end-to-end flow", () => {
           return jsonResponse({
             agent_run_id: "run-1",
             workspace_id: "ws-1",
-            symbol: "EURUSD",
+            symbol: "XAUUSD",
             timeframe: "H1",
             perceive: {},
-            recall: { count: 2, items: [{ key: "eurusd.sweep.bias" }] },
+            recall: { count: 2, items: [{ key: "xauusd.sweep.bias" }] },
             engines: { structure: { swept: true } },
             decision: { direction: "BUY", confidence: 0.71 },
             narrative: "Liquidity sweep then structure break, aligned with HTF bias.",
@@ -159,9 +159,9 @@ describe("Batch 3 mocked end-to-end flow", () => {
         if (pathname === "/api/v1/chart/semantic/persist" && method === "POST") {
           return jsonResponse({ ids: ["ann-1"], count: 1, version: 1 });
         }
-        if (pathname === "/api/v1/markets/EURUSD/candles" && method === "GET") {
+        if (pathname === "/api/v1/markets/XAUUSD/candles" && method === "GET") {
           return jsonResponse({
-            symbol: "EURUSD",
+            symbol: "XAUUSD",
             timeframe: "H1",
             workspace_id: "ws-1",
             candles: [
@@ -202,12 +202,12 @@ describe("Batch 3 mocked end-to-end flow", () => {
               {
                 event: "recall",
                 label: "HISTORICAL_MEMORY",
-                symbol: "EURUSD",
+                symbol: "XAUUSD",
                 count: 2,
-                items: [{ key: "eurusd.sweep.bias" }, { key: "eurusd.htf.trend" }],
+                items: [{ key: "xauusd.sweep.bias" }, { key: "xauusd.htf.trend" }],
               },
               { event: "user_message", id: "msg-user" },
-              { event: "token", data: "EURUSD is showing a bullish structure break, " },
+              { event: "token", data: "XAUUSD is showing a bullish structure break, " },
               { event: "token", data: "consistent with your prior notes." },
               {
                 event: "done",
@@ -226,12 +226,12 @@ describe("Batch 3 mocked end-to-end flow", () => {
           return jsonResponse({
             user_message_id: "msg-user",
             assistant_message_id: "msg-assistant",
-            content: "EURUSD is showing a bullish structure break, consistent with your prior notes.",
+            content: "XAUUSD is showing a bullish structure break, consistent with your prior notes.",
             recall: {
               label: "HISTORICAL_MEMORY",
-              symbol: "EURUSD",
+              symbol: "XAUUSD",
               count: 2,
-              items: [{ key: "eurusd.sweep.bias" }, { key: "eurusd.htf.trend" }],
+              items: [{ key: "xauusd.sweep.bias" }, { key: "xauusd.htf.trend" }],
             },
             actions: [],
             summary_text: null,
@@ -271,10 +271,10 @@ describe("Batch 3 mocked end-to-end flow", () => {
     // silently does nothing.
     const runButton = screen.getByRole("button", { name: /run analysis/i });
     await waitFor(() => expect(runButton).not.toBeDisabled());
-    fireEvent.change(symbolInput, { target: { value: "EURUSD" } });
+    fireEvent.change(symbolInput, { target: { value: "XAUUSD" } });
     fireEvent.click(runButton);
 
-    expect(await screen.findByText(/EURUSD · H1 — BUY/)).toBeInTheDocument();
+    expect(await screen.findByText(/XAUUSD · H1 — BUY/)).toBeInTheDocument();
     await screen.findByTestId("chart-status");
 
     // See the annotated chart.
@@ -286,18 +286,18 @@ describe("Batch 3 mocked end-to-end flow", () => {
 
     // See the recommendation.
     fireEvent.click(screen.getByRole("link", { name: /recommendations/i }));
-    expect(await screen.findByText("EURUSD BUY")).toBeInTheDocument();
+    expect(await screen.findByText("XAUUSD BUY")).toBeInTheDocument();
 
     // See the recalled memory in chat.
     fireEvent.click(screen.getByRole("link", { name: /^chat$/i }));
     fireEvent.click(await screen.findByRole("button", { name: /new conversation/i }));
     const draft = await screen.findByLabelText(/message/i);
-    fireEvent.change(draft, { target: { value: "What's the current bias on EURUSD?" } });
+    fireEvent.change(draft, { target: { value: "What's the current bias on XAUUSD?" } });
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
     const recallPanel = await screen.findByTestId("recall-panel");
     expect(within(recallPanel).getByText(/HISTORICAL_MEMORY/)).toBeInTheDocument();
     expect(within(recallPanel).getByText(/2 memories/)).toBeInTheDocument();
-    expect(within(recallPanel).getByText(/eurusd.sweep.bias/)).toBeInTheDocument();
+    expect(within(recallPanel).getByText(/xauusd.sweep.bias/)).toBeInTheDocument();
   });
 });

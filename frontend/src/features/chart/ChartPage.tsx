@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { createChartEngine, type ChartEngine, type SemanticAnnotation } from "@/chart";
@@ -14,7 +15,7 @@ import {
 } from "@/features/chart/annotationStream";
 import { BACKEND_TIMEFRAMES, backendTimeframeToChart } from "@/features/chart/timeframe";
 
-const DEFAULT_SYMBOL = "EURUSD";
+
 const DEFAULT_TIMEFRAME = "H1";
 
 export function ChartPage() {

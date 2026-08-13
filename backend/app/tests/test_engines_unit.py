@@ -87,9 +87,9 @@ def test_candle_aggregator_dedupes_and_orders_ticks() -> None:
     agg = CandleAggregator(timeframe_minutes=1)
     ts = datetime(2026, 1, 1, 12, 0, 5, tzinfo=UTC)
     ticks = [
-        PriceTick("EURUSD", Decimal("1.1"), Decimal("1.1002"), ts),
-        PriceTick("EURUSD", Decimal("1.1"), Decimal("1.1002"), ts),
-        PriceTick("EURUSD", Decimal("1.1001"), Decimal("1.1003"), ts),
+        PriceTick("XAUUSD", Decimal("1.1"), Decimal("1.1002"), ts),
+        PriceTick("XAUUSD", Decimal("1.1"), Decimal("1.1002"), ts),
+        PriceTick("XAUUSD", Decimal("1.1001"), Decimal("1.1003"), ts),
     ]
     ordered = agg.dedupe_ticks(ticks)
     assert len(ordered) == 2

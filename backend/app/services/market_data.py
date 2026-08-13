@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.symbols import require_instrument
 from app.models.candle import Candle
 from app.models.enums import Timeframe
 from app.models.symbol import Symbol
@@ -15,17 +16,30 @@ from app.providers.market.oanda import get_market_provider
 
 
 async def get_or_create_symbol(session: AsyncSession, code: str) -> Symbol:
-    normalized = code.replace("_", "").upper()
-    existing = await session.scalar(select(Symbol).where(Symbol.code == normalized))
+    """Resolve a symbol row, refusing anything outside the allowlist.
+
+    This is the single chokepoint (app/core/symbols.py). It raises rather than
+    substituting the default: a caller asking for an instrument the platform
+    does not analyse has made a mistake, and silently answering about gold
+    instead would produce a confident analysis of the wrong market.
+
+    Currency and pip metadata come from the instrument spec rather than being
+    sliced out of the ticker — `normalized[:3]` happens to work for XAUUSD but
+    would give the wrong pip location for every JPY pair, and a wrong pip
+    location scales stop distances and position sizes by a hundred without
+    failing anywhere visible.
+    """
+    spec = require_instrument(code)
+    existing = await session.scalar(select(Symbol).where(Symbol.code == spec.symbol))
     if existing is not None:
         return existing
-    base = normalized[:3]
-    quote = normalized[3:]
     symbol = Symbol(
-        code=normalized,
-        base_currency=base,
-        quote_currency=quote,
-        provider_mappings_json={"oanda": f"{base}_{quote}"},
+        code=spec.symbol,
+        base_currency=spec.base,
+        quote_currency=spec.quote,
+        asset_class=spec.asset_class,
+        pip_location=spec.pip_location,
+        provider_mappings_json={"oanda": spec.oanda_instrument},
     )
     session.add(symbol)
     await session.flush()

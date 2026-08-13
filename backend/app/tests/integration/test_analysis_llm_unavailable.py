@@ -30,7 +30,7 @@ def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
         o = price + Decimal(i) * Decimal("0.0002")
         candles.append(
             NormalizedCandle(
-                symbol="EURUSD",
+                symbol="XAUUSD",
                 timeframe=Timeframe.H1,
                 ts=ts,
                 open=o,
@@ -85,7 +85,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     ) -> tuple[Symbol, list[NormalizedCandle]]:
         row = Symbol(
             code=symbol_code,
-            base_currency="EUR",
+            base_currency="XAU",
             quote_currency="USD",
             provider_mappings_json={},
         )
@@ -119,7 +119,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
                 "/api/v1/analysis/run",
-                json={"symbol": "EURUSD", "complete_pipeline": True},
+                json={"symbol": "XAUUSD", "complete_pipeline": True},
                 headers={
                     "X-Tenant-Id": str(org.id),
                     "X-Workspace-Id": str(ctx.workspace_id),

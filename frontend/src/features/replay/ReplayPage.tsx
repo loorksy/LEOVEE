@@ -1,10 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useState } from "react";
 import { previewReplay } from "@/api/replay";
 import { ReplayPanel, type ReplayPreview } from "@/features/replay/ReplayPanel";
 
 export function ReplayPage() {
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState("H1");
   const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 16));
   const [preview, setPreview] = useState<ReplayPreview | null>(null);

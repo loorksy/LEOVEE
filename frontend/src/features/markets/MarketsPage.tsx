@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useQuery } from "@tanstack/react-query";
 import { getCandles } from "@/api/markets";
 import { getProvidersStatus } from "@/api/providers";
@@ -7,7 +8,7 @@ import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredB
 const TIMEFRAMES = ["M15", "H1", "H4", "D1"] as const;
 
 export function MarketsPage() {
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState<(typeof TIMEFRAMES)[number]>("H1");
 
   const providersQuery = useQuery({

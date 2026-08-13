@@ -36,7 +36,7 @@ async def test_chat_message_injects_recall(
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"bias": "bullish", "sample_size": 25},
         memory_type=MemoryType.SEMANTIC,
     )
@@ -45,7 +45,7 @@ async def test_chat_message_injects_recall(
         workspace_id=ctx.workspace_id,
         user_id=user.id,
         title="Recall",
-        symbol="EURUSD",
+        symbol="XAUUSD",
         mode=ConversationMode.ANALYZE,
     )
     db_session.add(conv)
@@ -69,7 +69,7 @@ async def test_chat_message_injects_recall(
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             f"/api/v1/conversations/{conv.id}/messages",
-            json={"content": "Please analyze EURUSD"},
+            json={"content": "Please analyze XAUUSD"},
             headers={
                 "X-Tenant-Id": str(org.id),
                 "X-Workspace-Id": str(ctx.workspace_id),
@@ -89,7 +89,7 @@ async def test_recommendation_terminal_status_triggers_outcome(db_session: Async
     rec = await recommendation_service.create_recommendation(
         db_session,
         ctx,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         direction=RecommendationDirection.BUY,
         status=RecommendationStatus.READY,
     )

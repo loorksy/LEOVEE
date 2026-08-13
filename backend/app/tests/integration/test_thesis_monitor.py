@@ -22,11 +22,11 @@ async def test_thesis_monitor_invalidates_on_structure_break(db_session: AsyncSe
     await db_session.commit()
     ctx = await resolve_tenant_context(db_session, user.id)
 
-    await market_data.get_or_create_symbol(db_session, "EURUSD")
+    await market_data.get_or_create_symbol(db_session, "XAUUSD")
     rec = await recommendation_service.create_recommendation(
         db_session,
         ctx,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         direction=RecommendationDirection.BUY,
         status=RecommendationStatus.ACTIVE,
         evidence={"engines": {"structure": {"swing_low": 1.095}}},
@@ -35,7 +35,7 @@ async def test_thesis_monitor_invalidates_on_structure_break(db_session: AsyncSe
         db_session,
         ctx,
         rec,
-        statement="Bullish EURUSD",
+        statement="Bullish XAUUSD",
     )
     thesis.invalidation_json = {"swing_low": 1.0950}
     await db_session.flush()

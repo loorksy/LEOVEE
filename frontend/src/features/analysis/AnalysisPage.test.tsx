@@ -13,7 +13,7 @@ import * as providersApi from "@/api/providers";
 const runResponse: analysisApi.AnalysisRunResponse = {
   agent_run_id: "run-1",
   workspace_id: "ws-1",
-  symbol: "EURUSD",
+  symbol: "XAUUSD",
   timeframe: "H1",
   perceive: {},
   recall: { count: 3 },
@@ -55,7 +55,7 @@ describe("AnalysisPage", () => {
     renderWithProviders(<AnalysisPage />);
     fireEvent.click(await waitForRunEnabled());
 
-    expect(await screen.findByText(/EURUSD · H1 — BUY/)).toBeInTheDocument();
+    expect(await screen.findByText(/XAUUSD · H1 — BUY/)).toBeInTheDocument();
     expect(screen.getByText(/recalled 3 memories/i)).toBeInTheDocument();
     expect(await screen.findByTestId("chart-status")).toHaveTextContent(
       "1 chart annotation(s) published",
@@ -98,7 +98,7 @@ describe("AnalysisPage", () => {
     expect(screen.getByText(/analysis degraded/i)).toBeInTheDocument();
     expect(screen.getByText("NO_TRADE")).toBeInTheDocument();
     expect(screen.getByText("LLM_UNAVAILABLE")).toBeInTheDocument();
-    expect(screen.queryByText(/EURUSD · H1 — BUY/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/XAUUSD · H1 — BUY/)).not.toBeInTheDocument();
     expect(screen.queryByText(/N\/A/)).not.toBeInTheDocument();
   });
 

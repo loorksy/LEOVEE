@@ -35,7 +35,7 @@ describe("ChatPage", () => {
     postMessageStream.mockReset();
     createConversation.mockReset();
     listConversations.mockResolvedValue({
-      items: [{ id: "c1", title: "EURUSD", symbol: "EURUSD", mode: "CHAT", summary_text: null }],
+      items: [{ id: "c1", title: "XAUUSD", symbol: "XAUUSD", mode: "CHAT", summary_text: null }],
     });
     listMessages.mockResolvedValue({ items: [], summary_text: null });
   });
@@ -57,7 +57,7 @@ describe("ChatPage", () => {
     );
 
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "EURUSD" }));
+    fireEvent.click(await screen.findByRole("button", { name: "XAUUSD" }));
     fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 

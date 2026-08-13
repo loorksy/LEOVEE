@@ -106,11 +106,11 @@ describe("AdminPage permission matrix", () => {
       workspace_id: "ws-1",
     });
     vi.spyOn(adminApi, "listAdminConversations").mockResolvedValue({
-      items: [{ id: "c-1", title: "EURUSD bias", mode: "CHAT" }],
+      items: [{ id: "c-1", title: "XAUUSD bias", mode: "CHAT" }],
     });
     vi.spyOn(adminApi, "listAdminAgentRuns").mockResolvedValue({
       items: [
-        { id: "r-1", symbol: "EURUSD", status: "COMPLETE", tool_calls: 2, memories_retrieved: 3 },
+        { id: "r-1", symbol: "XAUUSD", status: "COMPLETE", tool_calls: 2, memories_retrieved: 3 },
       ],
     });
     vi.spyOn(adminApi, "getAdminSecrets").mockResolvedValue({

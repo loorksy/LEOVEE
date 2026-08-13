@@ -26,7 +26,7 @@ async def test_alert_evaluation_cycle_fans_out_notification(
     )
     ctx = await resolve_tenant_context(db_session, user.id)
     await bind_workspace_rls(db_session, ctx)
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     db_session.add(
         Candle(
             symbol_id=symbol.id,
@@ -45,7 +45,7 @@ async def test_alert_evaluation_cycle_fans_out_notification(
         db_session,
         ctx,
         alert_type="PRICE",
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         condition={"op": "gte", "price": 1.10},
         channels={"in_app": True},
     )
