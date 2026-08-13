@@ -24,6 +24,10 @@ dependencies = [
     "arq>=0.26.1",
     "stripe>=11.0.0",
     "cryptography>=42.0.0",
+    # Server-side chart rendering for the agent's visual evidence. Pillow
+    # only — the chart is drawn from the same candle rows the engines read,
+    # so no browser or JS runtime is involved.
+    "Pillow>=11.0.0",
 ]
 
 [project.optional-dependencies]

@@ -123,30 +123,50 @@ def swinging_bars(
 
     `rising_bars` climbs every bar, so no bar is a local extreme and the swing
     detectors correctly find nothing — a straight line has no structure. Trend
-    and level tests need pullbacks: price advances by `drift` per leg while
-    oscillating `swing` around it, so higher highs and higher lows exist to be
-    detected.
+    and level tests need pullbacks, so this walks between alternating turning
+    points that each drift by `drift` per cycle: higher highs and higher lows
+    for a positive drift, lower ones for a negative drift.
 
-    `drift` is signed — pass a negative value for a downtrend.
+    Two construction details are load-bearing, both learned by getting them
+    wrong:
+
+    - the path is *continuous*, each leg starting where the last ended. Building
+      legs independently let a pullback begin above the peak it was retracing,
+      which is not a pullback;
+    - wicks *vary*. A turning price is the close of one bar and the open of the
+      next, so a constant wick gives both the same high and they disqualify each
+      other under the plateau rule — the series then reads as having no swings
+      at all. Real candles have unequal wicks; these do too, deterministically.
     """
+    turns: list[float] = []
+    for cycle in range(legs):
+        base = start + drift * cycle
+        turns.append(base)
+        turns.append(base + swing)
+
+    path: list[float] = [turns[0]]
+    for index in range(len(turns) - 1):
+        origin = turns[index]
+        target = turns[index + 1]
+        for step in range(1, bars_per_leg + 1):
+            path.append(origin + (target - origin) * step / bars_per_leg)
+
     bars: list[OHLCBar] = []
-    index = 0
-    for leg in range(legs):
-        base = start + drift * leg
-        going_up = leg % 2 == 0
-        for step in range(bars_per_leg):
-            fraction = step / max(1, bars_per_leg - 1)
-            offset = swing * (fraction if going_up else 1 - fraction)
-            price = base + offset
-            bars.append(
-                OHLCBar(
-                    ts=EPOCH + interval * index,
-                    open=price,
-                    high=price + spread,
-                    low=price - spread,
-                    close=price,
-                    volume=100.0 + index,
-                )
+    for index in range(len(path) - 1):
+        open_price = path[index]
+        close_price = path[index + 1]
+        # Deterministic, so fixtures stay reproducible, but uneven enough that
+        # two adjacent bars never share an extreme.
+        upper = spread * (0.5 + 0.5 * ((index * 7) % 5) / 4)
+        lower = spread * (0.5 + 0.5 * ((index * 11) % 5) / 4)
+        bars.append(
+            OHLCBar(
+                ts=EPOCH + interval * index,
+                open=open_price,
+                high=max(open_price, close_price) + upper,
+                low=min(open_price, close_price) - lower,
+                close=close_price,
+                volume=100.0 + index,
             )
-            index += 1
+        )
     return bars

@@ -132,6 +132,27 @@ async def load_recent_candles(
     return rows
 
 
+async def load_oldest_candle(
+    session: AsyncSession,
+    symbol_id: uuid.UUID,
+    *,
+    timeframe: Timeframe,
+) -> Candle | None:
+    """The earliest stored candle — how far back the history actually reaches.
+
+    The agent needs this to tell a thin store from a quiet market: "no structure
+    before this point" and "we only have two days of data" look identical
+    otherwise.
+    """
+    result = await session.execute(
+        select(Candle)
+        .where(Candle.symbol_id == symbol_id, Candle.timeframe == timeframe)
+        .order_by(Candle.ts.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
 def candle_to_dict(candle: Candle) -> dict[str, str | float | bool]:
     return {
         "ts": candle.ts.isoformat(),
