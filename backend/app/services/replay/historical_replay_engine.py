@@ -1,3 +1,16 @@
+"""Load the market and memory state that was visible at a historical moment.
+
+Lives under ``app/services/`` and not ``app/engines/`` deliberately, and it was
+under ``engines`` by mistake until the purity guard found it. It takes a
+database session and a tenant context and loads rows; the engine layer is pure
+functions of bars. The name says "engine" because that is what it is called in
+the spec, not because of where it belongs.
+
+Kept under D7 as a **visual review** tool: replaying a past analysis to look at
+it again. It is not the statistical-validation surface D7 removed, and it makes
+no claim about how a strategy would have performed.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

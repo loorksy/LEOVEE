@@ -6,9 +6,9 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.engines.replay.historical_replay_engine import filter_candles_for_replay
 from app.models.candle import Candle
 from app.models.enums import Timeframe
+from app.services.replay.historical_replay_engine import filter_candles_for_replay
 
 
 def test_filter_candles_for_replay_excludes_future() -> None:
@@ -97,8 +97,8 @@ async def test_historical_replay_engine_preview_excludes_future_candles(
     db_session: AsyncSession,
 ) -> None:
     from app.core.tenant import resolve_tenant_context
-    from app.engines.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
     from app.services import market_data
+    from app.services.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
     from app.tests.conftest import seed_user_org
 
     user, org, _ = await seed_user_org(db_session, email="replay-c@example.com", slug="replay-c")

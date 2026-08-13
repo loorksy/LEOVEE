@@ -6,9 +6,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenant import TenantContext
-from app.engines.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
 from app.models.enums import Timeframe
 from app.services import entitlement_service
+from app.services.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
 
 
 class ReplayNotEnabledError(entitlement_service.EntitlementError):
