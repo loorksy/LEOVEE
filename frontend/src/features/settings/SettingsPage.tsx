@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getEntitlements } from "@/api/billing";
 import { formatPlanLabel } from "@/features/admin/AdminEntitlementsPanel";
+import { TelegramSettings } from "@/features/telegram/TelegramSettings";
 
 export function SettingsPage() {
   const entitlementsQuery = useQuery({
@@ -40,6 +41,10 @@ export function SettingsPage() {
           </p>
         </section>
       )}
-    </div>
+    
+      <section className="max-w-lg rounded border border-slate-800 bg-leovee-panel p-6">
+        <TelegramSettings />
+      </section>
+</div>
   );
 }

@@ -24,6 +24,7 @@ async def create_recommendation(
     status: RecommendationStatus = RecommendationStatus.DETECTED,
     evidence: dict[str, Any] | None = None,
     agent_run_id: uuid.UUID | None = None,
+    confidence: Decimal | None = None,
 ) -> Recommendation:
     await bind_workspace_rls(session, tenant)
     symbol = await market_data.get_or_create_symbol(session, symbol_code)
@@ -35,7 +36,12 @@ async def create_recommendation(
         status=status,
         evidence_json=evidence or {},
         agent_run_id=agent_run_id,
-        confidence_calibrated=Decimal("0.5"),
+        # None, not 0.5. The hardcoded half was written to every row including
+        # the NO_TRADE ones — a confidence figure attached to a failed analysis,
+        # which ADR 0002 forbids precisely because a reader takes it for a weak
+        # opinion when it is the absence of one. A missing confidence is a fact
+        # the column can express; an invented one is not.
+        confidence_calibrated=confidence,
     )
     session.add(rec)
     await session.flush()
@@ -129,7 +135,10 @@ def recommendation_to_card(
     *,
     symbol_code: str | None = None,
 ) -> dict[str, Any]:
-    confidence = float(rec.confidence_calibrated or 0)
+    # None, not 0.0. A card reading "0% confidence" looks like a very weak
+    # opinion; the absence of one is a different fact, and the only one a
+    # degraded run has to report.
+    confidence = None if rec.confidence_calibrated is None else float(rec.confidence_calibrated)
     return {
         "id": str(rec.id),
         "symbol": symbol_code,
@@ -138,7 +147,9 @@ def recommendation_to_card(
         "confidence": confidence,
         "headline": f"{symbol_code or 'SYMBOL'} {rec.direction.value}",
         "thesis": rec.thesis_text,
-        "badges": [rec.status.value, f"conf:{confidence:.0%}"],
+        # A missing confidence gets no badge rather than a "conf:0%" one, which
+        # would read as a measured zero.
+        "badges": [rec.status.value, *([] if confidence is None else [f"conf:{confidence:.0%}"])],
         "entry": float(rec.entry) if rec.entry is not None else None,
         "stop": float(rec.stop) if rec.stop is not None else None,
         "targets": rec.targets_json,

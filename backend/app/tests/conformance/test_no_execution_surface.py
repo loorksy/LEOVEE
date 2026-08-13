@@ -67,6 +67,10 @@ TELEGRAM_ALLOWED_PREFIXES = (
     "backend/app/tests/",
     "backend/alembic/versions/",
     "frontend/src/features/telegram/",
+    "frontend/src/api/telegram.ts",
+    # The settings page mounts the panel; mounting is not sending.
+    "frontend/src/features/settings/",
+    "frontend/src/i18n/",
     # Registration points. Each mentions the transport in order to wire it up,
     # and none of them can send anything.
     "backend/app/main.py",

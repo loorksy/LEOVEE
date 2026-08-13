@@ -127,14 +127,14 @@ def test_scenarios_follow_the_structural_bias() -> None:
 
 def test_decision_engine_fails_closed_without_scenarios() -> None:
     """A missing input must degrade the decision, never raise out of the pipeline."""
-    risk = run_risk_engine(entry=Decimal("1.2"), stop=Decimal("1.18"))
+    risk = run_risk_engine(entry=Decimal("2000.00"), stop=Decimal("1996.00"))
     decision = run_decision_engine({"status": "unavailable"}, risk)
     assert decision["direction"] == "NO_TRADE"
     assert decision["confidence"] is None
 
 
 def test_decision_engine_maps_scenarios_when_they_exist() -> None:
-    risk = run_risk_engine(entry=Decimal("1.2"), stop=Decimal("1.18"))
+    risk = run_risk_engine(entry=Decimal("2000.00"), stop=Decimal("1996.00"))
     scenarios = {
         "scenarios": [
             {"label": "BULLISH", "confidence": 0.7},

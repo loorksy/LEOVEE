@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,6 +186,13 @@ async def run_analysis(
                 "persistence": payload.get("persistence"),
             },
             agent_run_id=result.agent_run_id,
+            # Only a completed analysis has one. A degraded run reaches here
+            # with confidence None and must keep it.
+            confidence=(
+                None
+                if result.decision.get("confidence") is None
+                else Decimal(str(result.decision["confidence"]))
+            ),
         )
         thesis = await recommendation_service.spawn_thesis_from_recommendation(
             session,

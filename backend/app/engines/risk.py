@@ -1,17 +1,47 @@
+"""Position risk: distance, cost and size — for the instrument actually traded.
+
+Two defects this replaces, both silent and both found by review rather than by
+anything failing.
+
+**The pip size was hardcoded to 0.0001**, a currency-pair convention, on a
+platform that trades only gold. Gold prices to two decimals, so every
+``risk_pips`` figure was a hundred times too large — and it looked like a
+plausible number, sitting in the same payload as ``plan_sanity``'s correct one,
+with nothing to say which was which.
+
+**The stop was assumed to be below the entry.** A short plan has its stop above,
+and a signed subtraction produces a negative distance that reads as an invalid
+stop. The distance is now signed by the plan's own direction, which is derived
+from the levels rather than passed in — the levels are the authority, and a
+direction argument that disagreed with them would just be a second thing to
+keep in step.
+"""
+
 from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
+
+from app.core.symbols import DEFAULT_SYMBOL, pip_size
+
+__all__ = ["run_risk_engine", "MAX_SPREAD_MULTIPLE"]
+
+#: Beyond this the spread is not a cost, it is the trade. A stop three times its
+#: own width away from being paid for is not a wide stop, it is a plan whose
+#: arithmetic never closes.
+MAX_SPREAD_MULTIPLE = Decimal("3")
 
 
 def run_risk_engine(
     *,
     entry: Decimal,
     stop: Decimal,
+    targets: list[Decimal] | None = None,
     account_risk_pct: Decimal = Decimal("1"),
-    pip_size: Decimal = Decimal("0.0001"),
-    spread_pips: Decimal = Decimal("1.5"),
+    symbol: str = DEFAULT_SYMBOL,
+    spread_pips: Decimal = Decimal("30"),
 ) -> dict[str, Any]:
+    size = Decimal(str(pip_size(symbol) or 0.01))
     risk_distance = abs(entry - stop)
     if risk_distance <= 0:
         return {
@@ -19,22 +49,45 @@ def run_risk_engine(
             "decision": "NO_TRADE",
             "reason": "invalid_stop",
             "position_size_units": None,
+            "direction": None,
         }
-    spread_cost = spread_pips * pip_size
+
+    # Read off the levels rather than taken as an argument: the levels are the
+    # authority, and a direction that could disagree with them is one more thing
+    # to keep in step for no gain.
+    direction = "SELL" if stop > entry else "BUY"
+
+    spread_cost = spread_pips * size
     adjusted_risk = risk_distance + spread_cost
-    if adjusted_risk > risk_distance * Decimal("3"):
+    if adjusted_risk > risk_distance * MAX_SPREAD_MULTIPLE:
         return {
             "approved": False,
             "decision": "NO_TRADE",
             "reason": "spread_too_wide",
             "position_size_units": None,
+            "direction": direction,
         }
-    notional_risk = account_risk_pct / Decimal("100")
-    units = notional_risk / adjusted_risk
+
+    units = (account_risk_pct / Decimal("100")) / adjusted_risk
+    reward_risk: float | None = None
+    if targets:
+        first = targets[0]
+        reward = abs(first - entry)
+        # A target on the stop's side of entry is a sign error, not an
+        # unambitious plan, and a negative ratio downstream reads as a very
+        # confident bad trade.
+        if (direction == "BUY" and first > entry) or (direction == "SELL" and first < entry):
+            reward_risk = float(reward / risk_distance)
+
     return {
         "approved": True,
         "decision": "TRADE",
         "reason": None,
+        "direction": direction,
         "position_size_units": float(units),
-        "risk_pips": float(risk_distance / pip_size),
+        "risk_distance": float(risk_distance),
+        "risk_pips": float(risk_distance / size),
+        "spread_cost": float(spread_cost),
+        "reward_risk": reward_risk,
+        "pip_size": float(size),
     }

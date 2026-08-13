@@ -9,6 +9,13 @@ regime classifier needs sixty bars before it will say anything at all, and its
 baselines are medians over the sixty *before* the current one — hand it eighty
 and every baseline is computed from a window that barely exists, which is how a
 normal session reads as a volatility expansion.
+
+**Every active frame is loaded, not just the context ladder.** The agent's
+timeframe selection can only choose between frames it has bars for, and an
+earlier version fetched H4/H1/M15 — so M1 and M5 were excluded as
+INSUFFICIENT_BARS on every run and the selector "chose" M15 every time. D11 says
+the agent picks between M1 and M15; loading three of the five made that a
+formality with a rationale attached.
 """
 
 from __future__ import annotations
@@ -17,7 +24,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.timeframes import ANALYSIS_WINDOW_BARS, INTERIM_DECISION_TIMEFRAME
+from app.core.timeframes import (
+    ANALYSIS_WINDOW_BARS,
+    DECISION_TIMEFRAMES,
+    INTERIM_DECISION_TIMEFRAME,
+)
 from app.engines.bar import OHLCBar, bars_from_candles
 from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import default_mtf_stack, run_mtf_engine
@@ -37,7 +48,18 @@ async def build_mtf_intelligence(
     decision_timeframe: Timeframe = INTERIM_DECISION_TIMEFRAME,
 ) -> dict[str, Any]:
     timeframes = stack or default_mtf_stack()
-    wanted = list(dict.fromkeys([*timeframes, decision_timeframe.value]))
+    # Context ladder plus every frame the agent may decide on. Anything missing
+    # here is silently unselectable, and "unselectable" is indistinguishable
+    # from "considered and rejected" in the output.
+    wanted = list(
+        dict.fromkeys(
+            [
+                *timeframes,
+                *(tf.value for tf in DECISION_TIMEFRAMES),
+                decision_timeframe.value,
+            ]
+        )
+    )
 
     bars_by_timeframe: dict[str, list[OHLCBar]] = {}
     intelligence_by_tf: dict[str, dict[str, Any]] = {}

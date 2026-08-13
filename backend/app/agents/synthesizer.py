@@ -127,7 +127,6 @@ DECISION_JSON_SCHEMA: dict[str, Any] = {
                 "targets": {"type": "array", "items": {"type": "number"}, "minItems": 1},
             },
         },
-        "timeframe": {"type": "string"},
         "rationale": {"type": "string"},
         "invalidation": {
             "type": "string",
@@ -254,7 +253,11 @@ def _to_decision(payload: dict[str, Any], *, timeframe: str | None) -> DecisionO
             "plan_type": plan_type,
             "execution_state": execution_state,
             "levels": payload.get("levels"),
-            "timeframe": payload.get("timeframe") or timeframe,
+            # The caller's frame wins outright. The model is told which frame it
+            # is analysing; a reply naming a different one is a mistake, not a
+            # decision, and honouring it would label a plan with a chart it was
+            # not sized for.
+            "timeframe": timeframe or payload.get("timeframe"),
             "condition": payload.get("condition"),
             "validity_candles": payload.get("validity_candles"),
             "evidence": {

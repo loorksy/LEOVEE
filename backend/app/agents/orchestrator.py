@@ -38,7 +38,7 @@ from typing import Any
 from app.agents.errors import AgentStage, StageFailure, stage_failure_from_error
 from app.agents.pipeline import PipelineLedger
 from app.agents.prompts import PromptNotFound, constitution
-from app.agents.synthesizer import synthesize_decision
+from app.agents.synthesizer import SynthesizerFailureKind, synthesize_decision
 from app.agents.timeframe import (
     NoViableTimeframeError,
     TimeframeChoice,
@@ -94,6 +94,24 @@ class OrchestratorResult:
     provider: str | None = None
 
 
+#: Which operational fact each synthesizer failure actually reports. An
+#: ungrounded plan is a *model* problem and a missing key is a *deployment*
+#: problem; one label for both makes the trace useless for telling them apart.
+_DEGRADED_REASON_BY_KIND: dict[SynthesizerFailureKind, str] = {
+    SynthesizerFailureKind.LLM_NOT_CONFIGURED: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_AUTH: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_RATE_LIMIT: "LLM_RATE_LIMITED",
+    SynthesizerFailureKind.PROVIDER_UNAVAILABLE: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_BAD_REQUEST: "LLM_BAD_REQUEST",
+    SynthesizerFailureKind.MALFORMED_OUTPUT: "MODEL_OUTPUT_INVALID",
+    SynthesizerFailureKind.INVALID_PLAN: "MODEL_PLAN_INVALID",
+    SynthesizerFailureKind.LEVELS_NOT_GROUNDED: "LEVELS_NOT_GROUNDED",
+    SynthesizerFailureKind.REPAIR_EXHAUSTED: "MODEL_OUTPUT_INVALID",
+    SynthesizerFailureKind.TIMEOUT: "LLM_TIMEOUT",
+    SynthesizerFailureKind.UNKNOWN: "LLM_UNAVAILABLE",
+}
+
+
 def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str, Any]:
     """Spec §95: analysis-path failures resolve to NO_TRADE — never a soft BUY/SELL."""
     payload: dict[str, Any] = {
@@ -147,10 +165,18 @@ async def run_analysis_orchestrator(
     visual_evidence: list[dict[str, Any]] | None = None,
     tool_context: ToolContext | None = None,
 ) -> OrchestratorResult:
-    if not candles:
-        raise ValueError("Analysis requires at least one stored candle")
-
     run_id = uuid.uuid4()
+    if not candles:
+        # A provider that returned nothing, or a symbol with no stored history.
+        # An exception here becomes a 500 with no explanation; the honest answer
+        # is the same one every other missing input gets.
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive={"symbol": symbol, "candle_count": 0},
+            decision=fail_closed_no_trade("NO_CANDLES", detail="no stored candles for this symbol"),
+            narrative={"degraded_reason": "NO_CANDLES"},
+        )
+
     ledger = PipelineLedger()
     perceive = {"symbol": symbol, "candle_count": len(candles)}
     recall = {"memories": memories or [], "count": len(memories or [])}
@@ -238,7 +264,14 @@ async def run_analysis_orchestrator(
     stop_distance = atr * policy.stop_atr_multiple
     entry = Decimal(str(entry_f))
     stop = entry - Decimal(str(stop_distance))
-    risk = run_risk_engine(entry=entry, stop=stop)
+    risk = run_risk_engine(
+        entry=entry,
+        stop=stop,
+        targets=[entry + Decimal(str(stop_distance * r)) for r in policy.target_r],
+        # Gold, not a currency pair: without the symbol the pip size defaults to
+        # an FX convention and every pip figure is out by a hundred.
+        symbol=symbol,
+    )
 
     plan_sanity = run_plan_sanity_engine(
         entry=entry_f,
@@ -364,6 +397,15 @@ async def run_analysis_orchestrator(
             moment=as_of,
         )
         engines["plan_sanity"] = model_sanity
+        # Re-priced from the model's own levels. Leaving the geometric figure in
+        # place would publish a long's risk beside a short's plan, and nothing
+        # downstream compares them.
+        engines["risk"] = run_risk_engine(
+            entry=Decimal(str(model_plan.levels.entry)),
+            stop=Decimal(str(model_plan.levels.stop)),
+            targets=[Decimal(str(t)) for t in model_plan.levels.targets],
+            symbol=symbol,
+        )
         if not model_sanity["viable"]:
             return OrchestratorResult(
                 agent_run_id=run_id,
@@ -382,6 +424,10 @@ async def run_analysis_orchestrator(
                 prompt_hash=prompt_hash,
             )
         decision = model_plan.model_dump(mode="json")
+        # The frame is the selector's answer, not the model's. D11 gives the
+        # choice to the agent's *analysis*; letting the reply name any frame
+        # string would publish a plan sized for one chart and labelled another.
+        decision["timeframe"] = decision_timeframe.value
         decision["timeframe_rationale"] = choice.rationale
         model_name, provider_name = outcome.model, outcome.provider
         narrative = {
@@ -400,10 +446,19 @@ async def run_analysis_orchestrator(
         model_name = provider_name = None
         if outcome.failure is not None:
             ledger.failures.append(outcome.failure)
-        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=outcome.detail)
+        # The kind is the reason. Collapsing every synthesizer failure into
+        # LLM_UNAVAILABLE made an ungrounded plan indistinguishable from an
+        # unconfigured provider in `agent_runs.error`, which is the one place an
+        # operator looks to tell a model problem from a deployment problem.
+        reason = (
+            _DEGRADED_REASON_BY_KIND.get(outcome.kind, "LLM_UNAVAILABLE")
+            if outcome.kind is not None
+            else "LLM_UNAVAILABLE"
+        )
+        decision = fail_closed_no_trade(reason, detail=outcome.detail)
         narrative = {
             "llm_unavailable": outcome.detail,
-            "degraded_reason": "LLM_UNAVAILABLE",
+            "degraded_reason": reason,
             "failure_kind": outcome.kind.value if outcome.kind else None,
             "attempts": outcome.attempts,
             "repairs": outcome.repairs,

@@ -109,3 +109,26 @@ def test_every_engine_has_a_persistence_destination() -> None:
 
 def test_the_two_destinations_do_not_overlap() -> None:
     assert not (MARKET_ARTIFACT_ENGINES & RUN_SCOPED_ENGINES)
+
+
+def test_every_degraded_reason_the_orchestrator_emits_is_in_the_contract() -> None:
+    """A reason the schema cannot express is a reason nothing downstream can act on.
+
+    The orchestrator builds its fail-closed payload as a raw dict, so a new
+    reason string will not fail validation at the point it is written — it fails
+    later, wherever something tries to parse the decision, or not at all. This
+    keeps the two lists in step.
+    """
+    import re
+    from pathlib import Path
+
+    from app.agents.orchestrator import _DEGRADED_REASON_BY_KIND
+    from app.schemas.decision import DegradedReason
+
+    known = {reason.value for reason in DegradedReason}
+    assert set(_DEGRADED_REASON_BY_KIND.values()) <= known
+
+    source = (Path(__file__).resolve().parents[2] / "agents" / "orchestrator.py").read_text()
+    literal_reasons = set(re.findall(r'fail_closed_no_trade\(\s*"([A-Z_]+)"', source))
+    unknown = literal_reasons - known
+    assert not unknown, f"orchestrator emits degraded reasons the contract lacks: {sorted(unknown)}"

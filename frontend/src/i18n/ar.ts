@@ -52,4 +52,15 @@ export const ar = {
   "common.cancel": "إلغاء",
   "common.save": "حفظ",
   "common.loading": "جارٍ التحميل…",
+
+  "telegram.title": "ربط تلجرام",
+  "telegram.intro": "اربط حسابك لتتحدث مع الوكيل من تلجرام. **لن يصلك شيء ما لم تسأل** — لا تنبيهات ولا ملخّصات.",
+  "telegram.generate": "توليد رمز ربط",
+  "telegram.codeLabel": "أرسل هذا الرمز للوكيل في تلجرام",
+  "telegram.expires": "ينتهي في",
+  "telegram.linked": "الحسابات المربوطة",
+  "telegram.none": "لا يوجد حساب مربوط.",
+  "telegram.revoke": "فكّ الربط",
+  "telegram.lastMessage": "آخر رسالة",
+  "telegram.never": "لم يراسل بعد",
 } as const;

@@ -59,6 +59,7 @@ async def test_a_run_and_its_traces_are_written(db_session: AsyncSession) -> Non
     run = await persist_agent_run(
         db_session, tenant, result=result, symbol="xauusd", started_at=datetime.now(UTC)
     )
+    assert run is not None, "the run was not written"
 
     assert run.id == result.agent_run_id
     assert run.symbol == "XAUUSD"
@@ -114,6 +115,7 @@ async def test_a_degraded_run_records_why_and_still_counts_as_completed(
     )
 
     run = await persist_agent_run(db_session, tenant, result=result, symbol="XAUUSD")
+    assert run is not None, "the run was not written"
     assert run.status.value == "COMPLETED"
     assert run.error == "ENGINE_UNAVAILABLE"
     assert run.decision == "NO_TRADE"
@@ -163,6 +165,7 @@ async def test_a_run_is_invisible_from_another_workspace(db_session: AsyncSessio
     owner = await _tenant(db_session, email="owner@example.com", slug="owner-org")
     result = _result()
     run = await persist_agent_run(db_session, owner, result=result, symbol="XAUUSD")
+    assert run is not None, "the run was not written"
     await db_session.commit()
 
     # Binds RLS to a different workspace as a side effect.

@@ -89,13 +89,18 @@ def _key(name: str, arguments: dict[str, Any]) -> str:
 
 
 def _result_message(call: LLMToolCall, payload: dict[str, Any]) -> LLMMessage:
+    """A tool result as *structure*, not as JSON stuffed into a body.
+
+    The id has to be a field. Embedding it in the content produced a
+    conversation both providers rejected on the second turn — Anthropic takes
+    only user and assistant roles, OpenAI wants `tool_call_id` as a field — and
+    the rejection surfaced as a malformed-request error far from this function.
+    """
     return LLMMessage(
         role="tool",
-        content=json.dumps(
-            {"tool_call_id": call.id, "name": call.name, "result": payload},
-            ensure_ascii=False,
-            default=str,
-        ),
+        content=json.dumps(payload, ensure_ascii=False, default=str),
+        tool_call_id=call.id,
+        tool_name=call.name,
     )
 
 
@@ -152,7 +157,15 @@ async def run_tool_loop(
             )
 
         iteration += 1
-        conversation.append(LLMMessage(role="assistant", content=response.content or ""))
+        # The assistant turn must carry the calls it made, or the results that
+        # follow answer nothing and the provider rejects the pairing.
+        conversation.append(
+            LLMMessage(
+                role="assistant",
+                content=response.content or "",
+                tool_calls=list(response.tool_calls),
+            )
+        )
 
         answered: set[str] = set()
         for call in response.tool_calls:

@@ -43,4 +43,15 @@ export const en: Dictionary = {
   "common.cancel": "Cancel",
   "common.save": "Save",
   "common.loading": "Loading…",
+
+  "telegram.title": "Telegram",
+  "telegram.intro": "Link your account to talk to the agent from Telegram. **Nothing is ever sent unless you ask** — no alerts, no summaries.",
+  "telegram.generate": "Generate a link code",
+  "telegram.codeLabel": "Send this code to the agent on Telegram",
+  "telegram.expires": "Expires",
+  "telegram.linked": "Linked accounts",
+  "telegram.none": "No account linked.",
+  "telegram.revoke": "Unlink",
+  "telegram.lastMessage": "Last message",
+  "telegram.never": "Never messaged",
 };

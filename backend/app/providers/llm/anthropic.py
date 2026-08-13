@@ -9,6 +9,7 @@ from app.providers.llm.common import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_TIMEOUT_SECONDS,
     parse_structured_content,
+    to_anthropic_messages,
     usage_from_anthropic,
     with_timeout_retry,
 )
@@ -38,8 +39,7 @@ class AnthropicProvider:
 
     def _split_messages(self, messages: list[LLMMessage]) -> tuple[str, list[dict[str, Any]]]:
         system_msg = next((m.content for m in messages if m.role == "system"), "")
-        user_msgs = [{"role": m.role, "content": m.content} for m in messages if m.role != "system"]
-        return system_msg, user_msgs
+        return system_msg, to_anthropic_messages(messages)
 
     async def complete(
         self,

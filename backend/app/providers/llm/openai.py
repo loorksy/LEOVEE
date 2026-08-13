@@ -10,6 +10,8 @@ from app.providers.llm.common import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_TIMEOUT_SECONDS,
     parse_structured_content,
+    to_openai_messages,
+    to_openai_tools,
     usage_from_openai,
     with_timeout_retry,
 )
@@ -66,7 +68,7 @@ class OpenAIProvider:
         max_retries: int | None = None,
     ) -> LLMResponse:
         client = self._get_client()
-        payload: list[dict[str, str]] = [{"role": m.role, "content": m.content} for m in messages]
+        payload = to_openai_messages(messages)
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": payload,
@@ -75,7 +77,7 @@ class OpenAIProvider:
             # Prefer native JSON mode when requesting structured output.
             kwargs["response_format"] = {"type": "json_object"}
         if tools:
-            kwargs["tools"] = tools
+            kwargs["tools"] = to_openai_tools(tools)
             kwargs["tool_choice"] = "auto"
 
         async def _call() -> Any:
@@ -119,7 +121,7 @@ class OpenAIProvider:
         timeout_seconds: float | None = None,
     ) -> AsyncIterator[LLMStreamChunk]:
         client = self._get_client()
-        payload: list[dict[str, str]] = [{"role": m.role, "content": m.content} for m in messages]
+        payload = to_openai_messages(messages)
 
         async def _open() -> Any:
             return await client.chat.completions.create(

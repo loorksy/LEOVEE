@@ -88,7 +88,7 @@ async def test_a_repeated_identical_call_is_answered_from_cache_and_says_so() ->
     result = await _run(model)
     assert [c.cached for c in result.calls] == [False, True]
     cached_message = json.loads(result.messages[-1].content)
-    assert "note" in cached_message["result"]
+    assert "note" in cached_message
 
 
 async def test_the_iteration_cap_is_absolute() -> None:
@@ -126,10 +126,12 @@ def test_an_orphaned_tool_call_is_given_an_explicit_error_result() -> None:
     ]
     repaired = repair_tool_pairs([], announced, answered={"a"})
     assert len(repaired) == 1
+    # The id is a field, not a substring of the body: both providers require it
+    # that way and reject the conversation otherwise.
+    assert repaired[0].tool_call_id == "b"
     payload = json.loads(repaired[0].content)
-    assert payload["tool_call_id"] == "b"
-    assert payload["result"]["error"] == "tool_result_missing"
-    assert "Do not assume" in payload["result"]["detail"]
+    assert payload["error"] == "tool_result_missing"
+    assert "Do not assume" in payload["detail"]
 
 
 def test_a_fully_answered_turn_needs_no_repair() -> None:

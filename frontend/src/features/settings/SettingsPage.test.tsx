@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithProviders } from "@/test/renderWithProviders";
 import { SettingsPage } from "./SettingsPage";
 
 const getEntitlements = vi.fn();
@@ -9,13 +9,16 @@ vi.mock("../../api/billing", () => ({
   getEntitlements: (...args: unknown[]) => getEntitlements(...args),
 }));
 
+vi.mock("../../api/telegram", () => ({
+  listLinks: () => Promise.resolve([]),
+  createLinkCode: () => Promise.resolve({ code: "", expires_at: "", note: "" }),
+  revokeLink: () => Promise.resolve(),
+}));
+
+// The shared harness, not a private one: it carries the locale provider, and a
+// page-local wrapper is exactly how this test came to lack it.
 function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <SettingsPage />
-    </QueryClientProvider>,
-  );
+  return renderWithProviders(<SettingsPage />);
 }
 
 describe("SettingsPage", () => {

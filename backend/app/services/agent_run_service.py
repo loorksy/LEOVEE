@@ -32,6 +32,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import OrchestratorResult
@@ -40,6 +41,8 @@ from app.core.tenant import TenantContext
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.learning import AgentRun, AgentRunStatus, AgentTrace
 from app.services.prompt_registry_service import record_prompt_version
+
+logger = structlog.get_logger(__name__)
 
 __all__ = ["persist_agent_run", "TRACE_EVENT_TYPES"]
 
@@ -63,8 +66,47 @@ async def persist_agent_run(
     started_at: datetime | None = None,
     user_id: uuid.UUID | None = None,
     prompt: Prompt | None = None,
+) -> AgentRun | None:
+    """Write the run and its traces. Returns None if the write failed.
+
+    It really does not raise, which the docstring used to claim without the code
+    backing it. The analysis has already completed by the time this runs, and
+    losing a finished recommendation over a bookkeeping row is the wrong trade —
+    but a failure that vanishes silently is the wrong trade in the other
+    direction, so it is logged at warning with the run id and the caller can see
+    that nothing was written.
+    """
+    try:
+        return await _persist(
+            session,
+            tenant,
+            result=result,
+            symbol=symbol,
+            trigger=trigger,
+            started_at=started_at,
+            user_id=user_id,
+            prompt=prompt,
+        )
+    except Exception as exc:  # noqa: BLE001 — the analysis must survive this
+        logger.warning(
+            "agent_run_persist_failed",
+            agent_run_id=str(result.agent_run_id),
+            error=str(exc)[:300],
+        )
+        return None
+
+
+async def _persist(
+    session: AsyncSession,
+    tenant: TenantContext,
+    *,
+    result: OrchestratorResult,
+    symbol: str,
+    trigger: str,
+    started_at: datetime | None,
+    user_id: uuid.UUID | None,
+    prompt: Prompt | None,
 ) -> AgentRun:
-    """Write the run and its traces. Never raises into the analysis path."""
     await bind_workspace_rls(session, tenant)
 
     if prompt is not None:
