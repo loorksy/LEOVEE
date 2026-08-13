@@ -52,14 +52,18 @@ ENGINE_STATUS: dict[str, EngineStatus] = {
     # Genuine arithmetic over its inputs (garbage-in still applies).
     "risk": EngineStatus.IMPLEMENTED,
     "decision": EngineStatus.IMPLEMENTED,
-    # M4 — bias is currently "last close > first close", which is not structure.
-    "structure": EngineStatus.PLACEHOLDER,
-    # M4 — only inspects the final bar; no equal-high tolerance by instrument.
-    "liquidity": EngineStatus.PLACEHOLDER,
-    # M4 — fabricates one demand and one supply zone from the last bar's range.
-    "zones": EngineStatus.PLACEHOLDER,
-    # M4 — hand-chosen confidences (0.55 / 0.35 / 0.4 / 0.2).
-    "scenarios": EngineStatus.PLACEHOLDER,
+    # Ported in M4 over the M2 primitives: swing detection, level clustering
+    # and trend inference.
+    "structure": EngineStatus.IMPLEMENTED,
+    # Sweep detection and equal-level clustering, with the tolerance derived
+    # from gold's pip size rather than a constant.
+    "liquidity": EngineStatus.IMPLEMENTED,
+    # Imbalance-origin zones, scored on impulse, respect and freshness, with
+    # consumed zones dropped.
+    "zones": EngineStatus.IMPLEMENTED,
+    # Two directional scenarios plus an invalidation scenario (ADR 0002), with
+    # confidence derived from evidence agreement rather than chosen by hand.
+    "scenarios": EngineStatus.IMPLEMENTED,
     # M4 — derived from the placeholder engines above.
     "market_intelligence": EngineStatus.PLACEHOLDER,
     "mtf": EngineStatus.PLACEHOLDER,

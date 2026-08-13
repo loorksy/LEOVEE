@@ -74,8 +74,6 @@ async def run_analysis_orchestrator(
     structure = run_structure_engine(bars)
     liquidity = run_liquidity_engine(bars)
     zones = run_zones_engine(bars)
-    scenarios = run_scenario_engine(structure, volatility, liquidity)
-
     intelligence = run_market_intelligence_engine(bars)
     if mtf_context and "mtf" in mtf_context:
         mtf = mtf_context["mtf"]
@@ -83,6 +81,10 @@ async def run_analysis_orchestrator(
     else:
         intelligence_by_tf = {"H1": intelligence}
         mtf = run_mtf_engine(intelligence_by_tf)
+
+    # Scenarios run last among the evidence engines: their confidence is the
+    # agreement between the others, so they need all of them.
+    scenarios = run_scenario_engine(structure, volatility, liquidity, zones, mtf)
 
     evidence = {
         "volatility": volatility,

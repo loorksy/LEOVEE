@@ -19,7 +19,14 @@ from datetime import UTC, datetime, timedelta
 
 from app.engines.bar import OHLCBar
 
-__all__ = ["EPOCH", "bar", "flat_bars", "rising_bars", "falling_bars"]
+__all__ = [
+    "EPOCH",
+    "bar",
+    "flat_bars",
+    "rising_bars",
+    "falling_bars",
+    "swinging_bars",
+]
 
 # A fixed start time: fixtures must be reproducible, so nothing here reads the
 # clock. Golden comparisons would drift on every run otherwise.
@@ -100,3 +107,46 @@ def flat_bars(
     interval: timedelta = timedelta(hours=1),
 ) -> list[OHLCBar]:
     return _series(count, start=price, step=0.0, spread=spread, interval=interval)
+
+
+def swinging_bars(
+    legs: int = 12,
+    *,
+    start: float = 2000.0,
+    drift: float = 4.0,
+    swing: float = 6.0,
+    bars_per_leg: int = 5,
+    spread: float = 0.5,
+    interval: timedelta = timedelta(minutes=15),
+) -> list[OHLCBar]:
+    """A trend that actually swings, which a monotonic ramp does not.
+
+    `rising_bars` climbs every bar, so no bar is a local extreme and the swing
+    detectors correctly find nothing — a straight line has no structure. Trend
+    and level tests need pullbacks: price advances by `drift` per leg while
+    oscillating `swing` around it, so higher highs and higher lows exist to be
+    detected.
+
+    `drift` is signed — pass a negative value for a downtrend.
+    """
+    bars: list[OHLCBar] = []
+    index = 0
+    for leg in range(legs):
+        base = start + drift * leg
+        going_up = leg % 2 == 0
+        for step in range(bars_per_leg):
+            fraction = step / max(1, bars_per_leg - 1)
+            offset = swing * (fraction if going_up else 1 - fraction)
+            price = base + offset
+            bars.append(
+                OHLCBar(
+                    ts=EPOCH + interval * index,
+                    open=price,
+                    high=price + spread,
+                    low=price - spread,
+                    close=price,
+                    volume=100.0 + index,
+                )
+            )
+            index += 1
+    return bars
