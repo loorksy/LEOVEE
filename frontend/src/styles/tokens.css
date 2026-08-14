@@ -21,7 +21,9 @@
   --buy: #15803d;
   --sell: #dc2626;
   --success: #15803d;
-  --warning: #d97706;
+  /* amber-700, not 600: #d97706 reads 3.19:1 on white — below AA for the text
+     this token colors (warnings are exactly the words that must stay legible). */
+  --warning: #b45309;
   --info: #0284c7;
   --destructive: #dc2626;
 
@@ -36,9 +38,11 @@
   --border: #1f2937;
 
   --buy: #22c55e;
-  --sell: #ef4444;
+  /* red-400, not 500: #ef4444 reads 4.19:1 on the card surface — a sell label
+     inside a card is the commonest place this token renders. */
+  --sell: #f87171;
   --success: #22c55e;
   --warning: #f59e0b;
   --info: #38bdf8;
-  --destructive: #ef4444;
+  --destructive: #f87171;
 }

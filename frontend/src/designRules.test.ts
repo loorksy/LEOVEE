@@ -83,6 +83,73 @@ describe("colour goes through tokens", () => {
   });
 });
 
+describe("AA contrast on the trading palette", () => {
+  // The M10 exit criterion, mechanical: buy/sell/warning must stay legible as
+  // text on both surfaces in both modes. This ran red on its first execution —
+  // light warning was 3.19:1 and dark sell 4.19:1 on the card — so the tokens
+  // were retuned, not the threshold.
+  const tokensCss = FILES.find((file) => file.path === "src/styles/tokens.css");
+
+  function parseBlock(source: string, selector: string): Record<string, string> {
+    const match = source.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`));
+    if (!match) return {};
+    const out: Record<string, string> = {};
+    for (const [, name, value] of match[1].matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})/g)) {
+      out[name] = value;
+    }
+    return out;
+  }
+
+  function luminance(hex: string): number {
+    const channel = (i: number) => {
+      const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  }
+
+  function contrast(a: string, b: string): number {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  //: Tokens that color text: AA normal text, 4.5:1.
+  const TEXT_TOKENS = ["foreground", "muted-foreground", "buy", "sell", "success", "warning", "destructive"];
+  //: Tokens that color UI components and large accents: AA non-text, 3:1.
+  const COMPONENT_TOKENS = ["info", "accent"];
+  const SURFACES = ["background", "card"];
+
+  function paletteFor(mode: string): Record<string, string> {
+    const light = parseBlock(tokensCss?.text ?? "", ":root");
+    if (mode === "light") return light;
+    // The cascade: a token the .dark block does not redefine inherits :root.
+    return { ...light, ...parseBlock(tokensCss?.text ?? "", "\\.dark") };
+  }
+
+  it("parses both palettes from the tokens file", () => {
+    expect(tokensCss).toBeDefined();
+    for (const palette of [paletteFor("light"), paletteFor("dark")]) {
+      for (const token of [...TEXT_TOKENS, ...COMPONENT_TOKENS, ...SURFACES]) {
+        expect(palette[token], token).toMatch(/^#[0-9a-fA-F]{6}$/);
+      }
+    }
+  });
+
+  it.each(["light", "dark"])("%s mode meets AA on every surface", (mode) => {
+    const palette = paletteFor(mode);
+    for (const surface of SURFACES) {
+      for (const token of TEXT_TOKENS) {
+        const ratio = contrast(palette[token], palette[surface]);
+        expect(ratio, `${mode} ${token} on ${surface}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const token of COMPONENT_TOKENS) {
+        const ratio = contrast(palette[token], palette[surface]);
+        expect(ratio, `${mode} ${token} on ${surface}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3.0);
+      }
+    }
+  });
+});
+
 describe("no static quick actions in chat", () => {
   it("the chat surface renders no hardcoded suggestion buttons", () => {
     // A non-negotiable inherited from the reference's system rules: canned
