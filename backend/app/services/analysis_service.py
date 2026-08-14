@@ -174,7 +174,7 @@ async def run_analysis(
         # Gives the decision stage the read-only tools: the digest it is sent is
         # deliberately partial, and this is how the elided detail stays
         # reachable instead of being reasoned around.
-        tool_context=ToolContext(session=session, symbol=symbol),
+        tool_context=ToolContext(session=session, symbol=symbol, tenant=tenant),
     )
     # The run is written before anything downstream can fail: a recommendation
     # that references an agent_run_id has to be able to find it, and a degraded

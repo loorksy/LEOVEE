@@ -21,11 +21,12 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.symbols import DEFAULT_SYMBOL, require_instrument
+from app.core.tenant import TenantContext
 from app.core.timeframes import ACTIVE_TIMEFRAMES, ANALYSIS_WINDOW_BARS
 from app.engines.bar import bars_from_candles
 from app.engines.primitives.indicators import adx, atr, bollinger, macd, rsi
@@ -38,13 +39,26 @@ __all__ = ["ToolContext", "ToolSpec", "TOOLS", "tool_definitions", "dispatch_too
 
 @dataclass(slots=True)
 class ToolContext:
-    """Everything a tool may touch. Deliberately small."""
+    """Everything a tool may touch. Deliberately small.
+
+    ``tenant`` is identity, not a filter: workspace-scoped tools require it so
+    the session can be RLS-bound, but no handler ever receives a workspace id
+    as an argument to filter by — row-level security is the only scoping, and a
+    tool cannot widen its own access by passing a different id (there is no
+    such parameter to pass).
+    """
 
     session: AsyncSession
     symbol: str = DEFAULT_SYMBOL
+    tenant: TenantContext | None = None
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[dict[str, Any]]]
+
+#: "platform" tools read shared market facts (candles, engines, news) and work
+#: without a workspace. "workspace" tools read tenant rows and refuse to run on
+#: an unbound context rather than silently returning another scope's answer.
+ToolScope = Literal["platform", "workspace"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +67,7 @@ class ToolSpec:
     description: str
     parameters: dict[str, Any]
     handler: ToolHandler
+    scope: ToolScope = "platform"
 
 
 def _timeframe(arguments: dict[str, Any], default: Timeframe = Timeframe.M15) -> Timeframe:
@@ -196,63 +211,85 @@ _TIMEFRAME_PARAM = {
     "description": "M1/M5/M15 are decision frames; H1/H4 are context only.",
 }
 
-TOOLS: dict[str, ToolSpec] = {
-    spec.name: spec
+_MARKET_TOOLS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        name="get_candles",
+        description="Raw OHLC candles for a timeframe, oldest first.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "symbol": _SYMBOL_PARAM,
+                "timeframe": _TIMEFRAME_PARAM,
+                "count": {"type": "integer", "description": "10–500 candles."},
+            },
+        },
+        handler=_get_candles,
+    ),
+    ToolSpec(
+        name="get_indicators",
+        description="RSI, ATR, ADX, MACD and Bollinger bands for a timeframe.",
+        parameters={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
+        },
+        handler=_get_indicators,
+    ),
+    ToolSpec(
+        name="get_structure",
+        description="Swing structure, clustered support and resistance levels.",
+        parameters={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
+        },
+        handler=_get_structure,
+    ),
+    ToolSpec(
+        name="get_chart_image",
+        description=(
+            "PNG charts of the analysed frame and the two above it, drawn "
+            "from the same candles the other tools return."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
+        },
+        handler=_get_chart_image,
+    ),
+    ToolSpec(
+        name="get_data_coverage",
+        description="Stored history range per timeframe.",
+        parameters={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_PARAM},
+        },
+        handler=_get_data_coverage,
+    ),
+)
+
+
+def _build_registry() -> dict[str, ToolSpec]:
+    """Merge every module's contributions, refusing duplicate names.
+
+    A silent overwrite here would mean two tools with the same name and
+    different behaviour depending on import order — the exact class of bug the
+    single-registry design exists to rule out.
+    """
+    from app.agents.tools import engine_tools, learning_tools, record_tools
+
+    merged: dict[str, ToolSpec] = {}
     for spec in (
-        ToolSpec(
-            name="get_candles",
-            description="Raw OHLC candles for a timeframe, oldest first.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "symbol": _SYMBOL_PARAM,
-                    "timeframe": _TIMEFRAME_PARAM,
-                    "count": {"type": "integer", "description": "10–500 candles."},
-                },
-            },
-            handler=_get_candles,
-        ),
-        ToolSpec(
-            name="get_indicators",
-            description="RSI, ATR, ADX, MACD and Bollinger bands for a timeframe.",
-            parameters={
-                "type": "object",
-                "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
-            },
-            handler=_get_indicators,
-        ),
-        ToolSpec(
-            name="get_structure",
-            description="Swing structure, clustered support and resistance levels.",
-            parameters={
-                "type": "object",
-                "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
-            },
-            handler=_get_structure,
-        ),
-        ToolSpec(
-            name="get_chart_image",
-            description=(
-                "PNG charts of the analysed frame and the two above it, drawn "
-                "from the same candles the other tools return."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {"symbol": _SYMBOL_PARAM, "timeframe": _TIMEFRAME_PARAM},
-            },
-            handler=_get_chart_image,
-        ),
-        ToolSpec(
-            name="get_data_coverage",
-            description="Stored history range per timeframe.",
-            parameters={
-                "type": "object",
-                "properties": {"symbol": _SYMBOL_PARAM},
-            },
-            handler=_get_data_coverage,
-        ),
-    )
-}
+        *_MARKET_TOOLS,
+        *engine_tools.TOOLS,
+        *record_tools.TOOLS,
+        *learning_tools.TOOLS,
+    ):
+        if spec.name in merged:
+            raise RuntimeError(f"duplicate tool name: {spec.name}")
+        merged[spec.name] = spec
+    return merged
+
+
+TOOLS: dict[str, ToolSpec] = _build_registry()
 
 
 def tool_definitions() -> list[dict[str, Any]]:
@@ -279,6 +316,10 @@ async def dispatch_tool(
     spec = TOOLS.get(name)
     if spec is None:
         return {"error": "unknown_tool", "detail": name, "available": sorted(TOOLS)}
+    if spec.scope == "workspace" and context.tenant is None:
+        # Refusing beats answering: a workspace read on an unbound session
+        # would either error deep in RLS or, worse, appear to succeed empty.
+        return {"error": "workspace_context_required", "detail": name}
     try:
         return await spec.handler(context, arguments or {})
     except Exception as exc:  # noqa: BLE001 — surfaced to the model, not raised
