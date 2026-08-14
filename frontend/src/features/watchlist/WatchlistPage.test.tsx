@@ -34,12 +34,12 @@ describe("WatchlistPage", () => {
 
     renderWithProviders(<WatchlistPage />);
 
-    expect(await screen.findByText(/no watchlists yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("watchlist-empty")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/new watchlist name/i), {
+    fireEvent.change(screen.getByTestId("new-watchlist-name"), {
       target: { value: "Metals" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /create watchlist/i }));
+    fireEvent.click(screen.getByTestId("create-watchlist"));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledWith("Metals"));
   });

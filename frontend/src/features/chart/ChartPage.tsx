@@ -25,11 +25,13 @@ import {
   applyAnnotationEvent,
 } from "@/features/chart/annotationStream";
 import { BACKEND_TIMEFRAMES, backendTimeframeToChart } from "@/features/chart/timeframe";
+import { useLocale } from "@/i18n/context";
 
 
 const DEFAULT_TIMEFRAME = "H1";
 
 export function ChartPage() {
+  const { t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const symbol = (searchParams.get("symbol") ?? DEFAULT_SYMBOL).toUpperCase();
   const timeframe = searchParams.get("timeframe") ?? DEFAULT_TIMEFRAME;
@@ -125,10 +127,10 @@ export function ChartPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-100">AI Analyst — Chart</h1>
+        <h1 className="text-xl font-semibold text-slate-100">{t("chart.title")}</h1>
         <div className="flex items-center gap-2 text-sm">
           <label htmlFor="chart-symbol" className="sr-only">
-            Symbol
+            {t("common.symbol")}
           </label>
           <input
             id="chart-symbol"
@@ -143,7 +145,7 @@ export function ChartPage() {
             className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
           />
           <label htmlFor="chart-timeframe" className="sr-only">
-            Timeframe
+            {t("common.timeframe")}
           </label>
           <select
             id="chart-timeframe"
@@ -166,7 +168,7 @@ export function ChartPage() {
         </div>
       </header>
       {candlesQuery.isError && (
-        <p className="text-amber-400">Could not load candles for {symbol}.</p>
+        <p className="text-amber-400">{t("chart.error.candles", { symbol })}</p>
       )}
       <div
         data-testid="chart-container"
@@ -180,8 +182,7 @@ export function ChartPage() {
         />
       </div>
       <p className="text-xs text-slate-500" data-testid="annotation-count">
-        {annotationCount} annotation(s) loaded · live updates via /ws/v1/stream
-        (channels=annotations)
+        {t("chart.annotations.count", { count: annotationCount })}
       </p>
     </div>
   );

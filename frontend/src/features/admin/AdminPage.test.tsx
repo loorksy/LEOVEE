@@ -37,9 +37,7 @@ describe("AdminPage permission matrix", () => {
 
     renderWithProviders(<AdminPage />);
 
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Admin & billing" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("admin-title")).toBeInTheDocument();
     await screen.findByTestId("admin-access-restricted");
 
     expect(screen.queryByTestId("admin-overview-panel")).not.toBeInTheDocument();
@@ -75,7 +73,7 @@ describe("AdminPage permission matrix", () => {
 
     await screen.findByTestId("admin-platform-only-hint");
     await waitFor(() => expect(auditSpy).toHaveBeenCalled());
-    expect(await screen.findByText(/Platform audit — users: 3/)).toBeInTheDocument();
+    expect(await screen.findByTestId("admin-audit-summary")).toHaveTextContent("3");
 
     expect(screen.queryByTestId("admin-overview-panel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-conversations-panel")).not.toBeInTheDocument();
@@ -131,8 +129,9 @@ describe("AdminPage permission matrix", () => {
     expect(await screen.findByTestId("admin-observability-panel")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-conversation-c-1")).toBeInTheDocument();
     expect(await screen.findByTestId("admin-agent-run-r-1")).toBeInTheDocument();
-    expect(await screen.findByTestId("secret-status-OANDA_API_TOKEN")).toHaveTextContent(
-      "configured",
+    expect(await screen.findByTestId("secret-status-OANDA_API_TOKEN")).toHaveAttribute(
+      "data-configured",
+      "true",
     );
 
     expect(screen.queryByTestId("admin-access-restricted")).not.toBeInTheDocument();

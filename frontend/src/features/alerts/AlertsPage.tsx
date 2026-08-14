@@ -5,8 +5,10 @@ import { createAlert, listAlerts, triggerAlert } from "@/api/alerts";
 import { useWorkspaceId } from "@/hooks/useWorkspaceId";
 import { useNotificationsStream } from "@/features/alerts/useNotificationsStream";
 import type { NotificationData } from "@/features/alerts/types";
+import { useLocale } from "@/i18n/context";
 
 export function AlertsPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const workspaceQuery = useWorkspaceId();
 
@@ -46,7 +48,7 @@ export function AlertsPage() {
       await queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
     onError: (err) => {
-      setTriggerError(err instanceof Error ? err.message : "Alert condition not met");
+      setTriggerError(err instanceof Error ? err.message : t("alerts.error.notMet"));
     },
   });
 
@@ -55,11 +57,8 @@ export function AlertsPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Alerts</h1>
-        <p className="mt-1 text-slate-400">
-          Create price alerts. Live evaluation runs from market ticks on the worker — not from the
-          UI test control below.
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("alerts.title")}</h1>
+        <p className="mt-1 text-slate-400">{t("alerts.intro")}</p>
       </header>
 
       <form
@@ -71,7 +70,7 @@ export function AlertsPage() {
       >
         <div className="flex flex-col">
           <label htmlFor="alert-symbol" className="text-xs text-slate-500">
-            Symbol
+            {t("common.symbol")}
           </label>
           <input
             id="alert-symbol"
@@ -82,7 +81,7 @@ export function AlertsPage() {
         </div>
         <div className="flex flex-col">
           <label htmlFor="alert-op" className="text-xs text-slate-500">
-            Condition
+            {t("alerts.condition")}
           </label>
           <select
             id="alert-op"
@@ -90,14 +89,14 @@ export function AlertsPage() {
             onChange={(event) => setOp(event.target.value as "gte" | "lte" | "eq")}
             className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
           >
-            <option value="gte">Price ≥</option>
-            <option value="lte">Price ≤</option>
-            <option value="eq">Price =</option>
+            <option value="gte">{t("alerts.op.gte")}</option>
+            <option value="lte">{t("alerts.op.lte")}</option>
+            <option value="eq">{t("alerts.op.eq")}</option>
           </select>
         </div>
         <div className="flex flex-col">
           <label htmlFor="alert-threshold" className="text-xs text-slate-500">
-            Threshold
+            {t("alerts.threshold")}
           </label>
           <input
             id="alert-threshold"
@@ -108,18 +107,21 @@ export function AlertsPage() {
         </div>
         <button
           type="submit"
+          data-testid="create-alert"
           disabled={createMutation.isPending}
           className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          Create alert
+          {t("alerts.create")}
         </button>
       </form>
 
-      {alertsQuery.isLoading && <p className="text-slate-400">Loading alerts…</p>}
-      {alertsQuery.isError && <p className="text-amber-400">Could not load alerts.</p>}
+      {alertsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
+      {alertsQuery.isError && <p className="text-amber-400">{t("common.error.load")}</p>}
       {triggerError && <p className="text-amber-400">{triggerError}</p>}
       {!alertsQuery.isLoading && alerts.length === 0 && (
-        <p className="text-slate-400">No alerts yet — create one above.</p>
+        <p className="text-slate-400" data-testid="alerts-empty">
+          {t("alerts.empty")}
+        </p>
       )}
 
       <ul className="space-y-2">
@@ -134,32 +136,36 @@ export function AlertsPage() {
                 {alert.type} · {JSON.stringify(alert.condition)}
               </p>
               <p className="text-xs text-slate-500">
-                {alert.active ? "Active" : "Inactive"}
-                {alert.last_triggered_at ? ` · last triggered ${alert.last_triggered_at}` : ""}
+                {alert.active ? t("alerts.active") : t("alerts.inactive")}
+                {alert.last_triggered_at
+                  ? ` · ${t("alerts.lastTriggered", { time: alert.last_triggered_at })}`
+                  : ""}
               </p>
             </div>
             <div
               className="flex flex-col items-end gap-1 rounded border border-dashed border-amber-800/70 bg-amber-950/20 p-2"
               data-testid={`alert-ui-test-${alert.id}`}
             >
-              <p className="max-w-[14rem] text-right text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                UI test control — not live evaluation
+              <p className="max-w-[14rem] text-end text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                {t("alerts.uiTest.label")}
               </p>
               <div className="flex items-center gap-2">
                 <label htmlFor={`trigger-price-${alert.id}`} className="sr-only">
-                  UI test price (not a live market quote) for {alert.type} alert
+                  {t("alerts.uiTest.priceLabel")}
                 </label>
                 <input
                   id={`trigger-price-${alert.id}`}
+                  data-testid={`trigger-price-${alert.id}`}
                   value={triggerPrices[alert.id] ?? ""}
                   onChange={(event) =>
                     setTriggerPrices((prev) => ({ ...prev, [alert.id]: event.target.value }))
                   }
-                  placeholder="test price"
+                  placeholder={t("common.price")}
                   className="w-24 rounded border border-amber-900/60 bg-slate-900 px-2 py-1 text-slate-100"
                 />
                 <button
                   type="button"
+                  data-testid={`fire-ui-test-${alert.id}`}
                   onClick={() =>
                     triggerMutation.mutate({
                       id: alert.id,
@@ -168,7 +174,7 @@ export function AlertsPage() {
                   }
                   className="rounded border border-amber-700/70 px-3 py-1 text-xs font-medium text-amber-100 hover:bg-amber-950/50"
                 >
-                  Fire UI test (not live)
+                  {t("alerts.uiTest.fire")}
                 </button>
               </div>
             </div>
@@ -177,12 +183,9 @@ export function AlertsPage() {
       </ul>
 
       <section>
-        <h2 className="text-lg font-semibold text-slate-100">Notifications</h2>
+        <h2 className="text-lg font-semibold text-slate-100">{t("alerts.notifications")}</h2>
         {notifications.length === 0 && (
-          <p className="mt-2 text-sm text-slate-400">
-            No notifications yet. Live alerts arrive from market evaluation; the UI test control
-            only exercises the notification fan-out path.
-          </p>
+          <p className="mt-2 text-sm text-slate-400">{t("alerts.notifications.empty")}</p>
         )}
         <ul className="mt-2 space-y-2" data-testid="notification-list">
           {notifications.map((note) => (

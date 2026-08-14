@@ -32,6 +32,6 @@ describe("RecommendationsPage", () => {
 
     renderWithProviders(<RecommendationsPage />);
 
-    expect(await screen.findByText(/no recommendations yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("recommendations-empty")).toBeInTheDocument();
   });
 });

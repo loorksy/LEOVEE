@@ -30,7 +30,7 @@ describe("MemoryPage", () => {
 
     renderWithProviders(<MemoryPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /delete/i }));
+    fireEvent.click(await screen.findByTestId("memory-delete-mem-1"));
 
     expect(deleteSpy).toHaveBeenCalledWith("mem-1");
     expect(await screen.findByTestId("recompute-stats")).toHaveTextContent("embeddings_indexed");

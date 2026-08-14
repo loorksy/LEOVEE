@@ -1,18 +1,21 @@
 import { type FormEvent, useEffect, useState } from "react";
 import type { AdminSecretItem } from "@/features/admin/types";
+import { useLocale } from "@/i18n/context";
+import type { TranslationKey } from "@/i18n";
 
-const LABELS: Record<string, string> = {
-  OANDA_API_TOKEN: "OANDA API token (practice)",
-  OANDA_ACCOUNT_ID: "OANDA account id (practice)",
-  OANDA_ENVIRONMENT: "OANDA environment",
-  ANTHROPIC_API_KEY: "Anthropic API key",
-  OPENAI_API_KEY: "OpenAI API key",
-  OPENROUTER_API_KEY: "OpenRouter API key (free-model rotation)",
-  FINNHUB_API_KEY: "Finnhub API key",
-  RESEND_API_KEY: "Resend API key",
-  SECRET_KEY: "App SECRET_KEY",
-  METRICS_BEARER_TOKEN: "Metrics bearer token",
-  SENTRY_DSN: "Sentry DSN",
+// Managed key → dictionary key. An unmanaged key falls back to its raw name.
+const LABEL_KEYS: Record<string, TranslationKey> = {
+  OANDA_API_TOKEN: "admin.secrets.label.oandaApiToken",
+  OANDA_ACCOUNT_ID: "admin.secrets.label.oandaAccountId",
+  OANDA_ENVIRONMENT: "admin.secrets.label.oandaEnvironment",
+  ANTHROPIC_API_KEY: "admin.secrets.label.anthropicApiKey",
+  OPENAI_API_KEY: "admin.secrets.label.openaiApiKey",
+  OPENROUTER_API_KEY: "admin.secrets.label.openrouterApiKey",
+  FINNHUB_API_KEY: "admin.secrets.label.finnhubApiKey",
+  RESEND_API_KEY: "admin.secrets.label.resendApiKey",
+  SECRET_KEY: "admin.secrets.label.secretKey",
+  METRICS_BEARER_TOKEN: "admin.secrets.label.metricsBearerToken",
+  SENTRY_DSN: "admin.secrets.label.sentryDsn",
 };
 
 type Props = {
@@ -34,6 +37,7 @@ export function AdminSecretsPanel({
   success,
   onSave,
 }: Props) {
+  const { t } = useLocale();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -57,15 +61,14 @@ export function AdminSecretsPanel({
       className="rounded-lg border border-slate-800 bg-leovee-panel p-4"
       data-testid="admin-secrets-panel"
     >
-      <h2 className="text-lg font-medium text-slate-100">Platform secrets</h2>
+      <h2 className="text-lg font-medium text-slate-100">{t("admin.secrets.title")}</h2>
       <p className="mt-1 text-sm text-slate-400">
-        Set provider credentials here. Values are stored encrypted and never shown again — leave a
-        field blank to keep the current value. Practice OANDA only (
+        {t("admin.secrets.intro")} (
         <code className="text-slate-300">{oandaEnvironment || "practice"}</code>
-        ); execution stays disabled.
+        ). {t("admin.secrets.executionDisabled")}
       </p>
 
-      {loading && <p className="mt-3 text-sm text-slate-500">Loading secret status…</p>}
+      {loading && <p className="mt-3 text-sm text-slate-500">{t("common.loading")}</p>}
       {error && (
         <p role="alert" className="mt-3 text-sm text-amber-400">
           {error}
@@ -81,19 +84,24 @@ export function AdminSecretsPanel({
         {items.map((item) => (
           <label key={item.key} className="block text-sm text-slate-300" htmlFor={`secret-${item.key}`}>
             <span className="flex items-center justify-between gap-2">
-              <span>{LABELS[item.key] ?? item.key}</span>
+              <span>{LABEL_KEYS[item.key] ? t(LABEL_KEYS[item.key]) : item.key}</span>
               <span
                 className={item.configured ? "text-emerald-400" : "text-slate-500"}
                 data-testid={`secret-status-${item.key}`}
+                data-configured={item.configured ? "true" : "false"}
               >
-                {item.configured ? "configured" : "not set"}
+                {item.configured ? t("admin.secrets.configured") : t("admin.secrets.notSet")}
               </span>
             </span>
             <input
               id={`secret-${item.key}`}
               type={item.key === "OANDA_ENVIRONMENT" ? "text" : "password"}
               autoComplete="off"
-              placeholder={item.configured ? "•••••••• (leave blank to keep)" : "Paste value"}
+              placeholder={
+                item.configured
+                  ? t("admin.secrets.placeholderKeep")
+                  : t("admin.secrets.placeholderPaste")
+              }
               value={drafts[item.key] ?? ""}
               onChange={(event) =>
                 setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))
@@ -107,7 +115,7 @@ export function AdminSecretsPanel({
           disabled={saving || loading}
           className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save secrets"}
+          {saving ? t("admin.secrets.saving") : t("admin.secrets.save")}
         </button>
       </form>
     </section>

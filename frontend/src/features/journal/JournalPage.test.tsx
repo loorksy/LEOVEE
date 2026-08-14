@@ -28,7 +28,7 @@ describe("JournalPage", () => {
 
     expect(await screen.findByText("Faded the sweep too early")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /promote to lesson/i }));
+    fireEvent.click(screen.getByTestId("journal-promote-entry-1"));
 
     await waitFor(() => expect(promoteSpy).toHaveBeenCalledWith("entry-1"));
     expect(await screen.findByTestId("promoted-lesson")).toHaveTextContent("lesson-1");
@@ -42,11 +42,15 @@ describe("JournalPage", () => {
 
     renderWithProviders(<JournalPage />);
 
-    expect(await screen.findByText(/no journal entries yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("journal-empty")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: "New reflection" } });
-    fireEvent.change(screen.getByLabelText(/^notes$/i), { target: { value: "Notes here" } });
-    fireEvent.click(screen.getByRole("button", { name: /add entry/i }));
+    fireEvent.change(screen.getByTestId("journal-title-input"), {
+      target: { value: "New reflection" },
+    });
+    fireEvent.change(screen.getByTestId("journal-notes-input"), {
+      target: { value: "Notes here" },
+    });
+    fireEvent.click(screen.getByTestId("journal-add"));
 
     await waitFor(() =>
       expect(createSpy).toHaveBeenCalledWith({ title: "New reflection", notes: "Notes here" }),

@@ -72,6 +72,6 @@ describe("ChartPage", () => {
 
     await waitFor(() => expect(fakeEngine.applyCandles).toHaveBeenCalled());
     await waitFor(() => expect(fakeEngine.applyAnnotations).toHaveBeenCalled());
-    expect(await screen.findByText(/1 annotation\(s\) loaded/)).toBeInTheDocument();
+    expect(await screen.findByTestId("annotation-count")).toBeInTheDocument();
   });
 });

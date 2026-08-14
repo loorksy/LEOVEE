@@ -15,6 +15,7 @@ import { AdminObservabilityPanel } from "@/features/admin/AdminObservabilityPane
 import { AdminOverviewPanel } from "@/features/admin/AdminOverviewPanel";
 import { AdminSecretsPanel } from "@/features/admin/AdminSecretsPanel";
 import { useAdminAccess } from "@/features/admin/useAdminAccess";
+import { useLocale } from "@/i18n/context";
 
 /**
  * `/admin` — plan/billing is visible to every workspace member; audit,
@@ -25,6 +26,7 @@ import { useAdminAccess } from "@/features/admin/useAdminAccess";
  * they never see an avoidable 403.
  */
 export function AdminPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const accessQuery = useAdminAccess();
   const isSupport = accessQuery.data?.is_support ?? false;
@@ -71,27 +73,28 @@ export function AdminPage() {
     mutationFn: putAdminSecrets,
     onSuccess: async () => {
       setSecretsError(null);
-      setSecretsSuccess("Secrets saved. Providers will use the new values immediately.");
+      setSecretsSuccess(t("admin.secrets.saved"));
       await queryClient.invalidateQueries({ queryKey: ["admin", "secrets"] });
     },
     onError: (err: unknown) => {
       setSecretsSuccess(null);
-      setSecretsError(err instanceof Error ? err.message : "Failed to save secrets");
+      setSecretsError(err instanceof Error ? err.message : t("admin.secrets.saveError"));
     },
   });
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Admin & billing</h1>
+        <h1 className="text-2xl font-semibold text-slate-100" data-testid="admin-title">
+          {t("admin.title")}
+        </h1>
         <p className="mt-1 text-slate-400">
-          Plan, entitlements, and platform administration (§36–§38). Sections below reflect your
-          role — <code>{accessQuery.data?.role ?? "…"}</code>.
+          {t("admin.intro")} — <code>{accessQuery.data?.role ?? "…"}</code>.
         </p>
       </header>
 
       {accessQuery.isError && (
-        <p className="text-amber-400">Could not load your admin permissions.</p>
+        <p className="text-amber-400">{t("admin.error.access")}</p>
       )}
 
       <AdminEntitlementsPanel
@@ -102,15 +105,13 @@ export function AdminPage() {
 
       {!isSupport && !accessQuery.isLoading && (
         <p data-testid="admin-access-restricted" className="text-sm text-slate-500">
-          Platform audit and admin sections are hidden — they require Support, Admin, or Super
-          Admin workspace role.
+          {t("admin.restricted")}
         </p>
       )}
 
       {isSupport && !isPlatformAdmin && (
         <p data-testid="admin-platform-only-hint" className="text-sm text-slate-500">
-          Overview, conversations, agent observability, and secrets require the platform Admin or
-          Super Admin role and are hidden for Support.
+          {t("admin.platformOnly")}
         </p>
       )}
 
@@ -121,7 +122,7 @@ export function AdminPage() {
             oandaEnvironment={secretsQuery.data?.oanda_environment ?? "practice"}
             loading={secretsQuery.isLoading}
             saving={secretsMutation.isPending}
-            error={secretsError ?? (secretsQuery.isError ? "Could not load secrets status." : null)}
+            error={secretsError ?? (secretsQuery.isError ? t("admin.secrets.loadError") : null)}
             success={secretsSuccess}
             onSave={async (secrets) => {
               setSecretsSuccess(null);

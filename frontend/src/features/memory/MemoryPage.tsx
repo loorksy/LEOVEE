@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteMemory, getCalibrationCurve, listMemories } from "@/api/memory";
 import { MemoryPanel } from "@/features/memory/MemoryPanel";
+import { useLocale } from "@/i18n/context";
 
 export function MemoryPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [recomputeStats, setRecomputeStats] = useState<Record<string, unknown> | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function MemoryPage() {
         queryClient.invalidateQueries({ queryKey: ["memory", "calibration"] }),
       ]);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete memory");
+      setDeleteError(err instanceof Error ? err.message : t("memory.error.delete"));
     }
   }
 
@@ -33,17 +35,14 @@ export function MemoryPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Memory</h1>
-        <p className="mt-1 text-slate-400">
-          Browse learned facts and delete stale memories — statistics recompute automatically
-          (§32).
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("memory.title")}</h1>
+        <p className="mt-1 text-slate-400">{t("memory.intro")}</p>
       </header>
       {deleteError && <p className="text-amber-400">{deleteError}</p>}
-      {loading && <p className="text-slate-400">Loading memory…</p>}
+      {loading && <p className="text-slate-400">{t("common.loading")}</p>}
       {recomputeStats && (
         <p className="text-xs text-slate-500" data-testid="recompute-stats">
-          Recompute: {JSON.stringify(recomputeStats)}
+          {t("memory.recompute")}: {JSON.stringify(recomputeStats)}
         </p>
       )}
       <MemoryPanel

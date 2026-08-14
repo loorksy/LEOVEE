@@ -1,4 +1,5 @@
 import type { AdminAgentRun } from "@/features/admin/types";
+import { useLocale } from "@/i18n/context";
 
 type Props = {
   runs: AdminAgentRun[];
@@ -8,16 +9,17 @@ type Props = {
 
 /** Platform-admin only — `GET /api/v1/admin/observability/agent-runs` (§36). */
 export function AdminObservabilityPanel({ runs, loading, error }: Props) {
+  const { t } = useLocale();
   return (
     <section
       data-testid="admin-observability-panel"
       className="rounded-lg border border-slate-800 bg-leovee-panel p-6"
     >
-      <h2 className="text-lg font-semibold text-slate-100">Agent observability</h2>
-      {loading && <p className="mt-2 text-slate-400">Loading agent runs…</p>}
-      {error && <p className="mt-2 text-amber-400">Could not load agent runs.</p>}
+      <h2 className="text-lg font-semibold text-slate-100">{t("admin.observability.title")}</h2>
+      {loading && <p className="mt-2 text-slate-400">{t("common.loading")}</p>}
+      {error && <p className="mt-2 text-amber-400">{t("common.error.load")}</p>}
       {!loading && !error && runs.length === 0 && (
-        <p className="mt-2 text-slate-400">No agent runs recorded yet.</p>
+        <p className="mt-2 text-slate-400">{t("admin.observability.empty")}</p>
       )}
       <ul className="mt-4 space-y-2 text-sm">
         {runs.map((run) => (
@@ -31,7 +33,8 @@ export function AdminObservabilityPanel({ runs, loading, error }: Props) {
               <p className="text-xs text-slate-500">{run.status}</p>
             </div>
             <p className="text-xs text-slate-500">
-              tools: {run.tool_calls} · memories: {run.memories_retrieved}
+              {t("admin.observability.tools")}: {run.tool_calls} ·{" "}
+              {t("admin.observability.memories")}: {run.memories_retrieved}
             </p>
           </li>
         ))}

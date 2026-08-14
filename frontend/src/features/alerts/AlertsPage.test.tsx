@@ -35,11 +35,11 @@ describe("AlertsPage", () => {
 
     expect(await screen.findByTestId("alert-alert-1")).toBeInTheDocument();
 
-    expect(screen.getByText(/UI test control — not live evaluation/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/UI test price/i), {
+    expect(screen.getByTestId("alert-ui-test-alert-1")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("trigger-price-alert-1"), {
       target: { value: "1.15" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /fire ui test \(not live\)/i }));
+    fireEvent.click(screen.getByTestId("fire-ui-test-alert-1"));
 
     await waitFor(() => expect(triggerSpy).toHaveBeenCalledWith("alert-1", 1.15));
   });
@@ -56,9 +56,9 @@ describe("AlertsPage", () => {
 
     renderWithProviders(<AlertsPage />);
 
-    expect(await screen.findByText(/no alerts yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("alerts-empty")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /create alert/i }));
+    fireEvent.click(screen.getByTestId("create-alert"));
 
     await waitFor(() =>
       expect(createSpy).toHaveBeenCalledWith({

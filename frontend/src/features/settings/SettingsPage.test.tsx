@@ -34,7 +34,9 @@ describe("SettingsPage", () => {
 
   it("shows entitlements", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText("Pro (pro)")).toBeInTheDocument());
-    expect(screen.getByText(/OANDA execution remains disabled/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("plan-label")).toHaveTextContent("Pro (pro)"),
+    );
+    expect(screen.getByTestId("settings-broker-policy")).toBeInTheDocument();
   });
 });

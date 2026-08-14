@@ -25,6 +25,7 @@ import {
 } from "./types";
 
 export { DEFAULT_LOCALE, LOCALES, LOCALE_DIRECTION };
+export { LOCALE_NATIVE_NAMES } from "./types";
 export type { Locale, TranslationKey };
 
 const DICTIONARIES: Record<Locale, Dictionary> = { ar, en };

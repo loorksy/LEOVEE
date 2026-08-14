@@ -4,10 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { getCandles } from "@/api/markets";
 import { getProvidersStatus } from "@/api/providers";
 import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
+import { useLocale } from "@/i18n/context";
 
 const TIMEFRAMES = ["M15", "H1", "H4", "D1"] as const;
 
 export function MarketsPage() {
+  const { t } = useLocale();
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState<(typeof TIMEFRAMES)[number]>("H1");
 
@@ -27,21 +29,19 @@ export function MarketsPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Markets</h1>
-        <p className="text-sm text-slate-400">
-          Candle snapshots from `/api/v1/markets` (practice OANDA when configured).
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("markets.title")}</h1>
+        <p className="text-sm text-slate-400">{t("markets.intro")}</p>
       </header>
       {providersQuery.isSuccess && !oandaConfigured && (
         <ProviderNotConfiguredBanner
-          title="Market data provider not configured"
+          title={t("markets.provider.notConfigured")}
           credentials={["OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"]}
           testId="oanda-provider-not-configured"
         />
       )}
       <div className="flex flex-wrap gap-3">
         <label className="text-xs text-slate-400">
-          Symbol
+          {t("common.symbol")}
           <input
             className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
             value={symbol}
@@ -50,7 +50,7 @@ export function MarketsPage() {
           />
         </label>
         <label className="text-xs text-slate-400">
-          Timeframe
+          {t("common.timeframe")}
           <select
             className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
             value={timeframe}
@@ -65,22 +65,24 @@ export function MarketsPage() {
           </select>
         </label>
       </div>
-      {oandaConfigured && candlesQuery.isLoading && <p className="text-slate-400">Loading candles…</p>}
+      {oandaConfigured && candlesQuery.isLoading && (
+        <p className="text-slate-400">{t("common.loading")}</p>
+      )}
       {oandaConfigured && candlesQuery.isError && (
         <p className="text-amber-400">
-          {(candlesQuery.error as Error).message || "Could not load market data."}
+          {(candlesQuery.error as Error).message || t("common.error.load")}
         </p>
       )}
       {candlesQuery.data && (
         <div className="overflow-auto rounded border border-slate-800">
-          <table className="min-w-full text-left text-sm text-slate-300">
+          <table className="min-w-full text-start text-sm text-slate-300">
             <thead className="bg-slate-900 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-2">Time</th>
-                <th className="px-3 py-2">Open</th>
-                <th className="px-3 py-2">High</th>
-                <th className="px-3 py-2">Low</th>
-                <th className="px-3 py-2">Close</th>
+                <th className="px-3 py-2">{t("markets.table.time")}</th>
+                <th className="px-3 py-2">{t("markets.table.open")}</th>
+                <th className="px-3 py-2">{t("markets.table.high")}</th>
+                <th className="px-3 py-2">{t("markets.table.low")}</th>
+                <th className="px-3 py-2">{t("markets.table.close")}</th>
               </tr>
             </thead>
             <tbody>

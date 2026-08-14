@@ -2,8 +2,10 @@ import { useState } from "react";
 import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTradeIdea, listTrades } from "@/api/trades";
+import { useLocale } from "@/i18n/context";
 
 export function TradesPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [direction, setDirection] = useState<"BUY" | "SELL">("BUY");
@@ -19,9 +21,9 @@ export function TradesPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Trades</h1>
-        <p className="text-sm text-slate-400">
-          Trade ideas only — live execution stays disabled (`OANDA_EXECUTION` off).
+        <h1 className="text-2xl font-semibold text-slate-100">{t("trades.title")}</h1>
+        <p className="text-sm text-slate-400" data-testid="trades-intro">
+          {t("trades.intro")}
         </p>
       </header>
       <form
@@ -32,7 +34,7 @@ export function TradesPage() {
         }}
       >
         <label className="text-xs text-slate-400">
-          Symbol
+          {t("common.symbol")}
           <input
             className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             value={symbol}
@@ -40,14 +42,14 @@ export function TradesPage() {
           />
         </label>
         <label className="text-xs text-slate-400">
-          Direction
+          {t("trades.direction")}
           <select
             className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             value={direction}
             onChange={(e) => setDirection(e.target.value as "BUY" | "SELL")}
           >
-            <option value="BUY">BUY</option>
-            <option value="SELL">SELL</option>
+            <option value="BUY">{t("direction.buy")}</option>
+            <option value="SELL">{t("direction.sell")}</option>
           </select>
         </label>
         <button
@@ -55,7 +57,7 @@ export function TradesPage() {
           className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white"
           disabled={createMutation.isPending}
         >
-          Create idea
+          {t("trades.create")}
         </button>
       </form>
       {createMutation.isError && (
@@ -69,14 +71,17 @@ export function TradesPage() {
             data-testid={`trade-${trade.id}`}
           >
             <span className="font-medium text-slate-100">
-              {trade.symbol ?? "—"} {trade.direction}
+              {trade.symbol ?? "—"}{" "}
+              {trade.direction === "BUY" ? t("direction.buy") : t("direction.sell")}
             </span>
-            {trade.status ? <span className="ml-2 text-slate-500">{trade.status}</span> : null}
+            {trade.status ? <span className="ms-2 text-slate-500">{trade.status}</span> : null}
           </li>
         ))}
       </ul>
       {!tradesQuery.isLoading && (tradesQuery.data?.items.length ?? 0) === 0 && (
-        <p className="text-slate-400">No trade ideas yet.</p>
+        <p className="text-slate-400" data-testid="trades-empty">
+          {t("trades.empty")}
+        </p>
       )}
     </div>
   );

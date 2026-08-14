@@ -1,42 +1,71 @@
 import { describe, expect, it } from "vitest";
+
 import { ar } from "./ar";
-import { en } from "./en";
 import {
   DEFAULT_LOCALE,
   LOCALE_DIRECTION,
+  LOCALE_NATIVE_NAMES,
   LOCALES,
   applyDocumentLocale,
+  dictionaryFor,
   interpolate,
   isLocale,
   translate,
 } from "./index";
 
-describe("dictionary parity", () => {
-  it("defines the same keys in every locale", () => {
-    const arabic = Object.keys(ar).sort();
-    const english = Object.keys(en).sort();
-    expect(english).toEqual(arabic);
+describe("locale registry", () => {
+  it("every registered locale carries a direction and a native name", () => {
+    // These records are what a new locale must fill in, and the compiler
+    // enforces them — this test exists so a *runtime*-constructed locale list
+    // (from config, some day) cannot outgrow the records silently.
+    for (const locale of LOCALES) {
+      expect(LOCALE_DIRECTION[locale]).toMatch(/^(rtl|ltr)$/);
+      expect(LOCALE_NATIVE_NAMES[locale].length).toBeGreaterThan(0);
+    }
   });
 
-  it("has no empty translations", () => {
-    for (const [locale, dictionary] of [
-      ["ar", ar],
-      ["en", en],
-    ] as const) {
-      for (const [key, value] of Object.entries(dictionary)) {
-        expect(value.trim(), `${locale}.${key} is empty`).not.toBe("");
+  it("native names are autonyms, not translations", () => {
+    // "العربية" must read as العربية in every locale: a reader stranded in the
+    // wrong language finds their own in the switcher precisely because it is
+    // not rendered in the language they cannot read.
+    expect(LOCALE_NATIVE_NAMES.ar).toBe("العربية");
+    expect(LOCALE_NATIVE_NAMES.en).toBe("English");
+  });
+});
+
+describe("dictionary parity", () => {
+  // Iterated over LOCALES rather than written as ar-versus-en: the product
+  // supports Arabic and English today and possibly more languages later, and a
+  // parity test naming the pair would quietly stop covering the third the day
+  // it arrives. Every locale is measured against the source dictionary
+  // (Arabic).
+  const source = ar;
+
+  it("every locale defines exactly the source key set", () => {
+    const sourceKeys = Object.keys(source).sort();
+    for (const locale of LOCALES) {
+      expect(Object.keys(dictionaryFor(locale)).sort(), `locale "${locale}"`).toEqual(sourceKeys);
+    }
+  });
+
+  it("no locale has an empty value", () => {
+    for (const locale of LOCALES) {
+      for (const [key, value] of Object.entries(dictionaryFor(locale))) {
+        expect(value.trim().length, `"${key}" in "${locale}"`).toBeGreaterThan(0);
       }
     }
   });
 
-  it("keeps placeholders consistent across locales", () => {
-    // A key that interpolates {reason} in one locale and not the other renders
-    // a partial sentence in production and nowhere else.
-    const placeholders = (text: string) => (text.match(/\{(\w+)\}/g) ?? []).sort();
-    for (const key of Object.keys(ar) as (keyof typeof ar)[]) {
-      expect(placeholders(en[key]), `placeholders differ for "${key}"`).toEqual(
-        placeholders(ar[key]),
-      );
+  it("placeholders match the source in every locale", () => {
+    const placeholders = (template: string) => (template.match(/{[a-zA-Z]+}/g) ?? []).sort();
+    for (const locale of LOCALES) {
+      const dictionary = dictionaryFor(locale);
+      for (const key of Object.keys(source) as (keyof typeof source)[]) {
+        expect(
+          placeholders(dictionary[key]),
+          `placeholders differ for "${key}" in "${locale}"`,
+        ).toEqual(placeholders(source[key]));
+      }
     }
   });
 });
@@ -55,12 +84,6 @@ describe("locale resolution", () => {
     expect(isLocale("ar")).toBe(true);
     expect(isLocale("fr")).toBe(false);
     expect(isLocale(undefined)).toBe(false);
-  });
-
-  it("covers every declared locale with a direction", () => {
-    for (const locale of LOCALES) {
-      expect(LOCALE_DIRECTION[locale]).toBeDefined();
-    }
   });
 });
 

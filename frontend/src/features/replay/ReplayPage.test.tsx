@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { ReplayPage } from "@/features/replay/ReplayPage";
 
 vi.mock("@/api/replay", () => ({
@@ -13,12 +14,14 @@ describe("ReplayPage", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <ReplayPage />
-        </MemoryRouter>
+        <LocaleProvider initialLocale="ar">
+          <MemoryRouter>
+            <ReplayPage />
+          </MemoryRouter>
+        </LocaleProvider>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("heading", { name: /replay/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /preview/i })).toBeInTheDocument();
+    expect(screen.getByTestId("replay-title")).toBeInTheDocument();
+    expect(screen.getByTestId("replay-preview-button")).toBeInTheDocument();
   });
 });

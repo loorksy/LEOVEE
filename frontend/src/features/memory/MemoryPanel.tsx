@@ -1,3 +1,4 @@
+import { useLocale } from "@/i18n/context";
 import type { CalibrationBin, MemoryListItem } from "./types";
 
 type Props = {
@@ -7,10 +8,11 @@ type Props = {
 };
 
 export function MemoryPanel({ memories, bins, onDelete }: Props) {
+  const { t } = useLocale();
   return (
     <section className="grid gap-6 md:grid-cols-2">
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-100">Workspace memories</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-100">{t("memory.workspace")}</h2>
         <ul className="space-y-2">
           {memories.map((memory) => (
             <li
@@ -23,10 +25,11 @@ export function MemoryPanel({ memories, bins, onDelete }: Props) {
               </div>
               <button
                 type="button"
+                data-testid={`memory-delete-${memory.id}`}
                 className="text-sm text-red-400 hover:text-red-300"
                 onClick={() => onDelete(memory.id)}
               >
-                Delete
+                {t("common.delete")}
               </button>
             </li>
           ))}
@@ -38,10 +41,11 @@ export function MemoryPanel({ memories, bins, onDelete }: Props) {
 }
 
 function CalibrationChart({ bins }: { bins: CalibrationBin[] }) {
+  const { t } = useLocale();
   const max = Math.max(1, ...bins.map((b) => b.predicted_count));
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold text-slate-100">Calibration</h2>
+      <h2 className="mb-3 text-lg font-semibold text-slate-100">{t("memory.calibration")}</h2>
       <div className="flex h-40 items-end gap-1">
         {bins.map((bin) => (
           <div

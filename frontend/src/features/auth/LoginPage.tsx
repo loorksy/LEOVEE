@@ -1,10 +1,12 @@
 import { type FormEvent, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { login } from "@/api/auth";
+import { useLocale } from "@/i18n/context";
 
 type LocationState = { from?: { pathname?: string } };
 
 export function LoginPage() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export function LoginPage() {
       const state = location.state as LocationState | null;
       navigate(state?.from?.pathname ?? "/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : t("auth.error.loginFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -34,14 +36,15 @@ export function LoginPage() {
         className="w-full max-w-sm rounded-lg border border-slate-800 bg-leovee-panel p-8"
       >
         <div className="mb-6 flex items-center gap-2">
-          <img src="/leovee.svg" alt="Leovee" className="h-8 w-8" />
-          <span className="text-lg font-semibold text-white">Leovee</span>
+          <img src="/leovee.svg" alt={t("app.name")} className="h-8 w-8" />
+          <span className="text-lg font-semibold text-white">{t("app.name")}</span>
         </div>
-        <h1 className="mb-4 text-xl font-semibold text-slate-100">Sign in</h1>
+        <h1 className="mb-4 text-xl font-semibold text-slate-100">{t("auth.login")}</h1>
         <label className="mb-3 block text-sm text-slate-300" htmlFor="login-email">
-          Email
+          {t("auth.email")}
           <input
             id="login-email"
+            data-testid="login-email"
             type="email"
             required
             autoComplete="username"
@@ -51,9 +54,10 @@ export function LoginPage() {
           />
         </label>
         <label className="mb-4 block text-sm text-slate-300" htmlFor="login-password">
-          Password
+          {t("auth.password")}
           <input
             id="login-password"
+            data-testid="login-password"
             type="password"
             required
             autoComplete="current-password"
@@ -69,15 +73,16 @@ export function LoginPage() {
         )}
         <button
           type="submit"
+          data-testid="login-submit"
           disabled={submitting}
           className="w-full rounded bg-leovee-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {submitting ? t("auth.signingIn") : t("auth.login")}
         </button>
         <p className="mt-4 text-center text-xs text-slate-500">
-          New here?{" "}
+          {t("auth.newHere")}{" "}
           <Link to="/signup" className="text-leovee-accent hover:underline">
-            Create an account
+            {t("auth.signup")}
           </Link>
         </p>
       </form>
