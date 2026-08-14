@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithProviders } from "@/test/renderWithProviders";
 import { TradesPage } from "./TradesPage";
 
 const listTrades = vi.fn();
@@ -11,15 +11,6 @@ vi.mock("../../api/trades", () => ({
   createTradeIdea: (...args: unknown[]) => createTradeIdea(...args),
 }));
 
-function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <TradesPage />
-    </QueryClientProvider>,
-  );
-}
-
 describe("TradesPage", () => {
   beforeEach(() => {
     listTrades.mockReset();
@@ -28,7 +19,7 @@ describe("TradesPage", () => {
       items: [
         {
           id: "t1",
-          symbol: "EURUSD",
+          symbol: "XAUUSD",
           direction: "BUY",
           status: "IDEA",
         },
@@ -37,9 +28,8 @@ describe("TradesPage", () => {
   });
 
   it("lists trade ideas", async () => {
-    renderPage();
+    renderWithProviders(<TradesPage />);
     await waitFor(() => expect(screen.getByTestId("trade-t1")).toBeInTheDocument());
-    expect(screen.getByText(/Trade ideas only/i)).toBeInTheDocument();
-    expect(screen.getByText(/OANDA_EXECUTION/i)).toBeInTheDocument();
+    expect(screen.getByTestId("trades-intro")).toBeInTheDocument();
   });
 });

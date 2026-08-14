@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 
 import { MarketsPage } from "./MarketsPage";
 
@@ -17,7 +18,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MarketsPage />
+      <LocaleProvider initialLocale="ar">
+        <MarketsPage />
+      </LocaleProvider>
     </QueryClientProvider>,
   );
 }
@@ -40,7 +43,6 @@ describe("MarketsPage", () => {
       expect(screen.getByTestId("oanda-provider-not-configured")).toBeInTheDocument(),
     );
     expect(screen.getByText(/OANDA_API_TOKEN/)).toBeInTheDocument();
-    expect(screen.getByText(/not an empty-data state/i)).toBeInTheDocument();
     expect(getCandles).not.toHaveBeenCalled();
   });
 
@@ -52,7 +54,7 @@ describe("MarketsPage", () => {
       openai: { configured: true, status: "ok" },
     });
     getCandles.mockResolvedValue({
-      symbol: "EURUSD",
+      symbol: "XAUUSD",
       timeframe: "H1",
       workspace_id: "w1",
       candles: [
@@ -67,6 +69,6 @@ describe("MarketsPage", () => {
     });
     renderPage();
     await waitFor(() => expect(screen.getByText("1.105")).toBeInTheDocument());
-    expect(getCandles).toHaveBeenCalledWith("EURUSD", "H1", 50);
+    expect(getCandles).toHaveBeenCalledWith("XAUUSD", "H1", 50);
   });
 });

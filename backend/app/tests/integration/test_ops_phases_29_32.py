@@ -25,7 +25,7 @@ async def test_watchlist_crud_isolated(db_session: AsyncSession) -> None:
     ctx = await resolve_tenant_context(db_session, user.id)
     await bind_workspace_rls(db_session, ctx)
     wl = await watchlist_service.create_watchlist(db_session, ctx, name="FX")
-    await watchlist_service.add_symbol(db_session, ctx, watchlist_id=wl.id, symbol_code="EURUSD")
+    await watchlist_service.add_symbol(db_session, ctx, watchlist_id=wl.id, symbol_code="XAUUSD")
     await db_session.commit()
     lists = await watchlist_service.list_watchlists(db_session, ctx)
     assert len(lists) == 1
@@ -51,7 +51,7 @@ async def test_alert_price_trigger_mock(db_session: AsyncSession) -> None:
             "/api/v1/alerts",
             json={
                 "type": "PRICE",
-                "symbol": "EURUSD",
+                "symbol": "XAUUSD",
                 "condition": {"op": "gte", "price": 1.1},
             },
             headers={
@@ -121,7 +121,7 @@ async def test_memory_delete_runs_recompute(db_session: AsyncSession) -> None:
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"note": "delete me", "sample_size": 30},
         memory_type=MemoryType.SEMANTIC,
     )

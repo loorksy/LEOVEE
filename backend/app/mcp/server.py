@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from app.mcp.runtime import TOOL_NAMES
+from app.agents.tools import TOOLS
+from app.mcp.runtime import TOOL_ALIASES
 
 _APPS_DIR = Path(__file__).resolve().parent / "apps"
 
@@ -30,7 +31,32 @@ def _apps_dirs() -> list[Path]:
 
 
 def list_tools() -> list[dict[str, Any]]:
-    return [{"name": name, "description": f"Leovee tool {name}"} for name in sorted(TOOL_NAMES)]
+    """The real registry definitions, plus the legacy dotted names as aliases.
+
+    Descriptions and schemas come from the specs themselves — the placeholder
+    strings this used to fabricate told a client nothing and could not drift
+    less than the truth, only differently.
+    """
+    tools: list[dict[str, Any]] = [
+        {
+            "name": spec.name,
+            "description": spec.description,
+            "input_schema": spec.parameters,
+            "scope": spec.scope,
+        }
+        for _, spec in sorted(TOOLS.items())
+    ]
+    tools.extend(
+        {
+            "name": alias,
+            "alias_of": canonical,
+            "description": TOOLS[canonical].description,
+            "input_schema": TOOLS[canonical].parameters,
+            "scope": TOOLS[canonical].scope,
+        }
+        for alias, canonical in sorted(TOOL_ALIASES.items())
+    )
+    return tools
 
 
 def load_app_manifest(app_id: str) -> dict[str, Any]:

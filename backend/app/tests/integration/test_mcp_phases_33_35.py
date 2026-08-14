@@ -30,7 +30,7 @@ async def test_mcp_workspace_escape_on_recommendation(db_session: AsyncSession) 
     rec_b = await recommendation_service.create_recommendation(
         db_session,
         ctx_b,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         direction=RecommendationDirection.SELL,
         status=RecommendationStatus.ACTIVE,
     )

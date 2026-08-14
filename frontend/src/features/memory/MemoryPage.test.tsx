@@ -7,7 +7,7 @@ import * as memoryApi from "@/api/memory";
 describe("MemoryPage", () => {
   it("lists memories and calibration bins", async () => {
     vi.spyOn(memoryApi, "listMemories").mockResolvedValue({
-      items: [{ id: "mem-1", key: "eurusd.sweep.bias", type: "SEMANTIC" }],
+      items: [{ id: "mem-1", key: "xauusd.sweep.bias", type: "SEMANTIC" }],
     });
     vi.spyOn(memoryApi, "getCalibrationCurve").mockResolvedValue({
       bins: [{ bin_lower: 0.5, bin_upper: 0.6, predicted_count: 4, realized_success_count: 2 }],
@@ -15,12 +15,12 @@ describe("MemoryPage", () => {
 
     renderWithProviders(<MemoryPage />);
 
-    expect(await screen.findByText("eurusd.sweep.bias")).toBeInTheDocument();
+    expect(await screen.findByText("xauusd.sweep.bias")).toBeInTheDocument();
   });
 
   it("deletes a memory and surfaces recompute statistics", async () => {
     vi.spyOn(memoryApi, "listMemories").mockResolvedValue({
-      items: [{ id: "mem-1", key: "eurusd.sweep.bias", type: "SEMANTIC" }],
+      items: [{ id: "mem-1", key: "xauusd.sweep.bias", type: "SEMANTIC" }],
     });
     vi.spyOn(memoryApi, "getCalibrationCurve").mockResolvedValue({ bins: [] });
     const deleteSpy = vi.spyOn(memoryApi, "deleteMemory").mockResolvedValue({
@@ -30,7 +30,7 @@ describe("MemoryPage", () => {
 
     renderWithProviders(<MemoryPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /delete/i }));
+    fireEvent.click(await screen.findByTestId("memory-delete-mem-1"));
 
     expect(deleteSpy).toHaveBeenCalledWith("mem-1");
     expect(await screen.findByTestId("recompute-stats")).toHaveTextContent("embeddings_indexed");

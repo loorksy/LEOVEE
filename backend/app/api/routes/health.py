@@ -1,6 +1,7 @@
 from typing import Any
 
-from fastapi import APIRouter
+import structlog
+from fastapi import APIRouter, Response, status
 from redis.asyncio import Redis
 from sqlalchemy import text
 
@@ -8,6 +9,12 @@ from app.core.config import get_settings
 from app.infrastructure.database import get_engine
 
 router = APIRouter(tags=["health"])
+logger = structlog.get_logger(__name__)
+
+# `/health/ready` is unauthenticated (it is a load-balancer probe), so the
+# failure reason is logged server-side rather than returned: a raw exception
+# string can carry a DSN, a hostname, or driver internals to anyone who curls it.
+_UNAVAILABLE = "unavailable"
 
 
 async def _check_redis(redis_url: str) -> tuple[bool, str | None]:
@@ -17,7 +24,8 @@ async def _check_redis(redis_url: str) -> tuple[bool, str | None]:
         pong = await client.ping()
         return bool(pong), None
     except Exception as exc:  # noqa: BLE001 — health probe
-        return False, str(exc)
+        logger.warning("health_redis_check_failed", error=str(exc))
+        return False, _UNAVAILABLE
     finally:
         if client is not None:
             await client.close()
@@ -26,13 +34,14 @@ async def _check_redis(redis_url: str) -> tuple[bool, str | None]:
 async def _check_database() -> tuple[bool, str | None]:
     engine = get_engine()
     if engine is None:
-        return False, "DATABASE_URL is not configured"
+        return False, "not_configured"
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True, None
     except Exception as exc:  # noqa: BLE001 — health probe
-        return False, str(exc)
+        logger.warning("health_database_check_failed", error=str(exc))
+        return False, _UNAVAILABLE
 
 
 @router.get("/health/live")
@@ -41,7 +50,7 @@ async def liveness() -> dict[str, str]:
 
 
 @router.get("/health/ready")
-async def readiness() -> dict[str, Any]:
+async def readiness(response: Response) -> dict[str, Any]:
     settings = get_settings()
     checks: dict[str, Any] = {}
     healthy = True
@@ -60,6 +69,11 @@ async def readiness() -> dict[str, Any]:
     else:
         checks["redis"] = {"ok": True, "skipped": True}
 
+    if not healthy:
+        # 503, not a 200 with {"status": "degraded"}: an orchestrator keying on
+        # the HTTP status must pull this instance from rotation on a dependency
+        # outage, not keep routing DB-backed requests it cannot serve.
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ok" if healthy else "degraded", "checks": checks}
 
 

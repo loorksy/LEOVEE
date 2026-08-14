@@ -1,19 +1,136 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import fail_closed_no_trade, run_analysis_orchestrator
+from app.agents.prompts import Prompt, PromptNotFound, constitution
+from app.agents.tools.registry import ToolContext
 from app.core.tenant import TenantContext
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
 from app.models.memory import MemoryType
 from app.providers.market.base import MarketDataProvider
 from app.services import entitlement_service, market_data, recommendation_service
+from app.services.agent_run_service import persist_agent_run
+from app.services.chart.visual_evidence import collect_visual_evidence
 from app.services.market.engine_persistence import persist_engine_outputs
+from app.services.market.history import TIMEFRAME_MINUTES
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol, store_memory
+from app.services.strategies import assess_support, classify
+
+
+def _plan_columns(decision: dict[str, Any], *, tenant_timeframe: Timeframe) -> dict[str, Any]:
+    """The plan's own columns, from a completed decision.
+
+    Empty for a degraded run: a NO_TRADE has no levels, and writing zeros or the
+    last price into those columns would give the tracker a stop to watch on a
+    plan that was never made.
+    """
+    if decision.get("degraded") or decision.get("direction") in {
+        RecommendationDirection.NO_TRADE.value,
+        RecommendationDirection.WAIT.value,
+    }:
+        return {}
+
+    levels = decision.get("levels") or {}
+    plan_type = decision.get("plan_type")
+    return {
+        "entry": _as_decimal(levels.get("entry")),
+        "stop": _as_decimal(levels.get("stop")),
+        "targets": [float(t) for t in (levels.get("targets") or [])],
+        "timeframe": decision.get("timeframe") or tenant_timeframe.value,
+        "plan_type": plan_type,
+        "execution_state": decision.get("execution_state"),
+        "activation_rule": decision.get("activation_rule"),
+        "activation_condition": decision.get("condition"),
+        "expires_at": _validity_deadline(decision, tenant_timeframe),
+    }
+
+
+def _as_decimal(value: Any) -> Decimal | None:
+    return None if value is None else Decimal(str(value))
+
+
+def _typical_atr(engines: dict[str, Any]) -> float | None:
+    """What "normal" volatility looks like on the context ladder right now.
+
+    The volatility bucket is a *ratio*, so it needs a denominator that is not
+    the same number as the numerator. The decision frame's own ATR compared
+    against itself is always 1.0 — every plan would file as NORMAL and the
+    dimension would carry no information at all. The context frames are the
+    honest baseline: they are already loaded, and they describe the same market
+    over a longer horizon.
+    """
+    by_tf = engines.get("intelligence_by_tf")
+    if not isinstance(by_tf, dict):
+        return None
+    values = [
+        float(payload["atr"])
+        for payload in by_tf.values()
+        if isinstance(payload, dict) and isinstance(payload.get("atr"), int | float)
+    ]
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _validity_deadline(decision: dict[str, Any], timeframe: Timeframe) -> datetime | None:
+    """When the plan stops being worth showing.
+
+    Derived from the frame it was made on, because "twelve candles" is a
+    different amount of time on M1 and M15 — and a plan with no deadline is one
+    that still reads as live three sessions after the structure that justified
+    it stopped existing.
+    """
+    candles = decision.get("validity_candles")
+    if not isinstance(candles, int) or candles <= 0:
+        return None
+    minutes = TIMEFRAME_MINUTES.get(timeframe)
+    if minutes is None:
+        return None
+    return datetime.now(UTC) + timedelta(minutes=minutes * candles)
+
+
+def _constitution_or_none() -> Prompt | None:
+    """The prompt to catalogue, or nothing if it could not be read.
+
+    Never raises: a prompt-registry problem has already failed the analysis
+    upstream, and failing the *write* here would additionally lose the trace
+    that explains why.
+    """
+    try:
+        return constitution()
+    except PromptNotFound:
+        return None
+
+
+async def _build_market_context(session: AsyncSession) -> dict[str, Any]:
+    """The news read for the evidence gate: recent headlines and their freshness.
+
+    Economic-calendar events (NFP/CPI/FOMC) drive the event-blackout gate; until
+    a forward-looking calendar source is ingested, ``upcoming_events`` is empty
+    and the blackout is inert rather than guessed. The headline read is real:
+    what was published, how recently. ``provider_configured`` reflects whether a
+    news key exists, so "no headlines" is distinguished from "no provider".
+    """
+    from app.core.config import get_settings
+    from app.services import news_service
+
+    settings = get_settings()
+    rows = await news_service.list_recent_news(session, limit=20)
+    latest_ts = rows[0].published_at if rows else None
+    return {
+        "provider_configured": bool(settings.finnhub_api_key),
+        "headline_count": len(rows),
+        "latest_headline_ts": latest_ts,
+        "upcoming_events": [],
+    }
 
 
 def map_decision_to_recommendation_status(decision: dict[str, Any]) -> RecommendationStatus:
@@ -31,11 +148,16 @@ async def run_analysis(
     tenant: TenantContext,
     *,
     symbol: str,
-    timeframe: Timeframe = Timeframe.H1,
+    # Which series to fetch as the primary one — *not* the frame the decision is
+    # made on. H1 used to be the default here, which is a context frame the API
+    # itself rejects with 422 under D11; an internal caller that omitted the
+    # argument got an analysis anchored to a frame no scalp may be taken on.
+    timeframe: Timeframe = DEFAULT_SERIES_TIMEFRAME,
     persist_engines: bool = True,
     market_provider: MarketDataProvider | None = None,
     complete_pipeline: bool = False,
 ) -> dict[str, Any]:
+    started_at = datetime.now(UTC)
     await entitlement_service.check_metric_limit(session, tenant, "analysis.run")
     symbol_row, candles = await market_data.fetch_and_store_candles(
         session,
@@ -54,24 +176,83 @@ async def run_analysis(
         symbol=symbol,
         provider=market_provider,
     )
+    # Charts for the decision stage, drawn from the same candle rows the engines
+    # read (never a browser screenshot: two ways of seeing produce two answers).
+    # Best-effort by contract — a missing frame is reported, and the analysis
+    # proceeds on numbers alone rather than being lost with the pictures.
+    visual = await collect_visual_evidence(
+        session,
+        symbol=symbol,
+        timeframe=timeframe,
+    )
+    # The news read the evidence gate requires: headlines that move the metal,
+    # plus whatever the ingestion has of the economic calendar. Fetched here
+    # where the session lives, and passed as a fact — an empty read is reported
+    # as empty, never as clear news.
+    market_context = await _build_market_context(session)
     result = await run_analysis_orchestrator(
         symbol=symbol,
         candles=candles,
         memories=memories,
         mtf_context=mtf_snapshot,
+        market_context=market_context,
+        # The ladder is already loaded for the MTF read, so the agent's own
+        # timeframe choice costs no extra fetch (D11).
+        bars_by_timeframe=mtf_snapshot.get("bars_by_timeframe"),
+        visual_evidence=[s.as_payload() for s in visual.snapshots],
+        # Gives the decision stage the read-only tools: the digest it is sent is
+        # deliberately partial, and this is how the elided detail stays
+        # reachable instead of being reasoned around.
+        tool_context=ToolContext(session=session, symbol=symbol, tenant=tenant),
+    )
+    # The run is written before anything downstream can fail: a recommendation
+    # that references an agent_run_id has to be able to find it, and a degraded
+    # run is exactly the one whose trace is worth keeping.
+    await persist_agent_run(
+        session,
+        tenant,
+        result=result,
+        symbol=symbol,
+        started_at=started_at,
+        user_id=tenant.user_id,
+        # Catalogue the prompt text alongside the hash, or prompt_hash is a
+        # pointer into an empty table and M8 cannot resolve it.
+        prompt=_constitution_or_none(),
     )
     payload: dict[str, Any] = {
         "agent_run_id": str(result.agent_run_id),
         "workspace_id": str(tenant.workspace_id),
         "symbol": symbol,
-        "timeframe": timeframe.value,
+        # The frame the *agent* chose, which is the honest direction for this
+        # information to flow (ADR 0008) and what the UI labels the result with.
+        # Reporting the requested frame here told the reader the analysis was
+        # decided on a chart it merely started from.
+        "timeframe": (result.decision.get("timeframe") or timeframe.value),
+        # What was fetched, kept separately so the two can never be confused.
+        "source_timeframe": timeframe.value,
         "perceive": result.perceive,
         "recall": result.recall,
         "engines": result.engines,
         "decision": result.decision,
         "narrative": result.narrative,
+        "pipeline": result.pipeline,
+        "visual": {"frames": [s.timeframe for s in visual.snapshots], "missing": visual.missing},
         "as_of": candles[-1].ts.isoformat(),
     }
+    # Derived once and used twice: the recommendation row is filed under this
+    # classification, and the response reports the support that classification
+    # has. Two derivations would eventually disagree, and the disagreement would
+    # be invisible — the reader would see one number and the statistics another.
+    classification = classify(
+        result.engines,
+        timeframe=result.decision.get("timeframe") or timeframe.value,
+        moment=started_at,
+        typical_atr=_typical_atr(result.engines),
+    )
+    support = await assess_support(session, tenant, classification)
+    payload["classification"] = classification.to_dict()
+    payload["support"] = support.to_dict()
+
     if persist_engines:
         counts = await persist_engine_outputs(
             session,
@@ -88,9 +269,7 @@ async def run_analysis(
         except Exception as exc:  # noqa: BLE001 — fail closed when adversarial cannot run
             # Preserve an earlier fail-closed reason (e.g. LLM_UNAVAILABLE).
             if not result.decision.get("degraded"):
-                result.decision = fail_closed_no_trade(
-                    "ADVERSARIAL_UNAVAILABLE", detail=str(exc)
-                )
+                result.decision = fail_closed_no_trade("ADVERSARIAL_UNAVAILABLE", detail=str(exc))
                 payload["decision"] = result.decision
                 narrative = result.narrative if isinstance(result.narrative, dict) else {}
                 payload["narrative"] = {
@@ -133,8 +312,31 @@ async def run_analysis(
                 "decision": result.decision,
                 "engines": result.engines,
                 "persistence": payload.get("persistence"),
+                # The five keys every learning statistic is grouped by, derived
+                # here from the engines that just ran. Without this the terminal
+                # hook has nothing to read and files the outcome under a
+                # constant — which is what it did, for the product's whole
+                # history, into one bucket holding everything.
+                "classification": classification.to_dict(),
+                # What the record behind this plan actually says — including,
+                # explicitly, that it says nothing yet. Stored with the plan so
+                # a card rendered later shows the support that was true when the
+                # call was made, not today's.
+                "support": support.to_dict(),
             },
             agent_run_id=result.agent_run_id,
+            # Only a completed analysis has one. A degraded run reaches here
+            # with confidence None and must keep it.
+            confidence=(
+                None
+                if result.decision.get("confidence") is None
+                else Decimal(str(result.decision["confidence"]))
+            ),
+            # The plan itself, not just its direction. Before this, the levels
+            # the analysis produced lived only inside evidence_json — so the
+            # tracker had no stop to watch and no condition to evaluate, and a
+            # recommendation could never resolve on its own.
+            **_plan_columns(result.decision, tenant_timeframe=timeframe),
         )
         thesis = await recommendation_service.spawn_thesis_from_recommendation(
             session,
@@ -155,9 +357,7 @@ async def run_analysis(
                 "decision": result.decision,
                 "recommendation_id": str(rec.id),
                 "thesis_id": str(thesis.id),
-                "summary": str(
-                    reasoning.get("summary") or f"{symbol.upper()} {direction_value}"
-                ),
+                "summary": str(reasoning.get("summary") or f"{symbol.upper()} {direction_value}"),
                 "confidence": None if conf is None else float(conf),
                 "sample_size": 1,
                 "agent_run_id": str(result.agent_run_id),

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import structlog
+
 from app.core.config import Settings
+
+logger = structlog.get_logger(__name__)
 
 
 def init_sentry(settings: Settings) -> None:
@@ -12,12 +16,23 @@ def init_sentry(settings: Settings) -> None:
     try:
         import sentry_sdk
     except ImportError:
+        # Loud, not silent: an operator who set SENTRY_DSN believes crashes are
+        # captured. If the SDK is not in the image, say so rather than swallow
+        # every future error report.
+        logger.error(
+            "sentry_dsn_set_but_sdk_missing",
+            detail="SENTRY_DSN is configured but sentry-sdk is not installed; "
+            "no errors will be reported. Add sentry-sdk to the image.",
+        )
         return
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.sentry_environment or settings.environment,
         traces_sample_rate=settings.sentry_traces_sample_rate,
         send_default_pii=False,
+        # Exception local variables can hold the OANDA token or the DSN; keep
+        # them out of the event that leaves the process.
+        include_local_variables=False,
     )
 
 

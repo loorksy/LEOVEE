@@ -1,16 +1,48 @@
+"""Market structure — real, as of M4.
+
+Replaces the placeholder that set bias by comparing the first close to the last.
+That is a statement about two bars; structure is a statement about the sequence
+of swing highs and lows between them, and a series can close higher across a
+clean downtrend.
+
+The work is in app/engines/primitives/structure.py; this is the engine-shaped
+wrapper the orchestrator calls.
+"""
+
 from __future__ import annotations
 
 from typing import Any
 
-from app.engines.volatility import OHLCBar
+from app.core.timeframes import MIN_CANDLES_FOR_ANALYSIS
+from app.engines.bar import OHLCBar
+from app.engines.primitives.structure import detect_structure_levels, level_to_dict
+from app.engines.status import INSUFFICIENT_DATA, engine_unavailable
+
+_BIAS_BY_SHAPE = {
+    "uptrend": "BULLISH",
+    "downtrend": "BEARISH",
+    "range": "NEUTRAL",
+    "unknown": "NEUTRAL",
+}
 
 
 def run_structure_engine(bars: list[OHLCBar]) -> dict[str, Any]:
-    if len(bars) < 3:
-        return {"bias": "NEUTRAL", "swing_high": None, "swing_low": None}
-    highs = [float(b.high) for b in bars]
-    lows = [float(b.low) for b in bars]
-    swing_high = max(highs[-5:]) if len(highs) >= 5 else max(highs)
-    swing_low = min(lows[-5:]) if len(lows) >= 5 else min(lows)
-    bias = "BULLISH" if bars[-1].close > bars[0].close else "BEARISH"
-    return {"bias": bias, "swing_high": swing_high, "swing_low": swing_low}
+    if len(bars) < MIN_CANDLES_FOR_ANALYSIS:
+        # Too few bars to confirm swings. Abstaining is the honest answer; a
+        # bias derived from a handful of bars is noise wearing a label.
+        return engine_unavailable("structure", INSUFFICIENT_DATA)
+
+    analysis = detect_structure_levels(bars)
+    return {
+        "bias": _BIAS_BY_SHAPE[analysis.structure],
+        "shape": analysis.structure,
+        "current_price": analysis.current_price,
+        "swing_high": max(analysis.swing_highs) if analysis.swing_highs else None,
+        "swing_low": min(analysis.swing_lows) if analysis.swing_lows else None,
+        "swing_highs": analysis.swing_highs,
+        "swing_lows": analysis.swing_lows,
+        "nearest_support": analysis.nearest_support,
+        "nearest_resistance": analysis.nearest_resistance,
+        "supports": [level_to_dict(level) for level in analysis.supports],
+        "resistances": [level_to_dict(level) for level in analysis.resistances],
+    }

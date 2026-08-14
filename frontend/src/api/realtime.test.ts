@@ -10,14 +10,14 @@ describe("buildStreamUrl", () => {
   it("builds a ws:// url from the current window origin when no API base is set", () => {
     const url = buildStreamUrl({
       token: "tok",
-      symbols: ["EURUSD"],
+      symbols: ["XAUUSD"],
       channels: ["candles", "annotations"],
       workspaceId: "ws-1",
     });
     expect(url.startsWith("ws://")).toBe(true);
     expect(url).toContain("/ws/v1/stream?");
     expect(url).toContain("token=tok");
-    expect(url).toContain("symbols=EURUSD");
+    expect(url).toContain("symbols=XAUUSD");
     expect(url).toContain("channels=candles%2Cannotations");
     expect(url).toContain("workspace_id=ws-1");
   });

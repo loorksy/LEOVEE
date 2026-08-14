@@ -30,7 +30,7 @@ class _ReconnectStreamManager(OandaStreamManager):
         partial_tick: PriceTick | None = None,
     ) -> None:
         settings = Settings(OANDA_API_TOKEN="token", OANDA_ACCOUNT_ID="acct")
-        super().__init__(settings, ["EURUSD"])
+        super().__init__(settings, ["XAUUSD"])
         self._backfill_candles = backfill_candles
         self._pending_ticks = [t for t in (partial_tick, tick) if t is not None]
         self._rest.fetch_candles = AsyncMock(return_value=backfill_candles)  # type: ignore[method-assign]
@@ -54,8 +54,8 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
     settings = Settings(OANDA_API_TOKEN="token", OANDA_ACCOUNT_ID="acct")
     anchor = datetime(2026, 3, 1, 12, 5, 10, tzinfo=UTC)
     partial_ts = anchor - timedelta(seconds=30)
-    partial = PriceTick("EURUSD", Decimal("1.0950"), Decimal("1.0952"), partial_ts)
-    tick = PriceTick("EURUSD", Decimal("1.1000"), Decimal("1.1002"), anchor)
+    partial = PriceTick("XAUUSD", Decimal("1.0950"), Decimal("1.0952"), partial_ts)
+    tick = PriceTick("XAUUSD", Decimal("1.1000"), Decimal("1.1002"), anchor)
 
     backfill: list[NormalizedCandle] = []
     for i in range(4):
@@ -63,7 +63,7 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
         price = Decimal("1.09") + Decimal(i) * Decimal("0.001")
         backfill.append(
             NormalizedCandle(
-                symbol="EURUSD",
+                symbol="XAUUSD",
                 timeframe=Timeframe.M1,
                 ts=ts,
                 open=price,
@@ -78,7 +78,7 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
 
     backfill.append(
         NormalizedCandle(
-            symbol="EURUSD",
+            symbol="XAUUSD",
             timeframe=Timeframe.M1,
             ts=anchor.replace(minute=4, second=0, microsecond=0),
             open=Decimal("1.099"),
@@ -92,7 +92,7 @@ async def test_stream_disconnect_fallback_backfill_gapless_series(db_session: As
     )
 
     manager = _ReconnectStreamManager(backfill_candles=backfill, tick=tick, partial_tick=partial)
-    consumer = OandaCandleStreamConsumer(settings, ["EURUSD"], stream_manager=manager)
+    consumer = OandaCandleStreamConsumer(settings, ["XAUUSD"], stream_manager=manager)
     stats = await consumer.run_cycle(db_session, max_ticks=2)
 
     assert stats["backfill_rows"] >= len(backfill)

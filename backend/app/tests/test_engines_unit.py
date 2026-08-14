@@ -1,47 +1,146 @@
+import importlib
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.engines.decision import run_decision_engine
+import pytest
+
 from app.engines.liquidity import run_liquidity_engine
-from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
+from app.engines.status import (
+    ENGINE_NOT_IMPLEMENTED,
+    ENGINE_STATUS,
+    EngineStatus,
+    is_unavailable,
+)
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
+from app.schemas.engines import EngineName
 from app.services.learning.calibration import apply_calibration
 from app.services.market.candle_aggregator import CandleAggregator, PriceTick
+from app.tests.bars import flat_bars, rising_bars, swinging_bars
 
 
 def _bars() -> list[OHLCBar]:
-    return [
-        OHLCBar(
-            open=Decimal("1.1"), high=Decimal("1.2"), low=Decimal("1.0"), close=Decimal("1.15")
-        ),
-        OHLCBar(
-            open=Decimal("1.15"), high=Decimal("1.25"), low=Decimal("1.1"), close=Decimal("1.2")
-        ),
-    ]
+    return rising_bars(20)
 
 
-def test_volatility_and_structure_engines() -> None:
-    bars = _bars()
-    vol = run_volatility_engine(bars)
-    structure = run_structure_engine(bars)
+def test_volatility_engine_is_implemented() -> None:
+    """ATR is genuine arithmetic over the bars, not a placeholder."""
+    vol = run_volatility_engine(_bars())
     assert vol["regime"]
-    assert structure["bias"]
+    assert not is_unavailable(vol)
 
 
-def test_liquidity_zones_scenario_decision_chain() -> None:
-    bars = _bars()
+@pytest.mark.parametrize(
+    ("name", "run"),
+    [
+        ("structure", lambda: run_structure_engine(swinging_bars(20))),
+        ("liquidity", lambda: run_liquidity_engine(swinging_bars(20))),
+        ("zones", lambda: run_zones_engine(swinging_bars(20))),
+    ],
+)
+def test_evidence_engines_answer_on_a_real_series(
+    name: str, run: Callable[[], dict[str, object]]
+) -> None:
+    """Ported in M4 — these no longer abstain, and no longer fabricate."""
+    output = run()
+    assert not is_unavailable(output), f"{name} declined on a well-formed series"
+    assert ENGINE_STATUS[name] is EngineStatus.IMPLEMENTED
+
+
+@pytest.mark.parametrize(
+    ("name", "run"),
+    [
+        ("structure", lambda: run_structure_engine(rising_bars(10))),
+        ("liquidity", lambda: run_liquidity_engine(rising_bars(10))),
+        ("zones", lambda: run_zones_engine(rising_bars(10))),
+    ],
+)
+def test_evidence_engines_abstain_below_the_minimum_window(
+    name: str, run: Callable[[], dict[str, object]]
+) -> None:
+    """Too few bars is a real condition on a 1-minute chart at the open.
+
+    Abstaining is the honest answer; a bias derived from ten bars is noise
+    wearing a label.
+    """
+    output = run()
+    assert is_unavailable(output), f"{name} answered on a 10-bar series"
+    assert output["reason"] == ENGINE_NOT_IMPLEMENTED or output["status"] == "unavailable"
+
+
+def test_zones_are_not_fabricated_from_the_last_bar() -> None:
+    """The placeholder returned a demand and a supply zone for any input.
+
+    A flat series has no imbalance, so a correct engine reports none rather
+    than manufacturing a pair around the final candle.
+    """
+    output = run_zones_engine(flat_bars(120))
+    if not is_unavailable(output):
+        assert output["zones"] == []
+
+
+def test_scenarios_derive_confidence_from_evidence_not_constants() -> None:
+    """The placeholder emitted 0.55 / 0.35 regardless of the market."""
+    bars = swinging_bars(20)
     structure = run_structure_engine(bars)
-    vol = run_volatility_engine(bars)
+    volatility = run_volatility_engine(bars)
     liquidity = run_liquidity_engine(bars)
     zones = run_zones_engine(bars)
-    scenarios = run_scenario_engine(structure, vol, liquidity)
-    risk = run_risk_engine(entry=Decimal("1.2"), stop=Decimal("1.18"))
-    decision = run_decision_engine(scenarios, risk)
-    assert zones["zones"]
-    assert decision["direction"] in {"BUY", "SELL", "WAIT", "NO_TRADE"}
+    result = run_scenario_engine(structure, volatility, liquidity, zones)
+    assert not is_unavailable(result)
+
+    labels = [s["label"] for s in result["scenarios"]]
+    # ADR 0002: two directional scenarios and an invalidation, never an
+    # abstention scenario.
+    assert labels == ["BULLISH", "BEARISH"]
+    assert "NO_TRADE" not in labels
+    assert result["invalidation"]["condition"] in ("CLOSE_BELOW", "CLOSE_ABOVE")
+
+    confidences = [s["confidence"] for s in result["scenarios"]]
+    assert all(0.0 < c < 1.0 for c in confidences)
+    # Nothing can be certain: the evidence set is finite and every input is a
+    # heuristic over a bounded window.
+    assert max(confidences) <= 0.85
+
+
+def test_scenarios_follow_the_structural_bias() -> None:
+    up = swinging_bars(20, drift=4.0)
+    down = swinging_bars(20, drift=-4.0)
+
+    def leading(bars: list[OHLCBar]) -> str:
+        structure = run_structure_engine(bars)
+        result = run_scenario_engine(
+            structure,
+            run_volatility_engine(bars),
+            run_liquidity_engine(bars),
+            run_zones_engine(bars),
+        )
+        best = max(result["scenarios"], key=lambda s: s["confidence"])
+        return str(best["label"])
+
+    assert leading(up) == "BULLISH"
+    assert leading(down) == "BEARISH"
+
+
+def test_there_is_no_second_decider() -> None:
+    """`engines/decision.py` is gone, and its absence is the assertion.
+
+    It mapped the leading scenario to a direction — a deterministic decider from
+    before the synthesizer landed. Every value it produced was overwritten before
+    the orchestrator returned, on every path, so it decided nothing; but it could
+    still emit `WAIT` and a confidence of 0.0 alongside NO_TRADE, both of which
+    ADR 0002 forbids. A dead decider that would violate the contract the moment
+    anyone rewired it is worse than no decider, so it was deleted rather than
+    corrected.
+    """
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("app.engines.decision")
+
+    assert "decision" not in ENGINE_STATUS
+    assert "decision" not in {engine.value for engine in EngineName}
 
 
 def test_calibration_never_returns_raw_only() -> None:
@@ -53,9 +152,9 @@ def test_candle_aggregator_dedupes_and_orders_ticks() -> None:
     agg = CandleAggregator(timeframe_minutes=1)
     ts = datetime(2026, 1, 1, 12, 0, 5, tzinfo=UTC)
     ticks = [
-        PriceTick("EURUSD", Decimal("1.1"), Decimal("1.1002"), ts),
-        PriceTick("EURUSD", Decimal("1.1"), Decimal("1.1002"), ts),
-        PriceTick("EURUSD", Decimal("1.1001"), Decimal("1.1003"), ts),
+        PriceTick("XAUUSD", Decimal("1.1"), Decimal("1.1002"), ts),
+        PriceTick("XAUUSD", Decimal("1.1"), Decimal("1.1002"), ts),
+        PriceTick("XAUUSD", Decimal("1.1001"), Decimal("1.1003"), ts),
     ]
     ordered = agg.dedupe_ticks(ticks)
     assert len(ordered) == 2

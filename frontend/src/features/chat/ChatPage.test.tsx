@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { ChatPage } from "./ChatPage";
 
 const postMessageStream = vi.fn();
@@ -21,9 +22,11 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ChatPage />
-      </MemoryRouter>
+      <LocaleProvider initialLocale="ar">
+        <MemoryRouter>
+          <ChatPage />
+        </MemoryRouter>
+      </LocaleProvider>
     </QueryClientProvider>,
   );
 }
@@ -35,7 +38,7 @@ describe("ChatPage", () => {
     postMessageStream.mockReset();
     createConversation.mockReset();
     listConversations.mockResolvedValue({
-      items: [{ id: "c1", title: "EURUSD", symbol: "EURUSD", mode: "CHAT", summary_text: null }],
+      items: [{ id: "c1", title: "XAUUSD", symbol: "XAUUSD", mode: "CHAT", summary_text: null }],
     });
     listMessages.mockResolvedValue({ items: [], summary_text: null });
   });
@@ -57,9 +60,9 @@ describe("ChatPage", () => {
     );
 
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "EURUSD" }));
-    fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "XAUUSD" }));
+    fireEvent.change(await screen.findByTestId("chat-draft-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("chat-send"));
 
     await waitFor(() => {
       expect(postMessageStream).toHaveBeenCalled();

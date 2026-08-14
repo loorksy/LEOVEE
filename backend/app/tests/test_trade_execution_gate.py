@@ -19,7 +19,7 @@ async def test_trade_execution_gate_blocks_live_orders(db_session: AsyncSession)
         await trade_service.create_trade_idea(
             db_session,
             ctx,
-            symbol_code="EURUSD",
+            symbol_code="XAUUSD",
             direction=RecommendationDirection.BUY,
             execution_enabled=True,
         )

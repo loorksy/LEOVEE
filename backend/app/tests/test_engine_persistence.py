@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 
 import pytest
 from sqlalchemy import func, select
@@ -14,33 +13,32 @@ from app.engines.zones import run_zones_engine
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
 from app.services import market_data
 from app.services.market.engine_persistence import persist_engine_outputs
+from app.tests.bars import rising_bars
 
 
 def _bars(n: int = 30) -> list[OHLCBar]:
-    bars: list[OHLCBar] = []
-    price = Decimal("1.1000")
-    for i in range(n):
-        o = price + Decimal(i) * Decimal("0.0001")
-        bars.append(
-            OHLCBar(
-                open=o,
-                high=o + Decimal("0.0005"),
-                low=o - Decimal("0.0003"),
-                close=o + Decimal("0.0002"),
-            )
-        )
-    return bars
+    return rising_bars(n)
 
 
 @pytest.mark.asyncio
 async def test_persist_engine_outputs_writes_artifacts(db_session: AsyncSession) -> None:
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
-    bars = _bars()
+    """Persistence itself, driven by engine-shaped payloads.
+
+    The real engines are placeholders until M4 (app/engines/status.py), so this
+    supplies the payload shapes they will produce rather than calling them —
+    otherwise the persistence logic would sit untested until the port lands.
+    """
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     engines = {
-        "structure": run_structure_engine(bars),
-        "volatility": run_volatility_engine(bars),
-        "liquidity": run_liquidity_engine(bars),
-        "zones": run_zones_engine(bars),
+        "structure": {"bias": "BULLISH", "swing_high": 1.1050, "swing_low": 1.0980},
+        "volatility": run_volatility_engine(_bars()),
+        "liquidity": {"sweeps": ["BUY_SIDE"], "equal_highs": True, "equal_lows": False},
+        "zones": {
+            "zones": [
+                {"type": "DEMAND", "low": 1.0980, "high": 1.1000, "strength": 0.7},
+                {"type": "SUPPLY", "low": 1.1050, "high": 1.1070, "strength": 0.6},
+            ]
+        },
     }
     counts = await persist_engine_outputs(
         db_session,
@@ -59,3 +57,31 @@ async def test_persist_engine_outputs_writes_artifacts(db_session: AsyncSession)
     assert structures and structures >= 1
     assert zones and zones >= 2
     assert events and events >= 1
+
+
+@pytest.mark.asyncio
+async def test_unavailable_engines_persist_nothing(db_session: AsyncSession) -> None:
+    """A declined answer must not become a stored artifact.
+
+    Reading `bias` off an "unavailable" payload with a NEUTRAL default would
+    write a structure row that later retrieval could not distinguish from a
+    measured one.
+    """
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
+    bars = _bars()
+    engines = {
+        "structure": run_structure_engine(bars),
+        "liquidity": run_liquidity_engine(bars),
+        "zones": run_zones_engine(bars),
+    }
+    counts = await persist_engine_outputs(
+        db_session,
+        symbol_id=symbol.id,
+        timeframe="H1",
+        as_of=datetime(2026, 1, 1, tzinfo=UTC),
+        engines=engines,
+    )
+    assert counts == {"market_events": 0, "structures": 0, "price_zones": 0}
+    assert await db_session.scalar(select(func.count()).select_from(Structure)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(PriceZone)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(MarketEvent)) == 0

@@ -54,10 +54,19 @@ class StripeBillingProvider(BillingProvider):
         import stripe
 
         stripe.api_key = self._settings.stripe_secret_key
-        event = stripe.Webhook.construct_event(  # type: ignore[no-untyped-call]
+        # Both are Optional in settings but mandatory for verification. Passing
+        # None through would either raise deep inside the SDK or, worse, skip
+        # the signature check — an unauthenticated caller could then forge
+        # billing events.
+        if signature is None:
+            raise ValueError("Stripe webhook is missing its signature header")
+        webhook_secret = self._settings.stripe_webhook_secret
+        if not webhook_secret:
+            raise ValueError("STRIPE_WEBHOOK_SECRET is not configured")
+        event = stripe.Webhook.construct_event(
             payload,
             signature,
-            self._settings.stripe_webhook_secret,
+            webhook_secret,
         )
         event_id = str(event["id"])
         event_type = str(event["type"])

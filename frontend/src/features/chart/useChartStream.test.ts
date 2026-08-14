@@ -34,7 +34,7 @@ describe("useChartStream", () => {
   it("does not connect until a workspaceId is available", () => {
     renderHook(() =>
       useChartStream({
-        symbol: "EURUSD",
+        symbol: "XAUUSD",
         workspaceId: undefined,
         onCandle: vi.fn(),
         onAnnotationEvent: vi.fn(),
@@ -47,12 +47,12 @@ describe("useChartStream", () => {
     const onCandle = vi.fn();
     const onAnnotationEvent = vi.fn();
     const { unmount } = renderHook(() =>
-      useChartStream({ symbol: "EURUSD", workspaceId: "ws-1", onCandle, onAnnotationEvent }),
+      useChartStream({ symbol: "XAUUSD", workspaceId: "ws-1", onCandle, onAnnotationEvent }),
     );
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     const socket = FakeWebSocket.instances[0];
-    expect(socket.url).toContain("symbols=EURUSD");
+    expect(socket.url).toContain("symbols=XAUUSD");
     expect(socket.url).toContain("channels=candles%2Cannotations");
     expect(socket.url).toContain("workspace_id=ws-1");
 
@@ -83,7 +83,7 @@ describe("useChartStream", () => {
     const onCandle = vi.fn();
     const onAnnotationEvent = vi.fn();
     renderHook(() =>
-      useChartStream({ symbol: "EURUSD", workspaceId: "ws-1", onCandle, onAnnotationEvent }),
+      useChartStream({ symbol: "XAUUSD", workspaceId: "ws-1", onCandle, onAnnotationEvent }),
     );
     const socket = FakeWebSocket.instances[0];
     expect(() => socket.onmessage?.({ data: "not-json" })).not.toThrow();

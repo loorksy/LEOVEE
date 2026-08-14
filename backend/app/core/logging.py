@@ -17,6 +17,11 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)oanda[_-]?api[_-]?token['\"]?\s*[:=]\s*['\"]?[A-Za-z0-9_-]{40,}"),
     # Long opaque tokens adjacent to OANDA context words
     re.compile(r"(?i)oanda[^A-Za-z0-9_-]{0,24}[A-Za-z0-9_-]{40,}"),
+    # Leovee's own API keys (lvk_ + 256-bit token).
+    re.compile(r"lvk_[A-Za-z0-9_-]{20,}"),
+    # JWTs (header.payload.signature) — the '.' separators mean the generic
+    # opaque-token classes above never span a whole bearer JWT.
+    re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"),
 )
 
 

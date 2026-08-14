@@ -10,7 +10,7 @@ def test_adversarial_blocks_conflicting_mtf() -> None:
     report = run_devils_advocate(decision=decision, engines=engines)
     assert report["approved"] is False
     reasoning = run_reasoning_engine(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         decision=decision,
         engines=engines,
         adversarial=report,

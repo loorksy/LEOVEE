@@ -1,3 +1,5 @@
+import { useLocale } from "@/i18n/context";
+
 type ProviderNotConfiguredBannerProps = {
   /** Short surface title, e.g. "LLM provider not configured". */
   title: string;
@@ -15,6 +17,7 @@ export function ProviderNotConfiguredBanner({
   testId,
   hint,
 }: ProviderNotConfiguredBannerProps) {
+  const { t } = useLocale();
   return (
     <div
       className="rounded border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
@@ -23,7 +26,7 @@ export function ProviderNotConfiguredBanner({
     >
       <p className="font-medium">{title}</p>
       <p className="mt-1 text-amber-200/80">
-        Not configured:{" "}
+        {t("banner.notConfigured")}{" "}
         {credentials.map((name, index) => (
           <span key={name}>
             {index > 0 ? ", " : ""}
@@ -33,8 +36,7 @@ export function ProviderNotConfiguredBanner({
         .
       </p>
       <p className="mt-1 text-amber-200/80">
-        {hint ??
-          "Set the missing credential(s) via Admin → Platform secrets or deploy secrets, then reload. This is not an empty-data state."}
+        {hint ?? t("banner.hint")}
       </p>
     </div>
   );

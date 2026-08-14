@@ -23,9 +23,7 @@ describe("PerformancePage", () => {
 
     renderWithProviders(<PerformancePage />);
 
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Performance" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("performance-title")).toBeInTheDocument();
     expect(await screen.findByText("3")).toBeInTheDocument();
     expect(screen.getByText("0.500")).toBeInTheDocument();
   });
@@ -35,6 +33,6 @@ describe("PerformancePage", () => {
 
     renderWithProviders(<PerformancePage />);
 
-    expect(await screen.findByText(/could not load performance summary/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("performance-error")).toBeInTheDocument();
   });
 });

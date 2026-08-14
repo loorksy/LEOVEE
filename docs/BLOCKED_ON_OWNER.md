@@ -69,6 +69,9 @@ Staging currently has practice OANDA + `SECRET_KEY` set; **both LLM keys are emp
 | **Sentry DSN verification** | Bridge is wired; confirm events with a real DSN | Waiting |
 | **Live / funded OANDA + `OANDA_EXECUTION`** | Explicitly **not** authorized. Practice OANDA only on staging until written authorization | Forbidden until written authorization |
 | **VPS backup/restore re-run** | Scripts count `candles` / `agent_memories` / `memory_embeddings`; re-run after next staging deploy with real data | Waiting |
+| **Git LFS budget** | `frontend/public/charting_library` (~27MB TradingView runtime) cannot push — "repository exceeded its LFS budget" is an account setting. Raise the budget (or pick an option from `frontend/vendor/tradingview/README.md`), then `git add frontend/public/charting_library && git push` | Waiting — code side complete |
+| **GitHub Actions runners** | Every CI job on every push (including `main`) fails in ~2s with `runner_id: 0` — no runner is ever provisioned. Repo/account-level Actions or billing setting; nothing in the workflow files causes it | Waiting — documented once on PR #25 |
+| **Archive the AiChart reference (M11)** | Tag `loorksy/AiChart`'s default branch `pre-leovee-migration-reference`, then archive the repo in GitHub settings. Migration agents only have push scope on `loorksy/leovee` | Waiting |
 
 ## Broker policy (non-negotiable)
 

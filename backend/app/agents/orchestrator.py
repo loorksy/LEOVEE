@@ -1,23 +1,84 @@
+"""The analysis pipeline: one visible agent over a fleet of specialists.
+
+The graph, and where each piece lives:
+
+    market_data                          (the caller: candles are already loaded)
+      → structure ∥ liquidity ∥ zones ∥ geometry ∥ volatility     app/engines/
+      → multi_timeframe                                           app/engines/mtf
+      → timeframe_selection                                       app/agents/timeframe
+      → scenarios → risk → plan_sanity                            app/engines/
+      → final_decision                                            the model layer
+
+AiChart's ``execution_guard`` stage is deleted and ``plan_sanity`` occupies its
+position as a deterministic gate (D4).
+
+**The fail-closed contract is the safety valve, and it is stricter than
+AiChart's degraded mode.** Any engine that cannot answer stops the run here:
+pricing risk and writing a narrative on top of missing evidence produces a
+confident, plausible, unfounded recommendation, which is the exact failure the
+contract exists to prevent. AiChart's operational messages carry over as
+*explanations attached to* NO_TRADE, never as a path around it.
+
+**Evidence is assembled before the decision, always.** Not for tidiness: a
+decision stage that runs while evidence is still arriving will use whatever
+happens to be ready, and which subset that is varies by provider latency — so
+the same market produces different recommendations on different days for
+reasons nothing records.
+"""
+
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from app.agents.errors import AgentStage, StageFailure, stage_failure_from_error
+from app.agents.pipeline import PipelineLedger
+from app.agents.prompts import PromptNotFound, constitution
+from app.agents.synthesizer import SynthesizerFailureKind, synthesize_decision
+from app.agents.timeframe import (
+    NoViableTimeframeError,
+    TimeframeChoice,
+    select_decision_timeframe,
+)
+from app.agents.tools.loop import run_tool_loop
+from app.agents.tools.registry import ToolContext
+from app.core.datetime_utils import utc_now
 from app.core.errors import ProviderConfigurationError
-from app.engines.decision import run_decision_engine
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
+from app.engines.bar import OHLCBar, bars_from_candles
+from app.engines.evidence import EconomicEvent, NewsContext, assess_evidence
+from app.engines.geometry import run_geometry_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import run_mtf_engine
+from app.engines.plan_sanity import (
+    measure_price_context,
+    risk_policy_for,
+    run_plan_sanity_engine,
+)
 from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
+from app.engines.status import unavailable_engines
 from app.engines.structure import run_structure_engine
-from app.engines.volatility import OHLCBar, run_volatility_engine
+from app.engines.volatility import run_volatility_engine
 from app.engines.zones import run_zones_engine
-from app.models.enums import RecommendationDirection
-from app.providers.llm.base import LLMMessage, LLMProvider
+from app.models.enums import RecommendationDirection, Timeframe
+from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.providers.llm.factory import get_llm_provider
+from app.services.market.calendar import get_session_status
+from app.services.memory.cases.fingerprint import session_of
+
+__all__ = [
+    "OrchestratorResult",
+    "bars_from_candles",
+    "fail_closed_no_trade",
+    "run_analysis_orchestrator",
+    "unavailable_engines",
+]
 
 
 @dataclass
@@ -28,10 +89,34 @@ class OrchestratorResult:
     engines: dict[str, Any] = field(default_factory=dict)
     decision: dict[str, Any] = field(default_factory=dict)
     narrative: dict[str, Any] = field(default_factory=dict)
+    #: What every stage did, including the ones that failed. Persisted to
+    #: agent_traces so a degraded run can be explained after the fact.
+    pipeline: dict[str, Any] = field(default_factory=dict)
+    #: The prompt this run was given, by content hash.
+    prompt_hash: str | None = None
+    #: Which model actually answered. Without it a run cannot be attributed to
+    #: an LLM after the fact, which is most of what run-level observability is
+    #: for when several providers rotate behind one router.
+    model: str | None = None
+    provider: str | None = None
 
 
-def bars_from_candles(candles: list[Any]) -> list[OHLCBar]:
-    return [OHLCBar(open=c.open, high=c.high, low=c.low, close=c.close) for c in candles]
+#: Which operational fact each synthesizer failure actually reports. An
+#: ungrounded plan is a *model* problem and a missing key is a *deployment*
+#: problem; one label for both makes the trace useless for telling them apart.
+_DEGRADED_REASON_BY_KIND: dict[SynthesizerFailureKind, str] = {
+    SynthesizerFailureKind.LLM_NOT_CONFIGURED: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_AUTH: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_RATE_LIMIT: "LLM_RATE_LIMITED",
+    SynthesizerFailureKind.PROVIDER_UNAVAILABLE: "LLM_UNAVAILABLE",
+    SynthesizerFailureKind.PROVIDER_BAD_REQUEST: "LLM_BAD_REQUEST",
+    SynthesizerFailureKind.MALFORMED_OUTPUT: "MODEL_OUTPUT_INVALID",
+    SynthesizerFailureKind.INVALID_PLAN: "MODEL_PLAN_INVALID",
+    SynthesizerFailureKind.LEVELS_NOT_GROUNDED: "LEVELS_NOT_GROUNDED",
+    SynthesizerFailureKind.REPAIR_EXHAUSTED: "MODEL_OUTPUT_INVALID",
+    SynthesizerFailureKind.TIMEOUT: "LLM_TIMEOUT",
+    SynthesizerFailureKind.UNKNOWN: "LLM_UNAVAILABLE",
+}
 
 
 def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str, Any]:
@@ -48,6 +133,27 @@ def fail_closed_no_trade(reason: str, *, detail: str | None = None) -> dict[str,
     return payload
 
 
+def _choose_timeframe(
+    ledger: PipelineLedger,
+    bars_by_timeframe: dict[str, list[OHLCBar]],
+    *,
+    leading_bias: str | None,
+) -> TimeframeChoice | None:
+    """Let the agent pick its frame, or record why it could not."""
+    try:
+        return select_decision_timeframe(bars_by_timeframe, leading_bias=leading_bias)
+    except NoViableTimeframeError as exc:
+        ledger.failures.append(
+            StageFailure(
+                stage=AgentStage.TIMEFRAME_SELECTION,
+                code=stage_failure_from_error(AgentStage.TIMEFRAME_SELECTION, exc).code,
+                retryable=False,
+                operator_detail=str(exc)[:500],
+            )
+        )
+        return None
+
+
 async def run_analysis_orchestrator(
     *,
     symbol: str,
@@ -55,71 +161,340 @@ async def run_analysis_orchestrator(
     memories: list[dict[str, Any]] | None = None,
     llm: LLMProvider | None = None,
     mtf_context: dict[str, Any] | None = None,
+    bars_by_timeframe: dict[str, list[OHLCBar]] | None = None,
+    visual_evidence: list[dict[str, Any]] | None = None,
+    tool_context: ToolContext | None = None,
+    market_context: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> OrchestratorResult:
-    if not candles:
-        raise ValueError("Analysis requires at least one stored candle")
-
     run_id = uuid.uuid4()
+    if not candles:
+        # A provider that returned nothing, or a symbol with no stored history.
+        # An exception here becomes a 500 with no explanation; the honest answer
+        # is the same one every other missing input gets.
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive={"symbol": symbol, "candle_count": 0},
+            decision=fail_closed_no_trade("NO_CANDLES", detail="no stored candles for this symbol"),
+            narrative={"degraded_reason": "NO_CANDLES"},
+        )
+
+    ledger = PipelineLedger()
     perceive = {"symbol": symbol, "candle_count": len(candles)}
     recall = {"memories": memories or [], "count": len(memories or [])}
 
     bars = bars_from_candles(candles)
     volatility = run_volatility_engine(bars)
     structure = run_structure_engine(bars)
+    geometry = run_geometry_engine(bars)
     liquidity = run_liquidity_engine(bars)
     zones = run_zones_engine(bars)
-    scenarios = run_scenario_engine(structure, volatility, liquidity)
-
-    entry = bars[-1].close
-    stop = entry - Decimal("0.0020")
-    risk = run_risk_engine(entry=entry, stop=stop)
-    decision = run_decision_engine(scenarios, risk)
-
     intelligence = run_market_intelligence_engine(bars)
+
     if mtf_context and "mtf" in mtf_context:
         mtf = mtf_context["mtf"]
         intelligence_by_tf = mtf_context.get("intelligence_by_tf", {})
     else:
-        intelligence_by_tf = {"H1": intelligence}
-        mtf = run_mtf_engine(intelligence_by_tf)
+        intelligence_by_tf = {DEFAULT_SERIES_TIMEFRAME.value: intelligence}
+        mtf = run_mtf_engine({DEFAULT_SERIES_TIMEFRAME.value: bars})
 
-    engines = {
+    # The agent picks its own frame (D11). Falls back to the frame the caller
+    # analysed only when the ladder was never loaded — with the fallback
+    # recorded, not hidden.
+    frames = bars_by_timeframe or {DEFAULT_SERIES_TIMEFRAME.value: bars}
+    leading_bias = mtf.get("trade_bias") if isinstance(mtf, dict) else None
+    choice = _choose_timeframe(ledger, frames, leading_bias=leading_bias)
+    decision_timeframe: Timeframe = choice.timeframe if choice else DEFAULT_SERIES_TIMEFRAME
+
+    scenarios = run_scenario_engine(structure, volatility, liquidity, zones, mtf)
+
+    evidence = {
         "volatility": volatility,
         "structure": structure,
+        "geometry": geometry,
         "liquidity": liquidity,
         "zones": zones,
         "scenarios": scenarios,
-        "risk": risk,
         "market_intelligence": intelligence,
         "mtf": mtf,
+    }
+
+    missing = unavailable_engines(evidence)
+    if missing:
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines={**evidence, "intelligence_by_tf": intelligence_by_tf},
+            decision=fail_closed_no_trade("ENGINE_UNAVAILABLE", detail=", ".join(missing)),
+            narrative={
+                "degraded_reason": "ENGINE_UNAVAILABLE",
+                "unavailable_engines": missing,
+            },
+            pipeline=ledger.to_dict(),
+        )
+
+    if choice is None:
+        # Every scalping frame was excluded — no readable shape, or too few bars.
+        # That is an answer, and a more useful one than a plan on a chart the
+        # agent has just established it cannot read.
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines={**evidence, "intelligence_by_tf": intelligence_by_tf},
+            decision=fail_closed_no_trade(
+                "NO_VIABLE_TIMEFRAME",
+                detail=ledger.failures[-1].operator_detail if ledger.failures else None,
+            ),
+            narrative={"degraded_reason": "NO_VIABLE_TIMEFRAME"},
+            pipeline=ledger.to_dict(),
+        )
+
+    # Back to Decimal at the money boundary: engines compute in float to match
+    # the reference implementation, prices are persisted and sized in Decimal.
+    policy = risk_policy_for(decision_timeframe)
+    atr = float(volatility.get("atr") or 0.0)
+    entry_f = bars[-1].close
+    stop_distance = atr * policy.stop_atr_multiple
+    entry = Decimal(str(entry_f))
+    stop = entry - Decimal(str(stop_distance))
+    risk = run_risk_engine(
+        entry=entry,
+        stop=stop,
+        targets=[entry + Decimal(str(stop_distance * r)) for r in policy.target_r],
+        # Gold, not a currency pair: without the symbol the pip size defaults to
+        # an FX convention and every pip figure is out by a hundred.
+        symbol=symbol,
+    )
+
+    # Measured from the bars this analysis read, not from an assumed cost.
+    price_context = measure_price_context(bars, atr=atr)
+    plan_sanity = run_plan_sanity_engine(
+        entry=entry_f,
+        stop=entry_f - stop_distance,
+        targets=[entry_f + stop_distance * r for r in policy.target_r],
+        context=price_context,
+        symbol=symbol,
+    )
+
+    engines = {
+        **evidence,
+        "risk": risk,
+        "plan_sanity": plan_sanity,
+        "timeframe_selection": choice.to_dict(),
         "intelligence_by_tf": intelligence_by_tf,
     }
 
-    narrative: dict[str, Any] = {}
-    try:
-        provider = llm or get_llm_provider()
-        llm_out = await provider.complete(
-            [
-                LLMMessage(role="system", content="You are a trading analyst."),
-                LLMMessage(
-                    role="user",
-                    content=f"Summarize {symbol} decision {decision['direction']}",
-                ),
-            ]
+    # A plan that cannot survive its own costs is not a weaker recommendation,
+    # it is one whose arithmetic never closes. Fail closed rather than publish it.
+    if not plan_sanity["viable"]:
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines=engines,
+            decision=fail_closed_no_trade(
+                "PLAN_NOT_VIABLE", detail=", ".join(plan_sanity["failures"])
+            ),
+            narrative={
+                "degraded_reason": "PLAN_NOT_VIABLE",
+                "plan_failures": plan_sanity["failures"],
+            },
+            pipeline=ledger.to_dict(),
         )
-        narrative = {"llm": llm_out.structured or {"summary": llm_out.content}}
-    except ProviderConfigurationError as exc:
-        # Fail closed: never emit BUY/SELL with confidence when the LLM layer is absent.
-        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
+
+    # The evidence gate: everything the platform insists on reading before it
+    # states a direction — the metal's session, the news and the economic
+    # calendar, the liquidity and supply/demand it already computed, and a final
+    # check that the price the plan is written at is the price on the screen. A
+    # mandatory reading that is missing or stale fails the run closed with its
+    # own name, exactly like a missing engine — the recommendation is never a
+    # claim the agent did not check.
+    moment = now or utc_now()
+    session = get_session_status(symbol, moment)
+    session_status = {
+        "is_open": session.is_open,
+        "reason": session.reason,
+        # London / New York / Asia — the metal's session, named for the reader.
+        "session": session_of(moment),
+    }
+    evidence_report = assess_evidence(
+        engines=engines,
+        session_status=session_status,
+        news=_news_context(market_context),
+        last_bar_ts=bars[-1].ts,
+        now=moment,
+        decision_timeframe=decision_timeframe,
+    )
+    engines["evidence"] = evidence_report.to_dict()
+    block_reason = evidence_report.block_reason
+    if block_reason is not None:
+        blocking = next(c for c in evidence_report.checks if c.blocking and c.failed)
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines=engines,
+            decision=fail_closed_no_trade(block_reason, detail=blocking.detail),
+            narrative={
+                "degraded_reason": block_reason,
+                "evidence": evidence_report.to_dict(),
+            },
+            pipeline=ledger.to_dict(),
+        )
+
+    narrative: dict[str, Any] = {}
+    prompt_hash: str | None = None
+    try:
+        prompt_hash = constitution().hash
+    except PromptNotFound as exc:
+        # A missing constitution is not a degraded run, it is an unguided model.
+        # Nothing below should execute.
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines=engines,
+            decision=fail_closed_no_trade("PROMPT_UNAVAILABLE", detail=str(exc)),
+            narrative={"degraded_reason": "PROMPT_UNAVAILABLE", "detail": str(exc)},
+            pipeline=ledger.to_dict(),
+        )
+
+    provider = llm
+    if provider is None:
+        try:
+            provider = get_llm_provider()
+        except ProviderConfigurationError as exc:
+            return OrchestratorResult(
+                agent_run_id=run_id,
+                perceive=perceive,
+                recall=recall,
+                engines=engines,
+                decision=fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc)),
+                narrative={"llm_unavailable": str(exc), "degraded_reason": "LLM_UNAVAILABLE"},
+                pipeline=ledger.to_dict(),
+                prompt_hash=prompt_hash,
+            )
+
+    resolved = provider
+    tool_calls_made = 0
+    loop_truncated: str | None = None
+
+    async def _complete(messages: list[LLMMessage]) -> LLMResponse:
+        """One turn — with the browse loop attached when a session is available.
+
+        The digest sent to the model is deliberately partial: a geometry
+        snapshot alone is thousands of tokens of anchor coordinates. The tools
+        are how the elided detail stays reachable, so the model can look at the
+        candles or the chart it needs rather than reasoning around a summary.
+
+        Without a session there is nothing to browse, and the stage falls back
+        to a single completion rather than pretending the tools exist.
+        """
+        nonlocal tool_calls_made, loop_truncated
+        if tool_context is None:
+            return await resolved.complete(messages)
+
+        async def _turn(conversation: list[LLMMessage], tools: list[dict[str, Any]]) -> LLMResponse:
+            return await resolved.complete(conversation, tools=tools or None)
+
+        loop = await run_tool_loop(complete=_turn, messages=messages, context=tool_context)
+        tool_calls_made += len(loop.calls)
+        loop_truncated = loop.stopped_on or loop_truncated
+        return loop.response
+
+    outcome = await synthesize_decision(
+        complete=_complete,
+        symbol=symbol,
+        evidence=_evidence_digest(engines),
+        timeframe=decision_timeframe.value,
+        visual=visual_evidence,
+        engines=engines,
+        atr=atr,
+    )
+
+    if outcome.ok and outcome.decision is not None:
+        # The model's plan replaces the geometric placeholder, then goes through
+        # the same cost gate: a plan the model wrote is not exempt from the
+        # arithmetic that would have rejected it from anyone else.
+        model_plan = outcome.decision
+        assert model_plan.levels is not None
+        model_sanity = run_plan_sanity_engine(
+            entry=model_plan.levels.entry,
+            stop=model_plan.levels.stop,
+            targets=list(model_plan.levels.targets),
+            context=price_context,
+            symbol=symbol,
+        )
+        engines["plan_sanity"] = model_sanity
+        # Re-priced from the model's own levels. Leaving the geometric figure in
+        # place would publish a long's risk beside a short's plan, and nothing
+        # downstream compares them.
+        engines["risk"] = run_risk_engine(
+            entry=Decimal(str(model_plan.levels.entry)),
+            stop=Decimal(str(model_plan.levels.stop)),
+            targets=[Decimal(str(t)) for t in model_plan.levels.targets],
+            symbol=symbol,
+        )
+        if not model_sanity["viable"]:
+            return OrchestratorResult(
+                agent_run_id=run_id,
+                perceive=perceive,
+                recall=recall,
+                engines=engines,
+                decision=fail_closed_no_trade(
+                    "PLAN_NOT_VIABLE", detail=", ".join(model_sanity["failures"])
+                ),
+                narrative={
+                    "degraded_reason": "PLAN_NOT_VIABLE",
+                    "plan_failures": model_sanity["failures"],
+                    "repairs": outcome.repairs,
+                },
+                pipeline=ledger.to_dict(),
+                prompt_hash=prompt_hash,
+            )
+        decision = model_plan.model_dump(mode="json")
+        # The frame is the selector's answer, not the model's. D11 gives the
+        # choice to the agent's *analysis*; letting the reply name any frame
+        # string would publish a plan sized for one chart and labelled another.
+        decision["timeframe"] = decision_timeframe.value
+        decision["timeframe_rationale"] = choice.rationale
+        model_name, provider_name = outcome.model, outcome.provider
         narrative = {
-            "llm_unavailable": str(exc),
-            "degraded_reason": "LLM_UNAVAILABLE",
+            "rationale": model_plan.rationale,
+            "invalidation": model_plan.evidence.get("invalidation"),
+            "condition": model_plan.evidence.get("condition"),
+            "contradicting_evidence": model_plan.evidence.get("contradicting_evidence"),
+            "attempts": outcome.attempts,
+            "repairs": outcome.repairs,
+            "tool_calls": tool_calls_made,
+            # Never silent: a caller has to be able to tell a considered answer
+            # from one the loop cut short.
+            "tools_truncated": loop_truncated,
         }
-    except Exception as exc:  # noqa: BLE001 — analysis path must fail closed
-        decision = fail_closed_no_trade("LLM_UNAVAILABLE", detail=str(exc))
+    else:
+        model_name = provider_name = None
+        if outcome.failure is not None:
+            ledger.failures.append(outcome.failure)
+        # The kind is the reason. Collapsing every synthesizer failure into
+        # LLM_UNAVAILABLE made an ungrounded plan indistinguishable from an
+        # unconfigured provider in `agent_runs.error`, which is the one place an
+        # operator looks to tell a model problem from a deployment problem.
+        reason = (
+            _DEGRADED_REASON_BY_KIND.get(outcome.kind, "LLM_UNAVAILABLE")
+            if outcome.kind is not None
+            else "LLM_UNAVAILABLE"
+        )
+        decision = fail_closed_no_trade(reason, detail=outcome.detail)
         narrative = {
-            "llm_unavailable": str(exc),
-            "degraded_reason": "LLM_UNAVAILABLE",
+            "llm_unavailable": outcome.detail,
+            "degraded_reason": reason,
+            "failure_kind": outcome.kind.value if outcome.kind else None,
+            "attempts": outcome.attempts,
+            "repairs": outcome.repairs,
+            "tool_calls": tool_calls_made,
+            "tools_truncated": loop_truncated,
         }
 
     return OrchestratorResult(
@@ -129,4 +504,77 @@ async def run_analysis_orchestrator(
         engines=engines,
         decision=decision,
         narrative=narrative,
+        pipeline=ledger.to_dict(),
+        prompt_hash=prompt_hash,
+        model=model_name,
+        provider=provider_name,
+    )
+
+
+def _evidence_digest(engines: dict[str, Any]) -> str:
+    """A compact, readable summary of the evidence for the prompt.
+
+    Deliberately not the raw bundle: a geometry snapshot alone is thousands of
+    tokens of anchor coordinates the model cannot use in prose, and spending the
+    budget on them leaves nothing for the frames that matter. Whatever is
+    elided here stays reachable through the tools, which is the division of
+    labour the tool loop exists for.
+    """
+    structure = engines.get("structure", {})
+    geometry = engines.get("geometry", {})
+    mtf = engines.get("mtf", {})
+    digest = {
+        "structure": {
+            "bias": structure.get("bias"),
+            "shape": structure.get("shape"),
+            "nearest_support": structure.get("nearest_support"),
+            "nearest_resistance": structure.get("nearest_resistance"),
+        },
+        "regime": engines.get("market_intelligence", {}).get("regime"),
+        "stance": engines.get("market_intelligence", {}).get("stance"),
+        "mtf": {
+            "alignment": mtf.get("alignment"),
+            "trade_bias": mtf.get("trade_bias"),
+            "conflict": mtf.get("conflict"),
+            "roles": mtf.get("roles"),
+        },
+        "patterns": [
+            {
+                "type": p.get("pattern_type"),
+                "status": p.get("status"),
+                "stage": p.get("stage"),
+                "confidence": p.get("confidence"),
+                "target": p.get("projected_target"),
+            }
+            for p in geometry.get("patterns", [])
+        ],
+        "candlesticks": [c.get("name") for c in geometry.get("candlesticks", [])[:3]],
+        "zones": engines.get("zones", {}).get("zones", [])[:4],
+        "plan_sanity": engines.get("plan_sanity"),
+        "timeframe": engines.get("timeframe_selection", {}).get("timeframe"),
+        # The pre-decision reading the gate assembled: session, news, event
+        # blackout, live-price freshness. The model must weigh what was checked,
+        # not assume it.
+        "evidence": engines.get("evidence"),
+    }
+    return json.dumps(digest, ensure_ascii=False, default=str, indent=2)
+
+
+def _news_context(market_context: dict[str, Any] | None) -> NewsContext:
+    """Build the news read from what the caller fetched, honestly.
+
+    An absent ``market_context`` means the analysis was invoked without a news
+    read wired in — reported as an unconfigured provider, never as clear news.
+    """
+    ctx = market_context or {}
+    events = tuple(
+        EconomicEvent(ts=e["ts"], title=str(e.get("title", "")), impact=e.get("impact", "low"))
+        for e in ctx.get("upcoming_events", [])
+        if isinstance(e, dict) and e.get("ts") is not None
+    )
+    return NewsContext(
+        provider_configured=bool(ctx.get("provider_configured", False)),
+        headline_count=int(ctx.get("headline_count", 0)),
+        latest_headline_ts=ctx.get("latest_headline_ts"),
+        upcoming_events=events,
     )

@@ -152,7 +152,7 @@ async def test_mid_stream_failure_falls_back_without_duplicate(
         workspace_id=ctx.workspace_id,
         user_id=user.id,
         title="Stream",
-        symbol="EURUSD",
+        symbol="XAUUSD",
         mode=ConversationMode.CHAT,
     )
     db_session.add(conv)

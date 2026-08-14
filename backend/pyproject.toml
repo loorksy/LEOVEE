@@ -24,6 +24,19 @@ dependencies = [
     "arq>=0.26.1",
     "stripe>=11.0.0",
     "cryptography>=42.0.0",
+    # Server-side chart rendering for the agent's visual evidence. Pillow
+    # only — the chart is drawn from the same candle rows the engines read,
+    # so no browser or JS runtime is involved.
+    "Pillow>=11.0.0",
+    # Real Prometheus metrics (M11). The registry is process-global on purpose:
+    # the in-memory counters it replaces vanished on every restart and could
+    # not express histograms, so latency percentiles were unknowable.
+    "prometheus-client>=0.21.0",
+    # Error tracking. Optional at runtime (init is a no-op without SENTRY_DSN)
+    # but must be *present in the image* — otherwise setting SENTRY_DSN silently
+    # captures nothing. The bridge logs loudly if the DSN is set and this is
+    # somehow absent.
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -73,3 +86,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["app/tests"]
+markers = [
+    "no_db: test inspects source or ORM metadata only and needs no database",
+]

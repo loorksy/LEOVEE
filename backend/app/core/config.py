@@ -9,6 +9,22 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
     secret_key: str = Field(default="change-me-in-production", alias="SECRET_KEY")
+    #: The dev-only `X-Leovee-User-Id` impersonation header does nothing unless
+    #: this is explicitly on. Off by default, so absence of config is secure: a
+    #: deployment that forgot `ENVIRONMENT=production` (the default is
+    #: "development") still cannot be impersonated, because the bypass needs a
+    #: positive signal, not merely a wrong environment string. Refused at
+    #: production startup.
+    dev_auth_bypass: bool = Field(default=False, alias="DEV_AUTH_BYPASS")
+    #: When true, `X-Forwarded-For` is trusted for the client IP (rate-limit
+    #: keying). Only turn this on behind a proxy that overwrites the header
+    #: (Caddy/nginx in the deploy); off by default so a direct client cannot
+    #: forge its rate-limit bucket by sending the header itself.
+    trust_proxy_headers: bool = Field(default=False, alias="TRUST_PROXY_HEADERS")
+    #: Dedicated key for platform-secret encryption. Falls back to a
+    #: domain-separated derivation of SECRET_KEY when unset, so the secrets key
+    #: is never literally the JWT signing key.
+    encryption_key: str | None = Field(default=None, alias="ENCRYPTION_KEY")
     public_url: str = Field(default="http://localhost:5173", alias="PUBLIC_URL")
     cors_origins: str = Field(
         default="http://localhost:5173,http://localhost:3000",
@@ -33,6 +49,10 @@ class Settings(BaseSettings):
     oanda_api_token: str | None = Field(default=None, alias="OANDA_API_TOKEN")
     oanda_account_id: str | None = Field(default=None, alias="OANDA_ACCOUNT_ID")
     oanda_environment: str = Field(default="practice", alias="OANDA_ENVIRONMENT")
+    #: Order execution is out of scope (ADR 0005) and no code reads this to place
+    #: an order. The field exists so startup can *refuse to boot* when it is on —
+    #: matching the deploy scripts' promise in code, not only in shell wrappers.
+    oanda_execution: bool = Field(default=False, alias="OANDA_EXECUTION")
     oanda_api_url: str | None = Field(default=None, alias="OANDA_API_URL")
     oanda_stream_url: str | None = Field(default=None, alias="OANDA_STREAM_URL")
 
@@ -46,6 +66,14 @@ class Settings(BaseSettings):
     finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
 
     sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
+    #: Telegram is a conversation transport (ADR 0009). The bot token is a
+    #: platform secret so it rotates without a redeploy and never sits in a
+    #: process listing.
+    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
+    #: Set on the webhook when it is registered, and sent back by Telegram in
+    #: `X-Telegram-Bot-Api-Secret-Token`. Without it the endpoint is a public
+    #: URL anyone can POST an arbitrary "message" to.
+    telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
     sentry_environment: str | None = Field(default=None, alias="SENTRY_ENVIRONMENT")
     sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
 
@@ -73,7 +101,10 @@ class Settings(BaseSettings):
     )
     strategy_decay_min_trades: int = Field(default=10, alias="STRATEGY_DECAY_MIN_TRADES")
 
-    candle_retention_m1_days: int = Field(default=365, alias="CANDLE_RETENTION_M1_DAYS")
+    # Every active timeframe keeps at least a full year: that is the window
+    # the geometry engine, similar-case memory and calibration are built on,
+    # so purging inside it would quietly degrade all three.
+    candle_retention_m1_days: int = Field(default=400, alias="CANDLE_RETENTION_M1_DAYS")
     candle_retention_m5_days: int = Field(default=1095, alias="CANDLE_RETENTION_M5_DAYS")
     candle_retention_m15_days: int = Field(default=1095, alias="CANDLE_RETENTION_M15_DAYS")
     candle_retention_m30_days: int = Field(default=1095, alias="CANDLE_RETENTION_M30_DAYS")

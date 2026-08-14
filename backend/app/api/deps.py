@@ -43,7 +43,13 @@ async def get_current_user_id(
                 detail={"message": str(exc), "code": exc.code},
             ) from exc
 
-    if settings.environment in {"development", "test"} and x_leovee_user_id:
+    if (
+        settings.dev_auth_bypass
+        and settings.environment in {"development", "test"}
+        and x_leovee_user_id
+    ):
+        # Explicit opt-in only. Without DEV_AUTH_BYPASS this branch is dead, so a
+        # token remains the only way to authenticate even in a dev-labelled env.
         try:
             return uuid.UUID(x_leovee_user_id)
         except ValueError as exc:

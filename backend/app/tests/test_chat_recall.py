@@ -14,12 +14,12 @@ def test_build_llm_messages_injects_recall_bundle() -> None:
         user_id=uuid.uuid4(),
         title="t",
         mode=ConversationMode.CHAT,
-        symbol="EURUSD",
+        symbol="XAUUSD",
     )
     recall = {
         "label": RECALL_CONTEXT_LABEL,
         "count": 1,
-        "items": [{"key": "symbol:EURUSD", "content": {"note": "lesson"}}],
+        "items": [{"key": "symbol:XAUUSD", "content": {"note": "lesson"}}],
     }
     messages = build_llm_messages(
         conversation=conv,
@@ -29,5 +29,5 @@ def test_build_llm_messages_injects_recall_bundle() -> None:
     )
     system = messages[0].content
     assert RECALL_CONTEXT_LABEL in system
-    assert "symbol:EURUSD" in system
+    assert "symbol:XAUUSD" in system
     assert messages[-1] == LLMMessage(role="user", content="What is bias?")

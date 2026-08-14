@@ -1,8 +1,10 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signup } from "@/api/auth";
+import { useLocale } from "@/i18n/context";
 
 export function SignupPage() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -18,7 +20,7 @@ export function SignupPage() {
       await signup(email, password, organizationName || undefined);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed");
+      setError(err instanceof Error ? err.message : t("auth.error.signupFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -32,12 +34,12 @@ export function SignupPage() {
         data-testid="signup-form"
       >
         <div className="mb-6 flex items-center gap-2">
-          <img src="/leovee.svg" alt="Leovee" className="h-8 w-8" />
-          <span className="text-lg font-semibold text-white">Leovee</span>
+          <img src="/leovee.svg" alt={t("app.name")} className="h-8 w-8" />
+          <span className="text-lg font-semibold text-white">{t("app.name")}</span>
         </div>
-        <h1 className="mb-4 text-xl font-semibold text-slate-100">Create account</h1>
+        <h1 className="mb-4 text-xl font-semibold text-slate-100">{t("auth.signup")}</h1>
         <label className="mb-3 block text-sm text-slate-300" htmlFor="signup-org">
-          Workspace / organization name
+          {t("auth.orgName")}
           <input
             id="signup-org"
             type="text"
@@ -45,11 +47,11 @@ export function SignupPage() {
             value={organizationName}
             onChange={(event) => setOrganizationName(event.target.value)}
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-            placeholder="My desk"
+            placeholder={t("auth.orgPlaceholder")}
           />
         </label>
         <label className="mb-3 block text-sm text-slate-300" htmlFor="signup-email">
-          Email
+          {t("auth.email")}
           <input
             id="signup-email"
             type="email"
@@ -61,7 +63,7 @@ export function SignupPage() {
           />
         </label>
         <label className="mb-4 block text-sm text-slate-300" htmlFor="signup-password">
-          Password
+          {t("auth.password")}
           <input
             id="signup-password"
             type="password"
@@ -83,12 +85,12 @@ export function SignupPage() {
           disabled={submitting}
           className="w-full rounded bg-leovee-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          {submitting ? "Creating…" : "Sign up"}
+          {submitting ? t("auth.creatingAccount") : t("auth.signup")}
         </button>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Already have an account?{" "}
+          {t("auth.haveAccount")}{" "}
           <Link to="/login" className="text-leovee-accent hover:underline">
-            Sign in
+            {t("auth.login")}
           </Link>
         </p>
       </form>

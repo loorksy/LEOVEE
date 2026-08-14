@@ -10,11 +10,11 @@ describe("RecommendationsPage", () => {
       items: [
         {
           id: "rec-1",
-          symbol: "EURUSD",
+          symbol: "XAUUSD",
           direction: "BUY",
           status: "READY",
           confidence: 0.72,
-          headline: "EURUSD BUY",
+          headline: "XAUUSD BUY",
           thesis: "Bullish structure break",
           badges: ["READY", "conf:72%"],
         },
@@ -23,7 +23,7 @@ describe("RecommendationsPage", () => {
 
     renderWithProviders(<RecommendationsPage />);
 
-    expect(await screen.findByText("EURUSD BUY")).toBeInTheDocument();
+    expect(await screen.findByText("XAUUSD BUY")).toBeInTheDocument();
     expect(screen.getByText("Bullish structure break")).toBeInTheDocument();
   });
 
@@ -32,6 +32,6 @@ describe("RecommendationsPage", () => {
 
     renderWithProviders(<RecommendationsPage />);
 
-    expect(await screen.findByText(/no recommendations yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("recommendations-empty")).toBeInTheDocument();
   });
 });

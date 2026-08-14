@@ -12,18 +12,18 @@ describe("WatchlistPage", () => {
         {
           id: "wl-1",
           name: "Majors",
-          symbols: [{ code: "EURUSD", item_id: "item-1", last_price: 1.0812 }],
+          symbols: [{ code: "XAUUSD", item_id: "item-1", last_price: 1.0812 }],
         },
       ],
-      ws_symbols: ["EURUSD"],
+      ws_symbols: ["XAUUSD"],
     });
     vi.spyOn(watchlistStreamHook, "useWatchlistQuotesStream").mockImplementation(() => undefined);
 
     renderWithProviders(<WatchlistPage />);
 
     expect(await screen.findByText("Majors")).toBeInTheDocument();
-    expect(screen.getByText("EURUSD")).toBeInTheDocument();
-    expect(await screen.findByTestId("quote-EURUSD")).toHaveTextContent("1.0812");
+    expect(screen.getByText("XAUUSD")).toBeInTheDocument();
+    expect(await screen.findByTestId("quote-XAUUSD")).toHaveTextContent("1.0812");
     expect(watchlistApi.listWatchlists).toHaveBeenCalledWith(true);
   });
 
@@ -34,12 +34,12 @@ describe("WatchlistPage", () => {
 
     renderWithProviders(<WatchlistPage />);
 
-    expect(await screen.findByText(/no watchlists yet/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("watchlist-empty")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/new watchlist name/i), {
+    fireEvent.change(screen.getByTestId("new-watchlist-name"), {
       target: { value: "Metals" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /create watchlist/i }));
+    fireEvent.click(screen.getByTestId("create-watchlist"));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledWith("Metals"));
   });

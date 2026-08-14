@@ -11,8 +11,8 @@ def test_normalize_oanda_candle() -> None:
         "volume": 120,
         "complete": True,
     }
-    candle = normalize_oanda_candle("EUR_USD", "H1", raw)
-    assert candle.symbol == "EURUSD"
+    candle = normalize_oanda_candle("XAU_USD", "H1", raw)
+    assert candle.symbol == "XAUUSD"
     assert candle.timeframe == Timeframe.H1
     assert candle.open == Decimal("1.1000")
     assert candle.close == Decimal("1.1005")

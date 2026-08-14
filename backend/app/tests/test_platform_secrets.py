@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user_id, get_db_session
+from app.api.deps import get_current_user_id
 from app.core.config import get_settings
 from app.core.tenant import resolve_tenant_context
+from app.infrastructure.database import get_db_session
 from app.infrastructure.seed import ensure_platform_seed
 from app.main import create_app
 from app.models.platform_secret import PlatformSecret
@@ -30,7 +31,7 @@ app = create_app()
 
 
 @pytest.fixture(autouse=True)
-def _clear_runtime_secrets() -> None:
+def _clear_runtime_secrets() -> Iterator[None]:
     set_runtime_overrides({})
     get_settings.cache_clear()
     yield

@@ -35,6 +35,8 @@ MANAGED_SECRET_KEYS: tuple[str, ...] = (
     "SECRET_KEY",
     "METRICS_BEARER_TOKEN",
     "SENTRY_DSN",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_WEBHOOK_SECRET",
 )
 
 # Map env key → Settings field name
@@ -43,6 +45,8 @@ _ENV_TO_FIELD: dict[str, str] = {
     "OANDA_ACCOUNT_ID": "oanda_account_id",
     "OANDA_ENVIRONMENT": "oanda_environment",
     "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
+    "TELEGRAM_WEBHOOK_SECRET": "telegram_webhook_secret",
     "OPENAI_API_KEY": "openai_api_key",
     "OPENROUTER_API_KEY": "openrouter_api_key",
     "FINNHUB_API_KEY": "finnhub_api_key",
@@ -74,10 +78,18 @@ def _boot_secret_key() -> str:
     return Settings().secret_key
 
 
+#: Domain-separation label so the secrets key is not literally a hash of the
+#: JWT signing key. A leaked SECRET_KEY no longer yields the encryption key
+#: directly; and a dedicated ENCRYPTION_KEY, when set, decouples them entirely.
+_SECRETS_KEY_CONTEXT = b"leovee.platform-secrets.v1\x00"
+
+
 def _get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
-        digest = hashlib.sha256(_boot_secret_key().encode("utf-8")).digest()
+        base = Settings().encryption_key or _boot_secret_key()
+        source = _SECRETS_KEY_CONTEXT if Settings().encryption_key is None else b""
+        digest = hashlib.sha256(source + base.encode("utf-8")).digest()
         _fernet = Fernet(base64.urlsafe_b64encode(digest))
     return _fernet
 

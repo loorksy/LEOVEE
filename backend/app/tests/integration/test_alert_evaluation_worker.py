@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenant import resolve_tenant_context
 from app.core.tenant_rls import bind_workspace_rls
+from app.infrastructure.rls import clear_rls_session_context
 from app.models.candle import Candle
 from app.models.enums import Timeframe
 from app.models.notification import Notification
@@ -26,7 +27,7 @@ async def test_alert_evaluation_cycle_fans_out_notification(
     )
     ctx = await resolve_tenant_context(db_session, user.id)
     await bind_workspace_rls(db_session, ctx)
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     db_session.add(
         Candle(
             symbol_id=symbol.id,
@@ -45,11 +46,17 @@ async def test_alert_evaluation_cycle_fans_out_notification(
         db_session,
         ctx,
         alert_type="PRICE",
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         condition={"op": "gte", "price": 1.10},
         channels={"in_app": True},
     )
     await db_session.flush()
+
+    # The cron opens a fresh, unbound session. Clear the setup binding so the
+    # cycle has to bind per workspace itself — the old flat scan on an unbound
+    # session returned zero alerts under FORCE RLS and fired nothing. Without
+    # this line the test binding masks that bug, exactly as it used to.
+    await clear_rls_session_context(db_session)
 
     stats = await run_alert_evaluation_cycle(db_session)
     await db_session.flush()

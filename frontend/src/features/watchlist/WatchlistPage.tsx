@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addWatchlistSymbol,
@@ -7,10 +8,12 @@ import {
   listWatchlists,
 } from "@/api/watchlist";
 import { useWatchlistQuotesStream } from "@/features/watchlist/useWatchlistQuotesStream";
+import { useLocale } from "@/i18n/context";
 
 const QUOTE_POLL_MS = 15_000;
 
 export function WatchlistPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [newListName, setNewListName] = useState("");
   const [symbolDrafts, setSymbolDrafts] = useState<Record<string, string>>({});
@@ -61,12 +64,8 @@ export function WatchlistPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Watchlist</h1>
-        <p className="mt-1 text-slate-400">
-          Track symbols across your workspace — quotes refresh via polling
-          (<code>with_quotes=true</code>) and live <code>/ws/v1/stream?channels=candles</code>{" "}
-          ticks (§29).
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("watchlist.title")}</h1>
+        <p className="mt-1 text-slate-400">{t("watchlist.intro")}</p>
       </header>
 
       <form
@@ -77,28 +76,32 @@ export function WatchlistPage() {
         className="flex gap-2"
       >
         <label htmlFor="new-watchlist-name" className="sr-only">
-          New watchlist name
+          {t("watchlist.newName")}
         </label>
         <input
           id="new-watchlist-name"
+          data-testid="new-watchlist-name"
           value={newListName}
           onChange={(event) => setNewListName(event.target.value)}
-          placeholder="New watchlist name"
+          placeholder={t("watchlist.newName")}
           className="w-64 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
         />
         <button
           type="submit"
+          data-testid="create-watchlist"
           disabled={createMutation.isPending}
           className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          Create watchlist
+          {t("watchlist.create")}
         </button>
       </form>
 
-      {watchlistsQuery.isLoading && <p className="text-slate-400">Loading watchlists…</p>}
-      {watchlistsQuery.isError && <p className="text-amber-400">Could not load watchlists.</p>}
+      {watchlistsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
+      {watchlistsQuery.isError && <p className="text-amber-400">{t("common.error.load")}</p>}
       {!watchlistsQuery.isLoading && items.length === 0 && (
-        <p className="text-slate-400">No watchlists yet — create one above.</p>
+        <p className="text-slate-400" data-testid="watchlist-empty">
+          {t("watchlist.empty")}
+        </p>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -115,7 +118,7 @@ export function WatchlistPage() {
                 onClick={() => deleteMutation.mutate(wl.id)}
                 className="text-sm text-red-400 hover:text-red-300"
               >
-                Delete
+                {t("common.delete")}
               </button>
             </div>
             <ul className="mt-3 space-y-1 text-sm">
@@ -130,7 +133,9 @@ export function WatchlistPage() {
                   </li>
                 );
               })}
-              {wl.symbols.length === 0 && <li className="text-slate-500">No symbols yet.</li>}
+              {wl.symbols.length === 0 && (
+                <li className="text-slate-500">{t("watchlist.noSymbols")}</li>
+              )}
             </ul>
             <form
               onSubmit={(event) => {
@@ -141,7 +146,7 @@ export function WatchlistPage() {
               className="mt-3 flex gap-2"
             >
               <label htmlFor={`symbol-${wl.id}`} className="sr-only">
-                Add symbol to {wl.name}
+                {t("watchlist.addSymbol")}
               </label>
               <input
                 id={`symbol-${wl.id}`}
@@ -152,7 +157,7 @@ export function WatchlistPage() {
                     [wl.id]: event.target.value.toUpperCase(),
                   }))
                 }
-                placeholder="EURUSD"
+                placeholder={DEFAULT_SYMBOL}
                 className="w-32 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
               />
               <button
@@ -160,7 +165,7 @@ export function WatchlistPage() {
                 disabled={addSymbolMutation.isPending}
                 className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
               >
-                Add
+                {t("watchlist.add")}
               </button>
             </form>
           </section>

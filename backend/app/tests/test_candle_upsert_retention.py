@@ -19,7 +19,7 @@ from app.tests.doubles.market import FakeMarketDataProvider
 def _candle(ts: datetime, close: str) -> NormalizedCandle:
     price = Decimal(close)
     return NormalizedCandle(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe=Timeframe.M1,
         ts=ts,
         open=price,
@@ -34,7 +34,7 @@ def _candle(ts: datetime, close: str) -> NormalizedCandle:
 
 @pytest.mark.asyncio
 async def test_upsert_duplicate_updates_row(db_session: AsyncSession) -> None:
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     t0 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     first = _candle(t0, "1.1000")
     second = _candle(t0, "1.2000")
@@ -49,12 +49,12 @@ async def test_upsert_duplicate_updates_row(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_upsert_out_of_order_preserves_extremes(db_session: AsyncSession) -> None:
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     t0 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     base = _candle(t0, "1.1000")
     await market_data.upsert_candles(db_session, symbol.id, [base])
     late_update = NormalizedCandle(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe=Timeframe.M1,
         ts=t0,
         open=Decimal("1.1000"),
@@ -74,7 +74,7 @@ async def test_upsert_out_of_order_preserves_extremes(db_session: AsyncSession) 
 
 @pytest.mark.asyncio
 async def test_gap_detection_and_repair(db_session: AsyncSession) -> None:
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     t0 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     await market_data.upsert_candles(
         db_session,
@@ -92,7 +92,7 @@ async def test_gap_detection_and_repair(db_session: AsyncSession) -> None:
     provider = FakeMarketDataProvider([fill])
     repaired = await repair_candle_gaps(
         db_session,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         timeframe=Timeframe.M1,
         provider=provider,
     )
@@ -112,7 +112,7 @@ async def test_retention_job_deletes_stale_candles(
 
     monkeypatch.setenv("CANDLE_RETENTION_M1_DAYS", "7")
     get_settings.cache_clear()
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     old = _candle(datetime(2020, 1, 1, 12, 0, tzinfo=UTC), "1.05")
     fresh = _candle(datetime.now(UTC).replace(second=0, microsecond=0), "1.10")
     await market_data.upsert_candles(db_session, symbol.id, [old, fresh])

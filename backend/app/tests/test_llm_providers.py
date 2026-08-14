@@ -42,7 +42,7 @@ class _AsyncIter:
 async def test_openai_generate_usage_structured_and_tools() -> None:
     tool = SimpleNamespace(
         id="call_1",
-        function=SimpleNamespace(name="lookup", arguments='{"symbol":"EURUSD"}'),
+        function=SimpleNamespace(name="lookup", arguments='{"symbol":"XAUUSD"}'),
     )
     message = SimpleNamespace(content='{"ok":true}', tool_calls=[tool])
     response = SimpleNamespace(
@@ -63,7 +63,7 @@ async def test_openai_generate_usage_structured_and_tools() -> None:
     assert out.usage["total_tokens"] == 18
     assert out.structured == {"ok": True}
     assert out.tool_calls[0].name == "lookup"
-    assert out.tool_calls[0].arguments["symbol"] == "EURUSD"
+    assert out.tool_calls[0].arguments["symbol"] == "XAUUSD"
     kwargs = client.chat.completions.create.await_args.kwargs
     assert kwargs["response_format"]["type"] == "json_object"
     assert kwargs["tools"]

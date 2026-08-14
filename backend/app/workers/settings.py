@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
+
+import structlog
 from arq import cron
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
+from app.core.symbols import TRADABLE_SYMBOLS
+from app.core.timeframes import ACTIVE_TIMEFRAMES
 from app.infrastructure.database import get_session_factory
 from app.services.learning.outcome_recorder import TerminalOutcome
 from app.services.learning.pipeline import run_learning_pipeline
+
+logger = structlog.get_logger(__name__)
 
 
 async def process_learning_outcome(ctx: dict[str, object], payload: dict[str, object]) -> str:
@@ -42,22 +50,46 @@ async def candle_backfill_job(_ctx: dict[str, object]) -> str:
     factory = get_session_factory()
     if factory is None:
         raise RuntimeError("DATABASE_URL is not configured")
-    from app.models.enums import Timeframe
     from app.providers.market.oanda import get_market_provider
     from app.services.market.gaps import repair_candle_gaps
 
     provider = get_market_provider()
     repaired = 0
     async with factory() as session:
-        for symbol in ("EURUSD", "GBPUSD", "USDJPY"):
-            repaired += await repair_candle_gaps(
-                session,
-                symbol_code=symbol,
-                timeframe=Timeframe.M1,
-                provider=provider,
-            )
+        # Every frame the platform analyses, not just M1: a gap on H1 leaves
+        # the multi-timeframe context wrong, which is harder to notice than a
+        # gap on the frame being charted.
+        for symbol in TRADABLE_SYMBOLS:
+            for timeframe in ACTIVE_TIMEFRAMES:
+                repaired += await repair_candle_gaps(
+                    session,
+                    symbol_code=symbol,
+                    timeframe=timeframe,
+                    provider=provider,
+                )
         await session.commit()
     return f"candle_backfill_ok:{repaired}"
+
+
+async def history_backfill_job(_ctx: dict[str, object]) -> str:
+    """Keep a full year of candles present for every active timeframe.
+
+    Resumable: each run continues from the newest stored candle, so the first
+    run fills a year and every later run costs one page.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.providers.market.oanda import get_market_provider
+    from app.services.market.history import backfill_all
+
+    provider = get_market_provider()
+    written: dict[str, int] = {}
+    async with factory() as session:
+        for symbol in TRADABLE_SYMBOLS:
+            written |= await backfill_all(session, symbol_code=symbol, provider=provider)
+        await session.commit()
+    return f"history_backfill_ok:{written}"
 
 
 async def candle_retention_job(_ctx: dict[str, object]) -> str:
@@ -189,6 +221,56 @@ async def thesis_monitor_job(_ctx: dict[str, object]) -> str:
     return f"thesis_monitor_ok:{changed}"
 
 
+async def recommendation_tracker_job(_ctx: dict[str, object]) -> str:
+    """Advance every open plan. Without it the lifecycle is a story told once.
+
+    A conditional plan sits at "awaiting activation" through the entire move it
+    was waiting for; a plan whose invalidation level broke keeps its READY
+    badge; an idea from three sessions ago still reads as live. Every one of
+    those is the product being confidently wrong in the user's favour.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.recommendations.worker import run_recommendation_tracker_cycle
+
+    async with factory() as session:
+        report = await run_recommendation_tracker_cycle(session)
+        await session.commit()
+    return (
+        "recommendation_tracker_ok:"
+        f"evaluated={report.evaluated},changed={report.changed},"
+        f"failed_workspaces={len(report.failures)}"
+    )
+
+
+async def recommendation_reevaluation_job(_ctx: dict[str, object]) -> str:
+    """Ask whether each open plan is still the plan the analysis would write today.
+
+    Distinct from the tracker, which asks a cheap deterministic question about
+    price against the plan's own levels. This one may spend a model call, so it
+    runs on the cooldown's cadence and its own admission rules — one automatic
+    cycle per sweep, a cooldown between them, and a lifetime cap — bound what it
+    spends. Nothing here changes a plan directly: a trigger requests a decision,
+    and only the decision's output may revise anything.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.recommendations.worker import run_reevaluation_sweep
+
+    async with factory() as session:
+        report = await run_reevaluation_sweep(session)
+        await session.commit()
+    verdicts = ",".join(f"{name}={count}" for name, count in sorted(report.cycles.items()))
+    return (
+        "recommendation_reevaluation_ok:"
+        f"plans={report.plans},detected={report.detected},"
+        f"admitted={report.admitted},suppressed={report.suppressed}"
+        f"{',' + verdicts if verdicts else ''}"
+    )
+
+
 async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
     """Keep worker Settings in sync with admin-managed DB secrets."""
     factory = get_session_factory()
@@ -199,6 +281,24 @@ async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
     async with factory() as session:
         loaded = await load_runtime_overrides(session)
     return f"platform_secrets_reloaded:{len(loaded)}"
+
+
+async def market_case_index_job(_ctx: dict[str, object]) -> str:
+    """Sweep the shared candle store into platform-global market-case memory.
+
+    Without this the ``find_similar_cases`` / ``get_case_outcome_stats`` tools —
+    the "when has gold looked like this before" memory — read an empty table
+    forever. Idempotent (``store_cases`` upserts) and bounded per timeframe.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.memory.cases.indexer import index_market_cases
+
+    async with factory() as session:
+        written = await index_market_cases(session)
+    total = sum(written.values())
+    return f"market_case_index_ok:{total}"
 
 
 def _worker_redis_settings() -> RedisSettings:
@@ -212,6 +312,7 @@ class WorkerSettings:
         process_learning_outcome,
         oanda_stream_consumer_job,
         candle_backfill_job,
+        history_backfill_job,
         candle_retention_job,
         news_ingestion_job,
         memory_embedding_index_job,
@@ -220,16 +321,73 @@ class WorkerSettings:
         memory_decay_job,
         alert_evaluation_job,
         reload_platform_secrets_job,
+        recommendation_tracker_job,
+        recommendation_reevaluation_job,
+        market_case_index_job,
     ]
     cron_jobs = [
-        cron(oanda_stream_consumer_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
+        # Hourly: the first run fills a year, later runs cost one page each.
+        cron(history_backfill_job, minute={7}),  # type: ignore[arg-type]
         cron(candle_retention_job, hour={1}, minute=15),  # type: ignore[arg-type]
         cron(news_ingestion_job, hour={2}, minute=0),  # type: ignore[arg-type]
         cron(thesis_monitor_job, minute={5, 35}),  # type: ignore[arg-type]
+        # Every five minutes. A scalp plan's condition can fire and its stop can
+        # break inside one M15 candle, so an hourly sweep would routinely record
+        # the outcome after the move it describes is over.
+        cron(recommendation_tracker_job, minute=set(range(0, 60, 5))),  # type: ignore[arg-type]
+        # On the cooldown's cadence. Sweeping faster than the cooldown only
+        # writes suppression rows: the admission rules would refuse every
+        # extra pass, so the work would be a database round trip per plan to
+        # record that nothing was allowed to happen.
+        cron(recommendation_reevaluation_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
         cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]
+        # Nightly, after retention/backfill have settled the day's candles.
+        cron(market_case_index_job, hour={4}, minute=0),  # type: ignore[arg-type]
     ]
+
+    @staticmethod
+    async def on_startup(ctx: dict[str, object]) -> None:
+        """Open the live price feed and fill any history gap on boot.
+
+        The feed is the reason a scalp can be decided on the current candle
+        rather than one up to fifteen minutes old, so it starts with the worker
+        rather than waiting for a scheduled tick.
+        """
+        # The worker shares the API's env, so it must refuse the same
+        # misconfigurations the API refuses — a mis-provisioned worker binding a
+        # BYPASSRLS role or an armed dev bypass should not quietly run background
+        # jobs against every tenant's data.
+        from app.core.startup import validate_production_startup
+
+        validate_production_startup(get_settings())
+
+        from app.workers.stream_runner import start_stream_supervisor
+
+        ctx["stream_task"] = start_stream_supervisor()
+        logger.info("live_stream_started")
+
+    @staticmethod
+    async def on_job_end(ctx: dict[str, object]) -> None:
+        """Surface job failures as a metric — a chronically failing cron is
+        otherwise invisible until someone reads stdout."""
+        exc = ctx.get("exception")
+        if exc is not None:
+            from app.observability.prometheus import record_worker_job_failure
+
+            job = str(ctx.get("job_name") or "unknown")
+            record_worker_job_failure(job, type(exc).__name__)
+            logger.warning("worker_job_failed", job=job, error=str(exc)[:200])
+
+    @staticmethod
+    async def on_shutdown(ctx: dict[str, object]) -> None:
+        task = ctx.get("stream_task")
+        if isinstance(task, asyncio.Task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            logger.info("live_stream_stopped")
 
     redis_settings = _worker_redis_settings()

@@ -19,13 +19,13 @@ describe("LoginPage", () => {
 
     renderWithProviders(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByTestId("login-email"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), {
+    fireEvent.change(screen.getByTestId("login-password"), {
       target: { value: "supersecret123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    fireEvent.click(screen.getByTestId("login-submit"));
 
     await waitFor(() =>
       expect(loginSpy).toHaveBeenCalledWith("user@example.com", "supersecret123"),
@@ -37,11 +37,11 @@ describe("LoginPage", () => {
 
     renderWithProviders(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByTestId("login-email"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "wrongpass123" } });
-    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    fireEvent.change(screen.getByTestId("login-password"), { target: { value: "wrongpass123" } });
+    fireEvent.click(screen.getByTestId("login-submit"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid credentials");
   });

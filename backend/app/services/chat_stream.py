@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.artifacts import stamp_artifacts
 from app.core.datetime_utils import utc_now
 from app.core.tenant import TenantContext
 from app.models.conversation import Conversation, Message, MessageRole
@@ -28,6 +29,7 @@ class StreamState:
     model: str = ""
     provider: str = ""
     usage: dict[str, int] = field(default_factory=dict)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
     assistant_message: Message | None = None
     finalized: bool = False
 
@@ -104,6 +106,11 @@ async def finalize_assistant_message(
     state: StreamState,
 ) -> Message:
     content = "".join(state.parts)
+    # Stamp artifacts on the finished text, not the token stream: a fence spans
+    # many chunks, so it can only be parsed once the reply is whole. The `done`
+    # event carries these stamped families so the client renders from the
+    # server's authoritative parse rather than re-deriving it.
+    state.artifacts = stamp_artifacts(content)
     assistant = Message(
         tenant_id=tenant.tenant_id,
         workspace_id=tenant.workspace_id,
@@ -113,6 +120,7 @@ async def finalize_assistant_message(
         content_json={
             "recall_count": state.recall.get("count", 0),
             "actions": state.actions,
+            "artifacts": state.artifacts,
             "streamed": True,
         },
         model=state.model or None,
@@ -183,6 +191,7 @@ async def iter_chat_turn_stream(
                 "event": "done",
                 "assistant_message_id": str(assistant.id),
                 "actions": state.actions,
+                "artifacts": state.artifacts,
                 "provider": state.provider,
                 "via": label,
             }

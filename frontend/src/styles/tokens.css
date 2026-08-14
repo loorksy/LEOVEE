@@ -1,0 +1,48 @@
+/**
+ * Design tokens — the palette as CSS custom properties (M10, from AiChart's
+ * DESIGN.md). Components consume the semantic Tailwind classes built on these
+ * (`text-buy`, `bg-warning/10`, …), never raw hex.
+ *
+ * Two rules the tokens themselves encode:
+ *
+ * - **Buy/sell mean trade direction and nothing else.** `--success` carries the
+ *   same values today, but it is a separate token on purpose: if the trading
+ *   palette is ever retuned, healthy-status UI must not drag along with it.
+ * - **Dark is the designed case, not the inversion.** The product is a trading
+ *   terminal read at night; light mode derives from dark, not the reverse.
+ */
+:root {
+  --background: #ffffff;
+  --card: #ffffff;
+  --foreground: #000000;
+  --muted-foreground: #404040;
+  --border: #e5e5e5;
+
+  --buy: #15803d;
+  --sell: #dc2626;
+  --success: #15803d;
+  /* amber-700, not 600: #d97706 reads 3.19:1 on white — below AA for the text
+     this token colors (warnings are exactly the words that must stay legible). */
+  --warning: #b45309;
+  --info: #0284c7;
+  --destructive: #dc2626;
+
+  --accent: #6366f1;
+}
+
+.dark {
+  --background: #0f1419;
+  --card: #1a2332;
+  --foreground: #f5f5f5;
+  --muted-foreground: #a3a3a3;
+  --border: #1f2937;
+
+  --buy: #22c55e;
+  /* red-400, not 500: #ef4444 reads 4.19:1 on the card surface — a sell label
+     inside a card is the commonest place this token renders. */
+  --sell: #f87171;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --info: #38bdf8;
+  --destructive: #f87171;
+}

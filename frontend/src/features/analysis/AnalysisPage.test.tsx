@@ -10,10 +10,18 @@ import * as analysisApi from "@/api/analysis";
 import * as chartApi from "@/api/chart";
 import * as providersApi from "@/api/providers";
 
+// Key-echoing translator for the unit tests of `formatAnalysisNarrative`,
+// which takes `t` as a parameter: asserting on keys keeps the tests
+// copy-independent, so retranslating a string never breaks them.
+const stubT = ((key: string, values?: Record<string, string | number>) =>
+  values ? `${key} ${Object.values(values).join(" ")}` : key) as Parameters<
+  typeof formatAnalysisNarrative
+>[1];
+
 const runResponse: analysisApi.AnalysisRunResponse = {
   agent_run_id: "run-1",
   workspace_id: "ws-1",
-  symbol: "EURUSD",
+  symbol: "XAUUSD",
   timeframe: "H1",
   perceive: {},
   recall: { count: 3 },
@@ -34,7 +42,7 @@ const providersOk = {
 };
 
 async function waitForRunEnabled() {
-  const button = await screen.findByRole("button", { name: /run analysis/i });
+  const button = await screen.findByTestId("analysis-run");
   await waitFor(() => expect(button).not.toBeDisabled());
   return button;
 }
@@ -55,13 +63,13 @@ describe("AnalysisPage", () => {
     renderWithProviders(<AnalysisPage />);
     fireEvent.click(await waitForRunEnabled());
 
-    expect(await screen.findByText(/EURUSD · H1 — BUY/)).toBeInTheDocument();
-    expect(screen.getByText(/recalled 3 memories/i)).toBeInTheDocument();
-    expect(await screen.findByTestId("chart-status")).toHaveTextContent(
-      "1 chart annotation(s) published",
-    );
-    expect(screen.getByRole("button", { name: /view chart/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /view recommendation/i })).toBeInTheDocument();
+    const title = await screen.findByTestId("analysis-result-title");
+    expect(title).toHaveTextContent(/XAUUSD · H1/);
+    const meta = screen.getByTestId("analysis-result-meta");
+    expect(meta).toHaveTextContent("3");
+    expect(await screen.findByTestId("chart-status")).toHaveTextContent("1");
+    expect(screen.getByTestId("analysis-view-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("analysis-view-recommendation")).toBeInTheDocument();
   });
 
   it("surfaces an error message when the analysis run fails", async () => {
@@ -71,7 +79,8 @@ describe("AnalysisPage", () => {
     renderWithProviders(<AnalysisPage />);
     fireEvent.click(await waitForRunEnabled());
 
-    expect(await screen.findByText("entitlement limit reached")).toBeInTheDocument();
+    const error = await screen.findByTestId("analysis-error");
+    expect(error).toHaveTextContent("entitlement limit reached");
   });
 
   it("renders LLM unavailable as an explicit degraded NO_TRADE state", async () => {
@@ -94,11 +103,11 @@ describe("AnalysisPage", () => {
     renderWithProviders(<AnalysisPage />);
     fireEvent.click(await waitForRunEnabled());
 
-    expect(await screen.findByTestId("analysis-degraded")).toBeInTheDocument();
-    expect(screen.getByText(/analysis degraded/i)).toBeInTheDocument();
+    const degraded = await screen.findByTestId("analysis-degraded");
+    expect(degraded).toBeInTheDocument();
     expect(screen.getByText("NO_TRADE")).toBeInTheDocument();
     expect(screen.getByText("LLM_UNAVAILABLE")).toBeInTheDocument();
-    expect(screen.queryByText(/EURUSD · H1 — BUY/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("analysis-result")).not.toBeInTheDocument();
     expect(screen.queryByText(/N\/A/)).not.toBeInTheDocument();
   });
 
@@ -113,17 +122,19 @@ describe("AnalysisPage", () => {
 
     expect(await screen.findByTestId("analysis-oanda-not-configured")).toBeInTheDocument();
     expect(screen.getByTestId("analysis-llm-not-configured")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /run analysis/i })).toBeDisabled();
+    expect(screen.getByTestId("analysis-run")).toBeDisabled();
   });
 });
 
 describe("formatAnalysisNarrative", () => {
   it("formats string and llm_unavailable object shapes", () => {
-    expect(formatAnalysisNarrative("plain")).toBe("plain");
-    expect(formatAnalysisNarrative({ llm_unavailable: "missing key" })).toBe(
-      "Narrative unavailable: missing key",
+    expect(formatAnalysisNarrative("plain", stubT)).toBe("plain");
+    expect(formatAnalysisNarrative({ llm_unavailable: "missing key" }, stubT)).toBe(
+      "analysis.narrative.unavailable missing key",
     );
-    expect(formatAnalysisNarrative({ llm: { summary: "Bias bullish" } })).toBe("Bias bullish");
+    expect(formatAnalysisNarrative({ llm: { summary: "Bias bullish" } }, stubT)).toBe(
+      "Bias bullish",
+    );
   });
 });
 

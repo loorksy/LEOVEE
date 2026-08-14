@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.symbols import require_instrument
 from app.models.candle import Candle
 from app.models.enums import Timeframe
 from app.models.symbol import Symbol
@@ -15,17 +16,30 @@ from app.providers.market.oanda import get_market_provider
 
 
 async def get_or_create_symbol(session: AsyncSession, code: str) -> Symbol:
-    normalized = code.replace("_", "").upper()
-    existing = await session.scalar(select(Symbol).where(Symbol.code == normalized))
+    """Resolve a symbol row, refusing anything outside the allowlist.
+
+    This is the single chokepoint (app/core/symbols.py). It raises rather than
+    substituting the default: a caller asking for an instrument the platform
+    does not analyse has made a mistake, and silently answering about gold
+    instead would produce a confident analysis of the wrong market.
+
+    Currency and pip metadata come from the instrument spec rather than being
+    sliced out of the ticker — `normalized[:3]` happens to work for XAUUSD but
+    would give the wrong pip location for every JPY pair, and a wrong pip
+    location scales stop distances and position sizes by a hundred without
+    failing anywhere visible.
+    """
+    spec = require_instrument(code)
+    existing = await session.scalar(select(Symbol).where(Symbol.code == spec.symbol))
     if existing is not None:
         return existing
-    base = normalized[:3]
-    quote = normalized[3:]
     symbol = Symbol(
-        code=normalized,
-        base_currency=base,
-        quote_currency=quote,
-        provider_mappings_json={"oanda": f"{base}_{quote}"},
+        code=spec.symbol,
+        base_currency=spec.base,
+        quote_currency=spec.quote,
+        asset_class=spec.asset_class,
+        pip_location=spec.pip_location,
+        provider_mappings_json={"oanda": spec.oanda_instrument},
     )
     session.add(symbol)
     await session.flush()
@@ -84,10 +98,15 @@ async def fetch_and_store_candles(
     count: int = 100,
     provider: MarketDataProvider | None = None,
 ) -> tuple[Symbol, list[Candle]]:
+    # Allowlist BEFORE the outbound call, not after. The chokepoint has to sit
+    # in front of the network request: fetching first placed a raw, unvalidated
+    # symbol into the OANDA URL path with the platform's credentials, and only
+    # then rejected it — the gate has to gate the thing it guards.
+    spec = require_instrument(symbol_code)
     granularity = timeframe.value
     market = provider or get_market_provider()
-    normalized = await market.fetch_candles(symbol_code, granularity=granularity, count=count)
-    symbol = await get_or_create_symbol(session, symbol_code)
+    normalized = await market.fetch_candles(spec.symbol, granularity=granularity, count=count)
+    symbol = await get_or_create_symbol(session, spec.symbol)
     await upsert_candles(session, symbol.id, normalized)
     result = await session.execute(
         select(Candle)
@@ -116,6 +135,27 @@ async def load_recent_candles(
     rows = list(result.scalars().all())
     rows.reverse()
     return rows
+
+
+async def load_oldest_candle(
+    session: AsyncSession,
+    symbol_id: uuid.UUID,
+    *,
+    timeframe: Timeframe,
+) -> Candle | None:
+    """The earliest stored candle — how far back the history actually reaches.
+
+    The agent needs this to tell a thin store from a quiet market: "no structure
+    before this point" and "we only have two days of data" look identical
+    otherwise.
+    """
+    result = await session.execute(
+        select(Candle)
+        .where(Candle.symbol_id == symbol_id, Candle.timeframe == timeframe)
+        .order_by(Candle.ts.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
 
 
 def candle_to_dict(candle: Candle) -> dict[str, str | float | bool]:

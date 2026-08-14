@@ -84,8 +84,8 @@ async def test_signup_requires_verify_when_resend_configured(
     assert get_settings().resend_api_key
 
     # Keep Resend key for the auto-verify gate, but capture mail via console.
-    from app.providers.email.console import ConsoleEmailProvider
     import app.services.auth_service as auth_service
+    from app.providers.email.console import ConsoleEmailProvider
 
     monkeypatch.setattr(auth_service, "get_email_provider", lambda: ConsoleEmailProvider())
     clear_console_outbox()
@@ -152,6 +152,54 @@ async def test_refresh_rotation_and_logout(api_client: AsyncClient) -> None:
         json={"refresh_token": new_refresh},
     )
     assert logged_out.status_code == 401
+
+
+async def test_password_reset_revokes_existing_sessions(
+    api_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A reset is the answer to a compromise: it must evict live sessions."""
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+    get_settings.cache_clear()
+
+    import app.services.auth_service as auth_service
+    from app.providers.email.console import ConsoleEmailProvider
+
+    monkeypatch.setattr(auth_service, "get_email_provider", lambda: ConsoleEmailProvider())
+    clear_console_outbox()
+
+    await api_client.post(
+        "/api/v1/auth/signup",
+        json={"email": "reset-evict@example.com", "password": "securepassword1"},
+    )
+    # Verify so the account is usable, then take a live session.
+    verify_token = _extract_token_from_outbox()
+    await api_client.post("/api/v1/auth/verify-email", json={"token": verify_token})
+    clear_console_outbox()
+    login = await api_client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset-evict@example.com", "password": "securepassword1"},
+    )
+    live_refresh = login.json()["refresh_token"]
+
+    # Reset the password; the emailed token is single-use.
+    await api_client.post(
+        "/api/v1/auth/password-reset/request",
+        json={"email": "reset-evict@example.com"},
+    )
+    reset_token = _extract_token_from_outbox()
+    confirm = await api_client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": reset_token, "new_password": "brandnewpassword2"},
+    )
+    assert confirm.status_code == 200
+
+    # The pre-reset refresh token is now dead — the attacker's session is gone.
+    replayed = await api_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": live_refresh},
+    )
+    assert replayed.status_code == 401
 
 
 async def test_login_rate_limit(api_client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:

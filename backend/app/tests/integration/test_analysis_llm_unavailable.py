@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -12,37 +12,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
 from app.core.config import get_settings
+from app.core.datetime_utils import utc_now
 from app.core.tenant import resolve_tenant_context
 from app.infrastructure.database import get_db_session
 from app.main import app
 from app.models.enums import RecommendationDirection, Timeframe
 from app.models.symbol import Symbol
 from app.providers.market.base import NormalizedCandle
+from app.services.market.calendar import SessionStatus
+from app.tests.bars import swinging_bars
 from app.tests.conftest import seed_user_org
 
 
-def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
-    start = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
-    candles: list[NormalizedCandle] = []
-    price = Decimal("1.1000")
-    for i in range(count):
-        ts = start + timedelta(hours=i)
-        o = price + Decimal(i) * Decimal("0.0002")
-        candles.append(
-            NormalizedCandle(
-                symbol="EURUSD",
-                timeframe=Timeframe.H1,
-                ts=ts,
-                open=o,
-                high=o + Decimal("0.0010"),
-                low=o - Decimal("0.0008"),
-                close=o + Decimal("0.0005"),
-                volume=Decimal("0"),
-                complete=True,
-                source="test_double",
-            )
+def _synthetic_gold_series(count: int = 140) -> list[NormalizedCandle]:
+    """A gold series a real analysis would accept.
+
+    Forty forex-priced bars used to reach the narrative stage because the
+    engines were placeholders. They no longer are, and the gates in front of the
+    model layer are real: the geometry engine needs sixty bars, and the agent
+    refuses a frame with no readable structure. Testing
+    the LLM guarantee needs candles that get that far.
+    """
+    # Timestamps end at *now*: the evidence gate blocks a scalp written on a
+    # stale price, so a live analysis reads fresh candles. A fixed historical
+    # fixture would (correctly) fail on EVIDENCE_LIVE_PRICE before the LLM stage.
+    bars = swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+    base = utc_now()
+    step = timedelta(minutes=15)
+    return [
+        NormalizedCandle(
+            symbol="XAUUSD",
+            timeframe=Timeframe.M15,
+            ts=base - step * (len(bars) - 1 - i),
+            open=Decimal(str(bar.open)),
+            high=Decimal(str(bar.high)),
+            low=Decimal(str(bar.low)),
+            close=Decimal(str(bar.close)),
+            volume=Decimal("0"),
+            complete=True,
+            source="test_double",
         )
-    return candles
+        for i, bar in enumerate(bars)
+    ]
 
 
 @pytest.mark.asyncio
@@ -50,7 +61,21 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec §95: missing LLM must fail closed to NO_TRADE — never BUY/SELL with confidence."""
+    """Spec §95: missing LLM must fail closed to NO_TRADE — never BUY/SELL with confidence.
+
+    The engine gate is lifted for this test. The analytical engines are still
+    placeholders and degrade the run before the narrative stage is reached
+    (app/engines/status.py), which would mask the LLM contract rather than test
+    it. The engines-are-placeholders path is covered separately below.
+    """
+    monkeypatch.setattr("app.agents.orchestrator.unavailable_engines", lambda _engines: [])
+    # Pin the session open so the run reaches the LLM stage this test is about,
+    # rather than failing closed on the wall-clock market session (covered in
+    # test_evidence_gate.py).
+    monkeypatch.setattr(
+        "app.agents.orchestrator.get_session_status",
+        lambda *_a, **_k: SessionStatus(is_open=True, reason="MARKET_OPEN"),
+    )
     for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "")
@@ -67,7 +92,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     ctx = await resolve_tenant_context(db_session, user.id)
     assert ctx.workspace_id is not None
 
-    candles = _synthetic_h1_series()
+    candles = _synthetic_gold_series()
 
     async def fake_fetch(
         session: AsyncSession,
@@ -78,7 +103,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     ) -> tuple[Symbol, list[NormalizedCandle]]:
         row = Symbol(
             code=symbol_code,
-            base_currency="EUR",
+            base_currency="XAU",
             quote_currency="USD",
             provider_mappings_json={},
         )
@@ -112,7 +137,7 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
                 "/api/v1/analysis/run",
-                json={"symbol": "EURUSD", "complete_pipeline": True},
+                json={"symbol": "XAUUSD", "complete_pipeline": True},
                 headers={
                     "X-Tenant-Id": str(org.id),
                     "X-Workspace-Id": str(ctx.workspace_id),

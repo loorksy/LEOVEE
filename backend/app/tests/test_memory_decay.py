@@ -30,7 +30,7 @@ async def test_memory_decay_reduces_freshness_and_archives_expired(
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"note": "x"},
         memory_type=MemoryType.SEMANTIC,
     )

@@ -9,6 +9,7 @@ from app.core.config import Settings
 from app.core.datetime_utils import ensure_utc, utc_now
 from app.core.security import (
     create_access_token,
+    dummy_password_verify,
     generate_opaque_token,
     hash_password,
     hash_token,
@@ -166,6 +167,9 @@ async def login(
     normalized = email.strip().lower()
     user = await session.scalar(select(User).where(User.email == normalized))
     if user is None or user.password_hash is None:
+        # Equalize timing: an unknown email must cost the same as a wrong
+        # password, or the response time enumerates registered accounts.
+        dummy_password_verify()
         raise AuthError("Invalid email or password", "invalid_credentials")
     if not verify_password(user.password_hash, password):
         raise AuthError("Invalid email or password", "invalid_credentials")
@@ -272,6 +276,19 @@ async def confirm_password_reset(session: AsyncSession, token: str, new_password
 
     user.password_hash = hash_password(new_password)
     row.used_at = utc_now()
+
+    # A reset is the response to a suspected compromise, so it must evict the
+    # attacker: revoke every live session, not just set a new password beside
+    # the 30-day refresh tokens they may already hold.
+    now = utc_now()
+    active_sessions = await session.scalars(
+        select(Session).where(
+            Session.user_id == user.id,
+            Session.revoked_at.is_(None),
+        )
+    )
+    for db_session in active_sessions:
+        db_session.revoked_at = now
 
 
 async def get_user_for_access_token(

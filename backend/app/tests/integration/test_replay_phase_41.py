@@ -27,7 +27,7 @@ async def test_replay_preview_api(db_session: AsyncSession) -> None:
         slug="replay-api",
     )
     ctx = await resolve_tenant_context(db_session, user.id)
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     db_session.add(
         Candle(
             symbol_id=symbol.id,
@@ -54,7 +54,7 @@ async def test_replay_preview_api(db_session: AsyncSession) -> None:
         response = await client.post(
             "/api/v1/replay/preview",
             json={
-                "symbol": "EURUSD",
+                "symbol": "XAUUSD",
                 "timeframe": "H1",
                 "as_of": "2024-06-01T15:00:00+00:00",
             },

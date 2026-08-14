@@ -32,22 +32,28 @@ class InMemoryRateLimiter:
         return True
 
 
+#: Atomic fixed-window: set the TTL in the same round trip that creates the key.
+#: The old two-step (INCR then, if first, EXPIRE) could leave a key with no TTL
+#: if the process died between the calls — permanently rate-limiting that key.
+#: `SET .. EX .. NX` seeds the window+TTL together; the INCR then counts.
+_WINDOW_LUA = """
+if redis.call('set', KEYS[1], 0, 'EX', ARGV[1], 'NX') then end
+return redis.call('incr', KEYS[1])
+"""
+
+
 class RedisRateLimiter:
     def __init__(self, redis_url: str) -> None:
-        self._redis_url = redis_url
+        # One pooled client reused across hits, not a fresh connect+close per
+        # request: under auth load the per-hit churn was latency and a risk of
+        # exhausting Redis connections.
+        self._redis: Redis[str] = Redis.from_url(redis_url, decode_responses=True)
 
     async def hit(self, key: str, limit: int, window_seconds: int) -> bool:
-        client: Redis[str] | None = None
-        try:
-            client = Redis.from_url(self._redis_url, decode_responses=True)
-            bucket_key = f"rl:{key}"
-            count = await client.incr(bucket_key)
-            if count == 1:
-                await client.expire(bucket_key, window_seconds)
-            return count <= limit
-        finally:
-            if client is not None:
-                await client.close()
+        count = await self._redis.eval(  # type: ignore[no-untyped-call]
+            _WINDOW_LUA, 1, f"rl:{key}", window_seconds
+        )
+        return int(count) <= limit
 
 
 _limiter: RateLimiterBackend | None = None

@@ -14,8 +14,12 @@ import {
   isLlmConfigured,
   llmCredentialNames,
 } from "@/components/ProviderNotConfiguredBanner";
+import { useLocale } from "@/i18n/context";
+import { MessageContent } from "@/artifacts/MessageContent";
+import type { ChatArtifact } from "@/artifacts/types";
 
 export function ChatPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -43,7 +47,7 @@ export function ChatPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => createConversation({ title: "New conversation" }),
+    mutationFn: () => createConversation({ title: t("chat.new") }),
     onSuccess: async ({ id }) => {
       setActiveId(id);
       setLastRecall(null);
@@ -56,9 +60,7 @@ export function ChatPage() {
   const sendStreaming = async (content: string) => {
     if (!activeId) return;
     if (!llmConfigured) {
-      setStreamError(
-        `LLM provider not configured. Missing one of: ${llmCredentialNames().join(", ")}.`,
-      );
+      setStreamError(t("chat.error.notconfigured", { names: llmCredentialNames().join(", ") }));
       return;
     }
     abortRef.current?.abort();
@@ -92,11 +94,9 @@ export function ChatPage() {
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
       if (error instanceof ApiError && error.code === "provider_not_configured") {
-        setStreamError(
-          `LLM provider not configured. Missing one of: ${llmCredentialNames().join(", ")}.`,
-        );
+        setStreamError(t("chat.error.notconfigured", { names: llmCredentialNames().join(", ") }));
       } else {
-        setStreamError(error instanceof Error ? error.message : "Could not send message.");
+        setStreamError(error instanceof Error ? error.message : t("chat.error.send"));
       }
       setStreamingText("");
     } finally {
@@ -108,7 +108,7 @@ export function ChatPage() {
     <div className="flex flex-1 flex-col gap-4 p-6">
       {providersQuery.isSuccess && !llmConfigured && (
         <ProviderNotConfiguredBanner
-          title="LLM provider not configured"
+          title={t("chat.error.llm")}
           credentials={llmCredentialNames()}
           testId="chat-llm-not-configured"
         />
@@ -121,7 +121,7 @@ export function ChatPage() {
             disabled={createMutation.isPending}
             className="mb-3 w-full rounded bg-leovee-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
           >
-            New conversation
+            {t("chat.new")}
           </button>
           <ul className="space-y-1 text-sm">
             {conversationsQuery.data?.items.map((conversation) => (
@@ -134,7 +134,7 @@ export function ChatPage() {
                     setStreamingText("");
                     setStreamError(null);
                   }}
-                  className={`block w-full truncate rounded px-2 py-1.5 text-left ${
+                  className={`block w-full truncate rounded px-2 py-1.5 text-start ${
                     activeId === conversation.id
                       ? "bg-slate-800 text-white"
                       : "text-slate-300 hover:bg-slate-800"
@@ -147,32 +147,37 @@ export function ChatPage() {
           </ul>
         </aside>
         <section className="flex flex-1 flex-col rounded-lg border border-slate-800 bg-leovee-panel p-4">
-          {!activeId && <p className="text-slate-400">Select or start a conversation.</p>}
+          {!activeId && <p className="text-slate-400">{t("chat.select")}</p>}
           {activeId && (
             <>
               <div className="flex-1 space-y-3 overflow-auto" data-testid="message-list">
                 {messagesQuery.data?.items.map((message) => (
                   <div
                     key={message.id}
-                    className={message.role === "user" ? "text-right" : "text-left"}
+                    className={message.role === "user" ? "text-end" : "text-start"}
                   >
-                    <p
-                      className={`inline-block max-w-lg rounded px-3 py-2 text-sm ${
-                        message.role === "user"
-                          ? "bg-leovee-accent text-white"
-                          : "bg-slate-800 text-slate-100"
-                      }`}
-                    >
-                      {message.content}
-                    </p>
+                    {message.role === "user" ? (
+                      <p className="inline-block max-w-lg rounded bg-leovee-accent px-3 py-2 text-sm text-white">
+                        {message.content}
+                      </p>
+                    ) : (
+                      <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
+                        <MessageContent
+                          content={message.content}
+                          artifacts={
+                            (message.content_json?.artifacts as ChatArtifact[] | undefined) ?? null
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {streamingText ? (
-                  <div className="text-left" data-testid="streaming-assistant">
-                    <p className="inline-block max-w-lg rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
-                      {streamingText}
-                      <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-slate-400" />
-                    </p>
+                  <div className="text-start" data-testid="streaming-assistant">
+                    <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
+                      <MessageContent content={streamingText} />
+                      <span className="ms-1 inline-block h-3 w-1 animate-pulse bg-slate-400" />
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -182,7 +187,8 @@ export function ChatPage() {
                   className="mt-3 rounded border border-sky-800 bg-sky-950/40 p-3 text-xs text-sky-200"
                 >
                   <p className="font-semibold uppercase tracking-wide">
-                    {lastRecall.label ?? "RECALL"} · {lastRecall.count} memories
+                    {lastRecall.label ?? t("chat.recall")} ·{" "}
+                    {t("chat.recall.count", { count: lastRecall.count })}
                   </p>
                   {lastRecall.items && lastRecall.items.length > 0 && (
                     <ul className="mt-1 list-inside list-disc">
@@ -202,22 +208,24 @@ export function ChatPage() {
                 className="mt-3 flex gap-2"
               >
                 <label htmlFor="chat-draft" className="sr-only">
-                  Message
+                  {t("chat.message")}
                 </label>
                 <input
                   id="chat-draft"
+                  data-testid="chat-draft-input"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ask about a symbol, setup, or your history…"
+                  placeholder={t("chat.placeholder")}
                   className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
                   disabled={isStreaming || !llmConfigured}
                 />
                 <button
                   type="submit"
+                  data-testid="chat-send"
                   disabled={isStreaming || !llmConfigured}
                   className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
                 >
-                  {isStreaming ? "Streaming…" : "Send"}
+                  {isStreaming ? t("chat.streaming") : t("chat.send")}
                 </button>
               </form>
             </>

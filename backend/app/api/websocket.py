@@ -7,6 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import get_settings
 from app.core.security import decode_access_token
+from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import resolve_tenant_context, resolve_workspace_context
 from app.infrastructure.database import get_session_factory
 from app.infrastructure.realtime import (
@@ -43,7 +44,7 @@ async def authenticated_ws(websocket: WebSocket, token: str | None = None) -> No
         return
 
     claims = decode_access_token(settings, token)
-    symbols_param = websocket.query_params.get("symbols", "EURUSD")
+    symbols_param = websocket.query_params.get("symbols", DEFAULT_SYMBOL)
     symbols = [s.strip().upper() for s in symbols_param.split(",") if s.strip()]
     candle_queues = [candle_broadcaster.subscribe(symbol) for symbol in symbols]
 

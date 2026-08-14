@@ -61,7 +61,7 @@ async def test_analysis_run_hard_limit_blocks_before_market_fetch(
     monkeypatch.setattr(market_data, "fetch_and_store_candles", _fail_if_called)
 
     with pytest.raises(EntitlementError) as exc_info:
-        await analysis_service.run_analysis(db_session, ctx, symbol="EURUSD")
+        await analysis_service.run_analysis(db_session, ctx, symbol="XAUUSD")
 
     assert exc_info.value.code == "limit_exceeded"
 
@@ -87,7 +87,7 @@ async def test_chat_send_hard_limit_blocks_before_llm_call(
         user_id=user.id,
         title="Limit test",
         mode=ConversationMode.CHAT,
-        symbol="EURUSD",
+        symbol="XAUUSD",
     )
     db_session.add(conversation)
     await db_session.flush()
@@ -99,7 +99,7 @@ async def test_chat_send_hard_limit_blocks_before_llm_call(
             db_session,
             ctx,
             conversation,
-            user_content="What is the bias on EURUSD?",
+            user_content="What is the bias on XAUUSD?",
             llm=fake_llm,
         )
 

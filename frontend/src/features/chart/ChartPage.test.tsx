@@ -24,10 +24,26 @@ vi.mock("@/chart", async () => {
   };
 });
 
+// The real component loads 27 MB of vendored charting library from a script
+// tag. Stubbed so the page can be tested at all — and stubbed to *call back*
+// immediately, because the engine is now created when the chart hands over its
+// drawing surface. A stub that rendered nothing would leave no engine, and the
+// test would pass by asserting against a page that never got one.
+vi.mock("@/chart/tradingview/TradingViewChart", () => ({
+  TradingViewChart: ({
+    onShapesReady,
+  }: {
+    onShapesReady: (shapes: unknown) => void;
+  }) => {
+    onShapesReady({ createMultipointShape: vi.fn(() => "shape-1"), removeEntity: vi.fn() });
+    return <div data-testid="tradingview-chart" />;
+  },
+}));
+
 describe("ChartPage", () => {
   it("loads candles + annotations and feeds them into the chart engine", async () => {
     vi.spyOn(marketsApi, "getCandles").mockResolvedValue({
-      symbol: "EURUSD",
+      symbol: "XAUUSD",
       timeframe: "H1",
       workspace_id: "ws-1",
       candles: [
@@ -38,7 +54,7 @@ describe("ChartPage", () => {
       items: [
         {
           id: "ann-1",
-          semantic_type: "DRAW_LEVEL",
+          semantic_type: "price_line",
           geometry: { anchors: [{ ts: "2024-01-01T00:00:00.000Z", price: 1.05 }] },
           status: "ACTIVE",
           version: 1,
@@ -56,6 +72,6 @@ describe("ChartPage", () => {
 
     await waitFor(() => expect(fakeEngine.applyCandles).toHaveBeenCalled());
     await waitFor(() => expect(fakeEngine.applyAnnotations).toHaveBeenCalled());
-    expect(await screen.findByText(/1 annotation\(s\) loaded/)).toBeInTheDocument();
+    expect(await screen.findByTestId("annotation-count")).toBeInTheDocument();
   });
 });

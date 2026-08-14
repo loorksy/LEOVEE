@@ -4,16 +4,25 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.errors import ProviderConfigurationError
 from app.core.tenant import TenantContext
 from app.infrastructure.rls import set_rls_session_context
 from app.models.learning import CalibrationBin, SymbolProfile
 from app.models.memory import AgentMemory, MemoryEmbedding, MemoryType
+from app.observability.prometheus import record_embedding_fallback
+from app.providers.llm.embeddings import (
+    DETERMINISTIC_MODEL,
+    get_embedding_provider,
+)
 from app.services.learning.calibration import apply_calibration
 from app.services.memory.embedding import embed_text_deterministic, merge_rank_hybrid
+
+logger = structlog.get_logger(__name__)
 
 
 async def calibrated_confidence_for_workspace(
@@ -104,6 +113,33 @@ async def retrieve_memories_for_symbol(
     return memories
 
 
+async def embed_for_index(text: str) -> tuple[list[float], str]:
+    """One vector plus the name of whatever produced it.
+
+    Falls back to the deterministic vectors when no embedding provider is
+    configured, because indexing must not block a deployment that has not set an
+    embedding key yet — but it falls back **under its own name**. A hashed
+    vector stored as ``text-embedding-3-small`` corrupts every future search
+    silently, and no amount of care downstream can recover from a wrong label.
+    """
+    try:
+        provider = get_embedding_provider()
+    except ProviderConfigurationError:
+        # Loud, not silent: hashed vectors are noise dressed as similarity, and a
+        # deployment that indexes on them for weeks and then calibrates the
+        # learning loop on the result has no way to know. The label is honest
+        # (`deterministic-v1`), and now so is the log line and the metric.
+        logger.warning(
+            "embedding_provider_missing_deterministic_fallback",
+            detail="No embedding provider configured; indexing hashed noise vectors. "
+            "Set OPENAI_API_KEY for real semantic memory.",
+        )
+        record_embedding_fallback()
+        return embed_text_deterministic(text), DETERMINISTIC_MODEL
+    result = await provider.embed([text])
+    return result.one, result.model
+
+
 async def index_memory_embedding(
     session: AsyncSession,
     *,
@@ -113,13 +149,16 @@ async def index_memory_embedding(
     text: str,
 ) -> MemoryEmbedding:
     await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
-    vector = embed_text_deterministic(text)
+    vector, model = await embed_for_index(text)
     row = MemoryEmbedding(
         tenant_id=tenant_id,
         workspace_id=workspace_id,
         memory_id=memory_id,
         embedding=vector,
-        model="deterministic-v1",
+        # The tag travels with the vector, always. Two generations of vectors in
+        # one HNSW index are indistinguishable without it, and cosine distance
+        # between a real embedding and a hashed one is meaningless.
+        model=model,
     )
     session.add(row)
     await session.flush()
@@ -143,7 +182,7 @@ async def retrieve_memories_hybrid(
         limit=limit,
     )
     await set_rls_session_context(session, tenant_id=tenant_id, workspace_id=workspace_id)
-    vector = embed_text_deterministic(query)
+    vector, model = await embed_for_index(query)
     vector_hits: list[dict[str, object]] = []
     try:
         result = await session.execute(
@@ -152,6 +191,10 @@ async def retrieve_memories_hybrid(
             .where(
                 MemoryEmbedding.tenant_id == tenant_id,
                 MemoryEmbedding.workspace_id == workspace_id,
+                # Only rows from the same generation. Ranking a real embedding
+                # against hashed neighbours returns whatever the index visited
+                # first, dressed up as similarity.
+                MemoryEmbedding.model == model,
                 AgentMemory.key.startswith(f"symbol:{symbol.upper()}"),
             )
             .order_by(MemoryEmbedding.embedding.cosine_distance(vector))

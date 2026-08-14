@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createJournalEntry, listJournalEntries, promoteJournalEntry } from "@/api/journal";
+import { useLocale } from "@/i18n/context";
 
 export function JournalPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -28,7 +30,7 @@ export function JournalPage() {
       await queryClient.invalidateQueries({ queryKey: ["journal"] });
     },
     onError: (err) => {
-      setPromoteError(err instanceof Error ? err.message : "Could not promote entry");
+      setPromoteError(err instanceof Error ? err.message : t("journal.error.promote"));
     },
   });
 
@@ -37,10 +39,8 @@ export function JournalPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Journal</h1>
-        <p className="mt-1 text-slate-400">
-          Log trade reflections and promote lessons into durable memory (§31).
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("journal.title")}</h1>
+        <p className="mt-1 text-slate-400">{t("journal.intro")}</p>
       </header>
 
       <form
@@ -51,19 +51,21 @@ export function JournalPage() {
         className="flex flex-col gap-2"
       >
         <label htmlFor="journal-title" className="text-xs text-slate-500">
-          Title
+          {t("journal.form.title")}
         </label>
         <input
           id="journal-title"
+          data-testid="journal-title-input"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
         />
         <label htmlFor="journal-notes" className="text-xs text-slate-500">
-          Notes
+          {t("journal.form.notes")}
         </label>
         <textarea
           id="journal-notes"
+          data-testid="journal-notes-input"
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           rows={3}
@@ -71,24 +73,27 @@ export function JournalPage() {
         />
         <button
           type="submit"
+          data-testid="journal-add"
           disabled={createMutation.isPending}
           className="self-start rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
-          Add entry
+          {t("journal.add")}
         </button>
       </form>
 
       {promoteError && <p className="text-amber-400">{promoteError}</p>}
       {lastPromotedLessonId && (
         <p className="text-xs text-slate-500" data-testid="promoted-lesson">
-          Promoted to lesson {lastPromotedLessonId}
+          {t("journal.promoted")}: {lastPromotedLessonId}
         </p>
       )}
 
-      {entriesQuery.isLoading && <p className="text-slate-400">Loading journal…</p>}
-      {entriesQuery.isError && <p className="text-amber-400">Could not load journal entries.</p>}
+      {entriesQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
+      {entriesQuery.isError && <p className="text-amber-400">{t("common.error.load")}</p>}
       {!entriesQuery.isLoading && entries.length === 0 && (
-        <p className="text-slate-400">No journal entries yet — add one above.</p>
+        <p className="text-slate-400" data-testid="journal-empty">
+          {t("journal.empty")}
+        </p>
       )}
 
       <ul className="space-y-3">
@@ -105,16 +110,17 @@ export function JournalPage() {
               </div>
               {entry.promoted_to_lesson_id ? (
                 <span className="whitespace-nowrap rounded bg-emerald-900/40 px-2 py-1 text-xs text-emerald-300">
-                  Lesson learned
+                  {t("journal.lessonLearned")}
                 </span>
               ) : (
                 <button
                   type="button"
+                  data-testid={`journal-promote-${entry.id}`}
                   onClick={() => promoteMutation.mutate(entry.id)}
                   disabled={promoteMutation.isPending}
                   className="whitespace-nowrap rounded border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50"
                 >
-                  Promote to lesson
+                  {t("journal.promote")}
                 </button>
               )}
             </div>

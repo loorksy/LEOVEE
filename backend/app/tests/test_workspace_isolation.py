@@ -63,7 +63,7 @@ async def test_recommendations_scoped_to_workspace(
     rec = await recommendation_service.create_recommendation(
         db_session,
         ctx,
-        symbol_code="EURUSD",
+        symbol_code="XAUUSD",
         direction=RecommendationDirection.BUY,
     )
     await db_session.commit()

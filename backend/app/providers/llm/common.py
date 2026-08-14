@@ -7,6 +7,7 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from app.providers.llm.base import LLMMessage
 from app.providers.llm.errors import (
     LLMAuthError,
     LLMBadResponseError,
@@ -124,3 +125,120 @@ def usage_from_anthropic(usage: Any) -> dict[str, int]:
         "input_tokens": prompt,
         "output_tokens": completion,
     }
+
+
+# --- tool-conversation translation -------------------------------------------
+#
+# The two providers disagree about how a tool exchange is represented, and the
+# disagreement is structural rather than cosmetic. Putting the translation here
+# means the tool loop builds one neutral conversation and neither it nor the
+# synthesizer has to know which provider answered.
+
+
+def to_openai_messages(messages: list[LLMMessage]) -> list[dict[str, Any]]:
+    """OpenAI: tool calls on the assistant turn, results as role="tool"."""
+    out: list[dict[str, Any]] = []
+    for message in messages:
+        if message.tool_call_id is not None:
+            out.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": message.tool_call_id,
+                    "content": message.content,
+                }
+            )
+            continue
+        entry: dict[str, Any] = {"role": message.role, "content": message.content}
+        if message.tool_calls:
+            entry["tool_calls"] = [
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.name,
+                        "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                    },
+                }
+                for call in message.tool_calls
+            ]
+            # An assistant turn that only asked for tools has no prose, and
+            # OpenAI rejects a null content alongside tool_calls.
+            entry["content"] = message.content or ""
+        out.append(entry)
+    return out
+
+
+def to_anthropic_messages(messages: list[LLMMessage]) -> list[dict[str, Any]]:
+    """Anthropic: only user and assistant roles, with tool blocks inside content.
+
+    A tool *result* is a **user** turn carrying `tool_result` blocks — which
+    reads oddly until you notice that the model is the one being told something.
+    Consecutive results merge into one user turn, because the API rejects two
+    user turns in a row.
+    """
+    out: list[dict[str, Any]] = []
+    for message in messages:
+        if message.role == "system":
+            continue
+
+        if message.tool_call_id is not None:
+            block = {
+                "type": "tool_result",
+                "tool_use_id": message.tool_call_id,
+                "content": message.content,
+            }
+            if out and out[-1]["role"] == "user" and isinstance(out[-1]["content"], list):
+                out[-1]["content"].append(block)
+            else:
+                out.append({"role": "user", "content": [block]})
+            continue
+
+        if message.tool_calls:
+            content: list[dict[str, Any]] = []
+            if message.content:
+                content.append({"type": "text", "text": message.content})
+            content.extend(
+                {
+                    "type": "tool_use",
+                    "id": call.id,
+                    "name": call.name,
+                    "input": call.arguments,
+                }
+                for call in message.tool_calls
+            )
+            out.append({"role": "assistant", "content": content})
+            continue
+
+        out.append({"role": message.role, "content": message.content})
+    return out
+
+
+def to_openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Translate the neutral tool shape into OpenAI's nested function form.
+
+    The registry emits `{name, description, input_schema}` — Anthropic's shape,
+    which OpenAI rejects: it wants `{"type": "function", "function": {"name",
+    "description", "parameters"}}`. Passing the wrong one through produced a 400
+    on the *first* tool-enabled call, and because a 400 classifies as
+    non-retryable the decision stage returned `provider_bad_request` without
+    ever attempting a repair. The tools looked wired and were not.
+
+    Idempotent: an entry already in OpenAI form passes through, so translating
+    twice does not corrupt it.
+    """
+    out: list[dict[str, Any]] = []
+    for tool in tools:
+        if tool.get("type") == "function":
+            out.append(tool)
+            continue
+        out.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.get("name"),
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("input_schema") or tool.get("parameters") or {},
+                },
+            }
+        )
+    return out

@@ -18,11 +18,21 @@ from app.services.workspace_service import create_default_workspace
 
 @pytest.fixture(autouse=True)
 def _configure_app_database(
+    request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,
-    migrated_postgres: str,
 ) -> Generator[None, None, None]:
     from app.core.config import get_settings
 
+    # Tests marked `no_db` inspect source or metadata only. Resolving the
+    # database fixture for them would spin up Postgres to run a grep.
+    if request.node.get_closest_marker("no_db") is not None:
+        monkeypatch.setenv("ENVIRONMENT", "test")
+        get_settings.cache_clear()
+        yield
+        get_settings.cache_clear()
+        return
+
+    migrated_postgres = request.getfixturevalue("migrated_postgres")
     monkeypatch.setenv("DATABASE_URL", migrated_postgres)
     monkeypatch.setenv("ENVIRONMENT", "test")
     get_settings.cache_clear()

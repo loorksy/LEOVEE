@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { listNews } from "@/api/news";
 import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
+import { useLocale } from "@/i18n/context";
 
 export function ResearchPage() {
+  const { t } = useLocale();
   const newsQuery = useQuery({
     queryKey: ["news"],
     queryFn: () => listNews("USD"),
@@ -14,18 +16,16 @@ export function ResearchPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-100">Research</h1>
-        <p className="text-sm text-slate-400">
-          Recent headlines from `/api/v1/news` (Finnhub when configured).
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-100">{t("research.title")}</h1>
+        <p className="text-sm text-slate-400">{t("research.intro")}</p>
       </header>
-      {newsQuery.isLoading && <p className="text-slate-400">Loading research…</p>}
+      {newsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
       {newsQuery.isError && (
         <p className="text-amber-400">{(newsQuery.error as Error).message}</p>
       )}
       {notConfigured && (
         <ProviderNotConfiguredBanner
-          title="News provider not configured"
+          title={t("research.providerNotConfigured")}
           credentials={["FINNHUB_API_KEY"]}
           testId="news-provider-not-configured"
         />
@@ -40,7 +40,7 @@ export function ResearchPage() {
             >
               <p className="text-sm font-medium text-slate-100">{item.headline}</p>
               <p className="mt-1 text-xs text-slate-500">
-                {item.source ?? "unknown"} · {item.published_at}
+                {item.source ?? t("research.sourceUnknown")} · {item.published_at}
               </p>
               {item.url ? (
                 <a
@@ -49,7 +49,7 @@ export function ResearchPage() {
                   rel="noreferrer"
                   className="mt-1 inline-block text-xs text-leovee-accent hover:underline"
                 >
-                  Open source
+                  {t("research.openSource")}
                 </a>
               ) : null}
             </li>
@@ -60,7 +60,7 @@ export function ResearchPage() {
         newsQuery.isSuccess &&
         newsQuery.data.provider_configured &&
         newsQuery.data.items.length === 0 && (
-          <p className="text-slate-400">No news rows yet — ingestion runs on the worker cron.</p>
+          <p className="text-slate-400">{t("research.empty")}</p>
         )}
     </div>
   );

@@ -6,6 +6,40 @@ export type AnalysisRunRequest = {
   complete_pipeline?: boolean;
 };
 
+export type EvidenceCheckStatus = "ok" | "warning" | "stale" | "absent";
+
+export type EvidenceCheck = {
+  name: string;
+  status: EvidenceCheckStatus;
+  blocking: boolean;
+  detail: string;
+  value?: Record<string, unknown>;
+};
+
+export type EvidenceReport = {
+  blocked: boolean;
+  block_reason: string | null;
+  warnings: string[];
+  checks: EvidenceCheck[];
+};
+
+/** Pull the evidence report out of the engines bag, defensively — an older run
+ *  (before the gate landed) simply has no `evidence` key. */
+export function evidenceFromEngines(
+  engines: Record<string, unknown> | undefined,
+): EvidenceReport | null {
+  const raw = engines?.evidence;
+  if (!raw || typeof raw !== "object") return null;
+  const report = raw as Partial<EvidenceReport>;
+  if (!Array.isArray(report.checks)) return null;
+  return {
+    blocked: Boolean(report.blocked),
+    block_reason: typeof report.block_reason === "string" ? report.block_reason : null,
+    warnings: Array.isArray(report.warnings) ? report.warnings : [],
+    checks: report.checks as EvidenceCheck[],
+  };
+}
+
 export type AnalysisRunResponse = {
   agent_run_id: string;
   workspace_id: string;
@@ -35,7 +69,7 @@ export async function runAnalysis(body: AnalysisRunRequest): Promise<AnalysisRun
     method: "POST",
     body: {
       symbol: body.symbol,
-      timeframe: body.timeframe ?? "H1",
+      ...(body.timeframe ? { timeframe: body.timeframe } : {}),
       complete_pipeline: body.complete_pipeline ?? false,
     },
   });

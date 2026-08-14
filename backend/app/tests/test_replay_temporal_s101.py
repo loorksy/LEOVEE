@@ -6,9 +6,9 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.engines.replay.historical_replay_engine import filter_candles_for_replay
 from app.models.candle import Candle
 from app.models.enums import Timeframe
+from app.services.replay.historical_replay_engine import filter_candles_for_replay
 
 
 def test_filter_candles_for_replay_excludes_future() -> None:
@@ -64,7 +64,7 @@ async def test_recall_at_time_excludes_future_memories(
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"note": "past"},
         memory_type=MemoryType.SEMANTIC,
     )
@@ -72,7 +72,7 @@ async def test_recall_at_time_excludes_future_memories(
         db_session,
         tenant_id=org.id,
         workspace_id=ctx.workspace_id,
-        key="symbol:EURUSD",
+        key="symbol:XAUUSD",
         content={"note": "future"},
         memory_type=MemoryType.SEMANTIC,
     )
@@ -85,7 +85,7 @@ async def test_recall_at_time_excludes_future_memories(
     recall = await replay_memory.recall_at_time(
         db_session,
         ctx,
-        symbol="EURUSD",
+        symbol="XAUUSD",
         as_of=as_of,
     )
     keys = {m["content"]["note"] for m in recall["memories"]}
@@ -97,13 +97,13 @@ async def test_historical_replay_engine_preview_excludes_future_candles(
     db_session: AsyncSession,
 ) -> None:
     from app.core.tenant import resolve_tenant_context
-    from app.engines.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
     from app.services import market_data
+    from app.services.replay.historical_replay_engine import HistoricalReplayEngine, ReplaySlice
     from app.tests.conftest import seed_user_org
 
     user, org, _ = await seed_user_org(db_session, email="replay-c@example.com", slug="replay-c")
     ctx = await resolve_tenant_context(db_session, user.id)
-    symbol = await market_data.get_or_create_symbol(db_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(db_session, "XAUUSD")
     early = datetime(2024, 1, 1, 8, tzinfo=UTC)
     late = datetime(2024, 1, 1, 16, tzinfo=UTC)
     for ts in (early, late):
@@ -123,7 +123,7 @@ async def test_historical_replay_engine_preview_excludes_future_candles(
     engine = HistoricalReplayEngine()
     as_of_slice = datetime(2024, 1, 1, 12, tzinfo=UTC)
     replay_slice = ReplaySlice(
-        symbol="EURUSD",
+        symbol="XAUUSD",
         timeframe=Timeframe.H1,
         as_of=as_of_slice,
     )

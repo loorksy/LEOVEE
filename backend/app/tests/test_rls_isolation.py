@@ -53,7 +53,7 @@ async def test_rls_without_workspace_guc_returns_zero_rows(
     await privileged_session.commit()
     ctx = await resolve_tenant_context(privileged_session, user.id)
     assert ctx.workspace_id is not None
-    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(privileged_session, "XAUUSD")
     privileged_session.add(
         Recommendation(
             tenant_id=org.id,
@@ -84,7 +84,7 @@ async def test_rls_blocks_cross_workspace_reads(
     assert ctx_a.workspace_id is not None
     assert ctx_b.workspace_id is not None
 
-    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(privileged_session, "XAUUSD")
     await set_rls_session_context(
         privileged_session,
         tenant_id=org_b.id,
@@ -112,7 +112,7 @@ async def test_rls_blocks_cross_workspace_reads(
                 tenant_id=org_b.id,
                 workspace_id=ctx_b.workspace_id,
                 memory_type=MemoryType.SEMANTIC,
-                key="symbol:EURUSD",
+                key="symbol:XAUUSD",
                 content_json={"note": "secret"},
             ),
             StrategyStat(
@@ -168,7 +168,7 @@ async def test_api_list_recommendations_enforces_rls(
     ctx_b = await resolve_tenant_context(db_session, user_b.id)
     assert ctx_a.workspace_id is not None and ctx_b.workspace_id is not None
 
-    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(privileged_session, "XAUUSD")
     await set_rls_session_context(
         privileged_session,
         tenant_id=org_b.id,
@@ -293,7 +293,7 @@ async def test_rls_blocks_cross_workspace_trades(
     ctx_a = await resolve_tenant_context(db_session, user_a.id)
     ctx_b = await resolve_tenant_context(db_session, user_b.id)
     assert ctx_a.workspace_id and ctx_b.workspace_id
-    symbol = await market_data.get_or_create_symbol(privileged_session, "EURUSD")
+    symbol = await market_data.get_or_create_symbol(privileged_session, "XAUUSD")
     await set_rls_session_context(
         privileged_session,
         tenant_id=org_b.id,

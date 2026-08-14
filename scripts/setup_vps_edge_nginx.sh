@@ -67,6 +67,21 @@ stream {
         listen [::]:443;
         proxy_pass $leovee_tls_backend;
         ssl_preread on;
+        # Prepend a PROXY-protocol header so Caddy sees the real client IP instead of
+        # 127.0.0.1. Without this Caddy writes X-Forwarded-For: 127.0.0.1 for every
+        # request and all clients collapse into one rate-limit bucket even with
+        # TRUST_PROXY_HEADERS=true. Caddy accepts PROXY from loopback via the
+        # listener_wrappers block in docker/caddy/Caddyfile.
+        #
+        # CAVEAT (shared host): `proxy_protocol on` is per stream-server, so nginx sends
+        # the PROXY header to WHICHEVER upstream $leovee_tls_backend resolves to —
+        # including the `default` branch (127.0.0.1:${NGINX_TLS_PORT}) that serves other
+        # vhosts' nginx TLS. Those listeners are NOT PROXY-aware and will break. Before
+        # enabling on a host with non-Leovee vhosts, make their :${NGINX_TLS_PORT}
+        # listener PROXY-aware too (add `proxy_protocol` to its `listen` line, plus
+        # `set_real_ip_from 127.0.0.1; real_ip_header proxy_protocol;`). On a
+        # Leovee-dedicated host (default branch unused) there is nothing else to change.
+        proxy_protocol on;
     }
 }
 NGINX_EOF

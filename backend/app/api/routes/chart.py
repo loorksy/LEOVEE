@@ -25,9 +25,13 @@ class SemanticModelPayload(BaseModel):
 
 class BuildSemanticPayload(BaseModel):
     symbol: str = Field(min_length=3, max_length=16)
-    timeframe: str = Field(default="H1", max_length=8)
+    timeframe: str = Field(default="M15", max_length=8)
     as_of: str
     engines: dict[str, Any]
+    #: The completed decision, when there is one. Optional because the engines
+    #: alone already draw a useful chart — structure, zones and liquidity exist
+    #: whether or not a plan was published.
+    decision: dict[str, Any] | None = None
 
 
 class AnnotationStatusUpdate(BaseModel):
@@ -93,7 +97,11 @@ async def update_chart_annotation_status(
 
 
 @router.post("/semantic/validate")
-async def validate_semantic_model(body: SemanticModelPayload) -> dict[str, Any]:
+async def validate_semantic_model(
+    body: SemanticModelPayload,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
     try:
         model = chart_semantic_service.validate_semantic_model(body.model)
     except ChartSemanticValidationError as exc:
@@ -104,7 +112,11 @@ async def validate_semantic_model(body: SemanticModelPayload) -> dict[str, Any]:
 
 
 @router.post("/semantic/build")
-async def build_semantic_from_engines(body: BuildSemanticPayload) -> dict[str, Any]:
+async def build_semantic_from_engines(
+    body: BuildSemanticPayload,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
     from datetime import datetime
 
     try:
@@ -118,6 +130,11 @@ async def build_semantic_from_engines(body: BuildSemanticPayload) -> dict[str, A
         timeframe=body.timeframe,
         as_of=as_of,
         engines=body.engines,
+        # The plan's own levels, when the caller has a completed decision. A
+        # degraded run carries none, and the builder draws nothing rather than
+        # falling back to the geometric placeholder — which would put a line on
+        # the chart at a price no published plan ever named.
+        decision=body.decision,
     )
     return {"model": model.model_dump()}
 

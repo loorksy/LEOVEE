@@ -22,6 +22,11 @@ class NormalizedCandle:
     source: str
 
 
+#: OANDA returns at most this many candles per REST call, so any window
+#: larger than it has to be walked in pages.
+MAX_CANDLES_PER_REQUEST = 5000
+
+
 class MarketDataProvider(Protocol):
     async def fetch_candles(
         self,
@@ -30,6 +35,23 @@ class MarketDataProvider(Protocol):
         granularity: str,
         count: int = 100,
     ) -> list[NormalizedCandle]: ...
+
+    async def fetch_candles_from(
+        self,
+        instrument: str,
+        *,
+        granularity: str,
+        start: datetime,
+        count: int = MAX_CANDLES_PER_REQUEST,
+    ) -> list[NormalizedCandle]:
+        """One page of candles at or after `start`, oldest first.
+
+        Paging forward from a timestamp rather than backward from "now" is what
+        makes a long backfill resumable: the caller advances `start` past the
+        last candle it received and asks again, so an interrupted run continues
+        from where it stopped instead of refetching a year.
+        """
+        ...
 
 
 GRANULARITY_TO_TIMEFRAME: dict[str, Timeframe] = {
