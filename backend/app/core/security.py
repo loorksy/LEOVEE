@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -25,6 +26,18 @@ def verify_password(password_hash: str, password: str) -> bool:
         return True
     except VerifyMismatchError:
         return False
+
+
+# A precomputed hash to verify against when no user matches, so login does the
+# same argon2 work whether the email exists or not — otherwise response timing
+# distinguishes a registered account from an unknown one.
+_DUMMY_PASSWORD_HASH = _password_hasher.hash("leovee-login-timing-equalizer")
+
+
+def dummy_password_verify() -> None:
+    """Burn one argon2 verify to match the cost of a real check. Never raises."""
+    with contextlib.suppress(VerifyMismatchError):
+        _password_hasher.verify(_DUMMY_PASSWORD_HASH, "not-the-password")
 
 
 def hash_token(token: str) -> str:

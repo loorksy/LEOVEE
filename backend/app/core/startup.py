@@ -9,6 +9,10 @@ def validate_production_startup(settings: Settings) -> None:
         return
 
     missing: list[str] = []
+    if settings.dev_auth_bypass:
+        # The impersonation header must never be shippable to production, even
+        # by accident. Refuse to boot rather than run with it armed.
+        missing.append("DEV_AUTH_BYPASS must be off in production")
     if not settings.database_url:
         missing.append("DATABASE_URL")
     elif "leovee_app" not in settings.database_url:

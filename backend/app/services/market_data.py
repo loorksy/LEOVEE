@@ -98,10 +98,15 @@ async def fetch_and_store_candles(
     count: int = 100,
     provider: MarketDataProvider | None = None,
 ) -> tuple[Symbol, list[Candle]]:
+    # Allowlist BEFORE the outbound call, not after. The chokepoint has to sit
+    # in front of the network request: fetching first placed a raw, unvalidated
+    # symbol into the OANDA URL path with the platform's credentials, and only
+    # then rejected it — the gate has to gate the thing it guards.
+    spec = require_instrument(symbol_code)
     granularity = timeframe.value
     market = provider or get_market_provider()
-    normalized = await market.fetch_candles(symbol_code, granularity=granularity, count=count)
-    symbol = await get_or_create_symbol(session, symbol_code)
+    normalized = await market.fetch_candles(spec.symbol, granularity=granularity, count=count)
+    symbol = await get_or_create_symbol(session, spec.symbol)
     await upsert_candles(session, symbol.id, normalized)
     result = await session.execute(
         select(Candle)

@@ -9,6 +9,22 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
     secret_key: str = Field(default="change-me-in-production", alias="SECRET_KEY")
+    #: The dev-only `X-Leovee-User-Id` impersonation header does nothing unless
+    #: this is explicitly on. Off by default, so absence of config is secure: a
+    #: deployment that forgot `ENVIRONMENT=production` (the default is
+    #: "development") still cannot be impersonated, because the bypass needs a
+    #: positive signal, not merely a wrong environment string. Refused at
+    #: production startup.
+    dev_auth_bypass: bool = Field(default=False, alias="DEV_AUTH_BYPASS")
+    #: When true, `X-Forwarded-For` is trusted for the client IP (rate-limit
+    #: keying). Only turn this on behind a proxy that overwrites the header
+    #: (Caddy/nginx in the deploy); off by default so a direct client cannot
+    #: forge its rate-limit bucket by sending the header itself.
+    trust_proxy_headers: bool = Field(default=False, alias="TRUST_PROXY_HEADERS")
+    #: Dedicated key for platform-secret encryption. Falls back to a
+    #: domain-separated derivation of SECRET_KEY when unset, so the secrets key
+    #: is never literally the JWT signing key.
+    encryption_key: str | None = Field(default=None, alias="ENCRYPTION_KEY")
     public_url: str = Field(default="http://localhost:5173", alias="PUBLIC_URL")
     cors_origins: str = Field(
         default="http://localhost:5173,http://localhost:3000",

@@ -78,10 +78,18 @@ def _boot_secret_key() -> str:
     return Settings().secret_key
 
 
+#: Domain-separation label so the secrets key is not literally a hash of the
+#: JWT signing key. A leaked SECRET_KEY no longer yields the encryption key
+#: directly; and a dedicated ENCRYPTION_KEY, when set, decouples them entirely.
+_SECRETS_KEY_CONTEXT = b"leovee.platform-secrets.v1\x00"
+
+
 def _get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
-        digest = hashlib.sha256(_boot_secret_key().encode("utf-8")).digest()
+        base = Settings().encryption_key or _boot_secret_key()
+        source = _SECRETS_KEY_CONTEXT if Settings().encryption_key is None else b""
+        digest = hashlib.sha256(source + base.encode("utf-8")).digest()
         _fernet = Fernet(base64.urlsafe_b64encode(digest))
     return _fernet
 

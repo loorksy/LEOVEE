@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_workspace_context
@@ -19,7 +19,7 @@ async def list_news(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _tenant: Annotated[TenantContext, Depends(get_workspace_context)],
     currency: str | None = None,
-    limit: int = 20,
+    limit: Annotated[int, Query(ge=1, le=200)] = 20,
 ) -> dict[str, object]:
     settings = get_settings()
     provider_configured = bool(settings.finnhub_api_key)

@@ -22,10 +22,20 @@ from app.services.auth_service import AuthError
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-def _client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+def _client_ip(request: Request, settings: Settings) -> str | None:
+    """The client IP for rate-limit keying.
+
+    ``X-Forwarded-For`` is honoured only behind a trusted proxy
+    (``TRUST_PROXY_HEADERS``), and then the *rightmost* entry is used — the hop
+    our own proxy appended, which a client cannot forge past. Untrusted, the
+    header is ignored entirely and the real TCP peer is used, so a direct
+    caller cannot mint a fresh rate-limit bucket per request by rotating the
+    header.
+    """
+    if settings.trust_proxy_headers:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[-1].strip()
     if request.client:
         return request.client.host
     return None
@@ -38,7 +48,7 @@ async def signup(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
-    ip = _client_ip(request)
+    ip = _client_ip(request, settings)
     try:
         await enforce_rate_limit(
             key=f"signup:{ip or 'unknown'}",
@@ -73,7 +83,7 @@ async def login(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
-    ip = _client_ip(request)
+    ip = _client_ip(request, settings)
     try:
         await enforce_rate_limit(
             key=f"login:{ip or 'unknown'}:{body.email.lower()}",
@@ -114,7 +124,7 @@ async def refresh(
             session,
             settings,
             refresh_token=body.refresh_token,
-            ip_address=_client_ip(request),
+            ip_address=_client_ip(request, settings),
             user_agent=request.headers.get("User-Agent"),
         )
     except AuthError as exc:
@@ -155,7 +165,7 @@ async def password_reset_request(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> MessageResponse:
-    ip = _client_ip(request)
+    ip = _client_ip(request, settings)
     try:
         await enforce_rate_limit(
             key=f"pwdreset:{ip or 'unknown'}:{body.email.lower()}",

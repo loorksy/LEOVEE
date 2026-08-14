@@ -97,7 +97,11 @@ async def update_chart_annotation_status(
 
 
 @router.post("/semantic/validate")
-async def validate_semantic_model(body: SemanticModelPayload) -> dict[str, Any]:
+async def validate_semantic_model(
+    body: SemanticModelPayload,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
     try:
         model = chart_semantic_service.validate_semantic_model(body.model)
     except ChartSemanticValidationError as exc:
@@ -108,7 +112,11 @@ async def validate_semantic_model(body: SemanticModelPayload) -> dict[str, Any]:
 
 
 @router.post("/semantic/build")
-async def build_semantic_from_engines(body: BuildSemanticPayload) -> dict[str, Any]:
+async def build_semantic_from_engines(
+    body: BuildSemanticPayload,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _tenant: Annotated[TenantContext, Depends(get_workspace_context)],
+) -> dict[str, Any]:
     from datetime import datetime
 
     try:

@@ -95,8 +95,15 @@ class ChartAnchor(BaseModel):
     timeframe: str | None = None
 
 
+#: Bounds on a semantic model, so a single request cannot carry an arbitrarily
+#: large graph to parse and validate. Both sit far above any real chart: the
+#: geometry engine caps a snapshot at three patterns and a handful of lines.
+MAX_ANCHORS_PER_OP = 64
+MAX_OPS_PER_MODEL = 256
+
+
 class ChartGeometry(BaseModel):
-    anchors: list[ChartAnchor] = Field(min_length=1)
+    anchors: list[ChartAnchor] = Field(min_length=1, max_length=MAX_ANCHORS_PER_OP)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("anchors")
@@ -141,7 +148,9 @@ class ChartSemanticModel(BaseModel):
     version: int = 1
     symbol: str | None = None
     timeframe: str | None = None
-    operations: list[ChartSemanticOperation] = Field(default_factory=list)
+    operations: list[ChartSemanticOperation] = Field(
+        default_factory=list, max_length=MAX_OPS_PER_MODEL
+    )
 
 
 class ChartAnnotationCreate(BaseModel):
