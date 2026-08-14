@@ -63,6 +63,10 @@ ALLOWED_OCCURRENCES: dict[str, str] = {
     "backend/app/tests/conformance/test_no_execution_surface.py": "the guard itself",
     # The gate that proves execution stays impossible has to name it.
     "backend/app/tests/test_trade_execution_gate.py": "asserts execution is refused",
+    # Same shape: it lists the eight metrics that were dropped in order to
+    # assert none of them exists. The names are string literals — code, which
+    # the guard is right to see — and the file's entire purpose is the absence.
+    "backend/app/tests/test_trading_dna.py": "asserts the dropped metrics are absent",
 }
 
 #: Where Telegram may be mentioned at all. A transport, nothing more (ADR 0009).
