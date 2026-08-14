@@ -35,6 +35,29 @@ dump_and_fail() {
 }
 
 # ---------------------------------------------------------------- preflight ---
+command -v docker >/dev/null 2>&1 || fail "docker is not installed on this host."
+docker compose version >/dev/null 2>&1 || fail "the docker compose plugin is not available (need 'docker compose', not 'docker-compose')."
+
+# This overlay gives Caddy the host's :80 and :443 so it can answer ACME
+# challenges. That is only true of a dedicated box. On a host already serving
+# other sites the bind fails partway through `up`, after migrations have already
+# run — and the fix is not to force it, it is to use a different topology. Check
+# before touching anything rather than half-deploying and then discovering it.
+if command -v ss >/dev/null 2>&1; then
+  occupied="$(ss -tlnH '( sport = :80 or sport = :443 )' 2>/dev/null |
+    awk '{print $4}' | grep -vE '^(127\.|\[::1\])' || true)"
+  if [[ -n "${occupied}" ]]; then
+    fail "something already listens on :80/:443 —
+$(ss -tlnpH '( sport = :80 or sport = :443 )' 2>/dev/null | sed 's/^/       /')
+       This overlay needs both ports for Caddy and its ACME challenge.
+       On a shared host, do NOT free them by stopping the other service. Either
+       deploy to a dedicated VPS, or put Leovee behind the existing edge: add a
+       server block proxying your domain to 127.0.0.1:3000 (web) and
+       127.0.0.1:8000 (api), skip the caddy service, and let that edge hold the
+       certificate. docs/VPS_DEPLOY.md covers both."
+  fi
+fi
+
 [[ -f .env ]] || fail ".env missing. Generate it first: scripts/generate_prod_env.sh \"${ROOT}/.env\""
 
 grep -qE '^ENVIRONMENT=production$' .env ||
