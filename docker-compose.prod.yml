@@ -23,10 +23,31 @@ services:
 
   postgres:
     restart: unless-stopped
+    # Docker publishes ports straight to the host firewall's DOCKER chain, bypassing
+    # UFW's INPUT rules. Drop the base file's 5432 host bind so Postgres is only
+    # reachable on the internal compose network (mirrors docker-compose.staging.yml).
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
 
   redis:
     restart: unless-stopped
     command: redis-server --appendonly yes
+    # Same firewall-bypass reasoning as postgres above: no host bind in production.
+    ports: !reset []
+    # AOF (--appendonly yes) is worthless without a durable volume: the arq queue and
+    # rate-limit counters would live on the ephemeral container layer and vanish on
+    # recreate. Persist /data (mirrors how docker-compose.yml persists pgdata).
+    volumes:
+      - redisdata:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
 
   migrate:
     build:
@@ -42,3 +63,6 @@ services:
         condition: service_healthy
     profiles:
       - tools
+
+volumes:
+  redisdata: {}

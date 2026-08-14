@@ -32,6 +32,11 @@ dependencies = [
     # the in-memory counters it replaces vanished on every restart and could
     # not express histograms, so latency percentiles were unknowable.
     "prometheus-client>=0.21.0",
+    # Error tracking. Optional at runtime (init is a no-op without SENTRY_DSN)
+    # but must be *present in the image* — otherwise setting SENTRY_DSN silently
+    # captures nothing. The bridge logs loudly if the DSN is set and this is
+    # somehow absent.
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]

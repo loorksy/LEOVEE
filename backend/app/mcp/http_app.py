@@ -18,6 +18,13 @@ from app.services.entitlement_service import EntitlementError
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
+    # MCP tools rely SOLELY on RLS for tenant scoping, so this container must
+    # refuse the same misconfigurations the API refuses — above all a
+    # BYPASSRLS/superuser DATABASE_URL, which would serve cross-tenant reads.
+    from app.core.config import get_settings
+    from app.core.startup import validate_production_startup
+
+    validate_production_startup(get_settings())
     yield
 
 

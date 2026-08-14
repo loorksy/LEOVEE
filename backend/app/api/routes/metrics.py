@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Response, status
@@ -22,7 +23,8 @@ def _authorize_metrics(authorization: str | None) -> None:
             detail="METRICS_BEARER_TOKEN is required in this environment",
         )
     expected = f"Bearer {token}"
-    if authorization != expected:
+    # Constant-time: a plain != leaks the token prefix through response timing.
+    if not secrets.compare_digest(authorization or "", expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="metrics authentication required",

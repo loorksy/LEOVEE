@@ -112,12 +112,34 @@ reevaluation_triggers_total = Counter(
     ["reason", "outcome"],
 )
 
+embedding_fallback_total = Counter(
+    "leovee_embedding_fallback_total",
+    "Times a memory vector was indexed with the deterministic (hashed) fallback "
+    "because no embedding provider was configured — every increment is noise "
+    "entering the semantic index",
+)
+
+worker_job_failures_total = Counter(
+    "leovee_worker_job_failures_total",
+    "Background job failures, by job name and exception type — a chronically "
+    "failing cron is otherwise invisible",
+    ["job", "code"],
+)
+
 build_info = Gauge(
     "leovee_build_info",
     "Constant 1, labelled with the running version — join against it to slice "
     "any other metric by deploy",
     ["version"],
 )
+
+
+def record_embedding_fallback() -> None:
+    embedding_fallback_total.inc()
+
+
+def record_worker_job_failure(job: str, code: str) -> None:
+    worker_job_failures_total.labels(job=job, code=code).inc()
 
 
 def normalize_path(path: str) -> str:

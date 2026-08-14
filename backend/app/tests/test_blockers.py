@@ -42,6 +42,10 @@ def test_production_startup_accepts_openrouter_as_llm() -> None:
         REDIS_URL="redis://localhost:6379/0",
         SECRET_KEY="x" * 32,
         OANDA_API_TOKEN="practice-token",
+        # The other production invariants must be satisfied so this test
+        # isolates the one thing it asserts: OpenRouter alone counts as the LLM.
+        TRUST_PROXY_HEADERS=True,
+        CORS_ORIGINS="https://app.leovee.example",
         OPENAI_API_KEY=None,
         ANTHROPIC_API_KEY=None,
         OPENROUTER_API_KEY="sk-or-test",

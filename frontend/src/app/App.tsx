@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
 import { HomePage } from "@/features/dashboard/HomePage";
 import { LoginPage } from "@/features/auth/LoginPage";
@@ -26,33 +27,35 @@ const queryClient = new QueryClient();
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route element={<AppShell />}>
-            <Route path="/" element={<HomePage />} />
-            <Route element={<RequireAuth />}>
-              <Route path="/analyst" element={<ChartPage />} />
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/markets" element={<MarketsPage />} />
-              <Route path="/analysis" element={<AnalysisPage />} />
-              <Route path="/recommendations" element={<RecommendationsPage />} />
-              <Route path="/trades" element={<TradesPage />} />
-              <Route path="/memory" element={<MemoryPage />} />
-              <Route path="/watchlist" element={<WatchlistPage />} />
-              <Route path="/alerts" element={<AlertsPage />} />
-              <Route path="/journal" element={<JournalPage />} />
-              <Route path="/research" element={<ResearchPage />} />
-              <Route path="/performance" element={<PerformancePage />} />
-              <Route path="/replay" element={<ReplayPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route element={<AppShell />}>
+              <Route path="/" element={<HomePage />} />
+              <Route element={<RequireAuth />}>
+                <Route path="/analyst" element={<ChartPage />} />
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/markets" element={<MarketsPage />} />
+                <Route path="/analysis" element={<AnalysisPage />} />
+                <Route path="/recommendations" element={<RecommendationsPage />} />
+                <Route path="/trades" element={<TradesPage />} />
+                <Route path="/memory" element={<MemoryPage />} />
+                <Route path="/watchlist" element={<WatchlistPage />} />
+                <Route path="/alerts" element={<AlertsPage />} />
+                <Route path="/journal" element={<JournalPage />} />
+                <Route path="/research" element={<ResearchPage />} />
+                <Route path="/performance" element={<PerformancePage />} />
+                <Route path="/replay" element={<ReplayPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }

@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     oanda_api_token: str | None = Field(default=None, alias="OANDA_API_TOKEN")
     oanda_account_id: str | None = Field(default=None, alias="OANDA_ACCOUNT_ID")
     oanda_environment: str = Field(default="practice", alias="OANDA_ENVIRONMENT")
+    #: Order execution is out of scope (ADR 0005) and no code reads this to place
+    #: an order. The field exists so startup can *refuse to boot* when it is on —
+    #: matching the deploy scripts' promise in code, not only in shell wrappers.
+    oanda_execution: bool = Field(default=False, alias="OANDA_EXECUTION")
     oanda_api_url: str | None = Field(default=None, alias="OANDA_API_URL")
     oanda_stream_url: str | None = Field(default=None, alias="OANDA_STREAM_URL")
 

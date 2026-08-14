@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,12 +14,15 @@ from app.core.tenant import TenantContext
 from app.infrastructure.rls import set_rls_session_context
 from app.models.learning import CalibrationBin, SymbolProfile
 from app.models.memory import AgentMemory, MemoryEmbedding, MemoryType
+from app.observability.prometheus import record_embedding_fallback
 from app.providers.llm.embeddings import (
     DETERMINISTIC_MODEL,
     get_embedding_provider,
 )
 from app.services.learning.calibration import apply_calibration
 from app.services.memory.embedding import embed_text_deterministic, merge_rank_hybrid
+
+logger = structlog.get_logger(__name__)
 
 
 async def calibrated_confidence_for_workspace(
@@ -121,6 +125,16 @@ async def embed_for_index(text: str) -> tuple[list[float], str]:
     try:
         provider = get_embedding_provider()
     except ProviderConfigurationError:
+        # Loud, not silent: hashed vectors are noise dressed as similarity, and a
+        # deployment that indexes on them for weeks and then calibrates the
+        # learning loop on the result has no way to know. The label is honest
+        # (`deterministic-v1`), and now so is the log line and the metric.
+        logger.warning(
+            "embedding_provider_missing_deterministic_fallback",
+            detail="No embedding provider configured; indexing hashed noise vectors. "
+            "Set OPENAI_API_KEY for real semantic memory.",
+        )
+        record_embedding_fallback()
         return embed_text_deterministic(text), DETERMINISTIC_MODEL
     result = await provider.embed([text])
     return result.one, result.model

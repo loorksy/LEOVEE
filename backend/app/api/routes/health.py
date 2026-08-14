@@ -1,7 +1,7 @@
 from typing import Any
 
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 from redis.asyncio import Redis
 from sqlalchemy import text
 
@@ -50,7 +50,7 @@ async def liveness() -> dict[str, str]:
 
 
 @router.get("/health/ready")
-async def readiness() -> dict[str, Any]:
+async def readiness(response: Response) -> dict[str, Any]:
     settings = get_settings()
     checks: dict[str, Any] = {}
     healthy = True
@@ -69,6 +69,11 @@ async def readiness() -> dict[str, Any]:
     else:
         checks["redis"] = {"ok": True, "skipped": True}
 
+    if not healthy:
+        # 503, not a 200 with {"status": "degraded"}: an orchestrator keying on
+        # the HTTP status must pull this instance from rotation on a dependency
+        # outage, not keep routing DB-backed requests it cannot serve.
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ok" if healthy else "degraded", "checks": checks}
 
 

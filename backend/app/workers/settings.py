@@ -283,6 +283,24 @@ async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
     return f"platform_secrets_reloaded:{len(loaded)}"
 
 
+async def market_case_index_job(_ctx: dict[str, object]) -> str:
+    """Sweep the shared candle store into platform-global market-case memory.
+
+    Without this the ``find_similar_cases`` / ``get_case_outcome_stats`` tools —
+    the "when has gold looked like this before" memory — read an empty table
+    forever. Idempotent (``store_cases`` upserts) and bounded per timeframe.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.memory.cases.indexer import index_market_cases
+
+    async with factory() as session:
+        written = await index_market_cases(session)
+    total = sum(written.values())
+    return f"market_case_index_ok:{total}"
+
+
 def _worker_redis_settings() -> RedisSettings:
     settings = get_settings()
     url = settings.redis_url or "redis://redis:6379/0"
@@ -305,6 +323,7 @@ class WorkerSettings:
         reload_platform_secrets_job,
         recommendation_tracker_job,
         recommendation_reevaluation_job,
+        market_case_index_job,
     ]
     cron_jobs = [
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
@@ -325,6 +344,8 @@ class WorkerSettings:
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
         cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]
+        # Nightly, after retention/backfill have settled the day's candles.
+        cron(market_case_index_job, hour={4}, minute=0),  # type: ignore[arg-type]
     ]
 
     @staticmethod
@@ -335,10 +356,30 @@ class WorkerSettings:
         rather than one up to fifteen minutes old, so it starts with the worker
         rather than waiting for a scheduled tick.
         """
+        # The worker shares the API's env, so it must refuse the same
+        # misconfigurations the API refuses — a mis-provisioned worker binding a
+        # BYPASSRLS role or an armed dev bypass should not quietly run background
+        # jobs against every tenant's data.
+        from app.core.startup import validate_production_startup
+
+        validate_production_startup(get_settings())
+
         from app.workers.stream_runner import start_stream_supervisor
 
         ctx["stream_task"] = start_stream_supervisor()
         logger.info("live_stream_started")
+
+    @staticmethod
+    async def on_job_end(ctx: dict[str, object]) -> None:
+        """Surface job failures as a metric — a chronically failing cron is
+        otherwise invisible until someone reads stdout."""
+        exc = ctx.get("exception")
+        if exc is not None:
+            from app.observability.prometheus import record_worker_job_failure
+
+            job = str(ctx.get("job_name") or "unknown")
+            record_worker_job_failure(job, type(exc).__name__)
+            logger.warning("worker_job_failed", job=job, error=str(exc)[:200])
 
     @staticmethod
     async def on_shutdown(ctx: dict[str, object]) -> None:

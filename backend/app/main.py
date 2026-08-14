@@ -51,13 +51,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     validate_production_startup(settings)
     if settings.database_url:
-        from app.infrastructure.database import get_session_factory
+        from app.infrastructure.database import get_session_factory, verify_runtime_db_role
         from app.infrastructure.seed import ensure_platform_seed
         from app.services.platform_secrets import load_runtime_overrides
 
         factory = get_session_factory()
         if factory is not None:
             async with factory() as session:
+                # Ask Postgres directly whether the live role is superuser/BYPASSRLS
+                # rather than trusting the URL string: RLS is the tenancy boundary,
+                # and a role that bypasses it must refuse to boot, not serve.
+                await verify_runtime_db_role(session)
                 await ensure_platform_seed(session)
                 # The table may not exist until migrations run; continue boot.
                 with suppress(Exception):

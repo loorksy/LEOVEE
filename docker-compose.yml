@@ -40,6 +40,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Drain in-flight requests before SIGKILL on stop/recreate.
+    stop_grace_period: 30s
+    # Readiness gate for dependents (web, leovee-mcp). /health/ready checks deps
+    # (db/redis), unlike the image's /health/live probe. curl is not installed in
+    # the API image (python:3.12-slim + libpq only), so probe via python/urllib —
+    # matching the pattern already used in docker/api.Dockerfile.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
     build:
@@ -54,6 +66,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Let arq finish the current job (and shut its pool) before SIGKILL.
+    stop_grace_period: 30s
 
   web:
     build:
@@ -64,7 +78,8 @@ services:
     ports:
       - "127.0.0.1:3000:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   leovee-mcp:
     build:
@@ -82,7 +97,7 @@ services:
       redis:
         condition: service_healthy
       api:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:
