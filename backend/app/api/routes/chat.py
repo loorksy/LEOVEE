@@ -262,10 +262,12 @@ async def post_message(
         if last_error is not None:
             raise last_error
         raise ProviderConfigurationError("No LLM provider available")
+    assistant_json = turn.assistant_message.content_json or {}
     return {
         "user_message_id": str(turn.user_message.id),
         "assistant_message_id": str(turn.assistant_message.id),
         "content": turn.assistant_message.content,
+        "artifacts": assistant_json.get("artifacts", []),
         "recall": turn.recall,
         "actions": turn.actions,
         "summary_text": conv.summary_text,

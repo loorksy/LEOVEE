@@ -110,6 +110,29 @@ def _constitution_or_none() -> Prompt | None:
         return None
 
 
+async def _build_market_context(session: AsyncSession) -> dict[str, Any]:
+    """The news read for the evidence gate: recent headlines and their freshness.
+
+    Economic-calendar events (NFP/CPI/FOMC) drive the event-blackout gate; until
+    a forward-looking calendar source is ingested, ``upcoming_events`` is empty
+    and the blackout is inert rather than guessed. The headline read is real:
+    what was published, how recently. ``provider_configured`` reflects whether a
+    news key exists, so "no headlines" is distinguished from "no provider".
+    """
+    from app.core.config import get_settings
+    from app.services import news_service
+
+    settings = get_settings()
+    rows = await news_service.list_recent_news(session, limit=20)
+    latest_ts = rows[0].published_at if rows else None
+    return {
+        "provider_configured": bool(settings.finnhub_api_key),
+        "headline_count": len(rows),
+        "latest_headline_ts": latest_ts,
+        "upcoming_events": [],
+    }
+
+
 def map_decision_to_recommendation_status(decision: dict[str, Any]) -> RecommendationStatus:
     direction = decision.get("direction")
     if direction == RecommendationDirection.NO_TRADE.value:
@@ -162,11 +185,17 @@ async def run_analysis(
         symbol=symbol,
         timeframe=timeframe,
     )
+    # The news read the evidence gate requires: headlines that move the metal,
+    # plus whatever the ingestion has of the economic calendar. Fetched here
+    # where the session lives, and passed as a fact — an empty read is reported
+    # as empty, never as clear news.
+    market_context = await _build_market_context(session)
     result = await run_analysis_orchestrator(
         symbol=symbol,
         candles=candles,
         memories=memories,
         mtf_context=mtf_snapshot,
+        market_context=market_context,
         # The ladder is already loaded for the MTF read, so the agent's own
         # timeframe choice costs no extra fetch (D11).
         bars_by_timeframe=mtf_snapshot.get("bars_by_timeframe"),

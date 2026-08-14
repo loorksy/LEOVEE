@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
 from app.agents.orchestrator import run_analysis_orchestrator
+from app.core.datetime_utils import utc_now
 from app.core.errors import ProviderConfigurationError
 from app.models.enums import RecommendationDirection, Timeframe
 from app.tests.bars import flat_bars, swinging_bars
+
+_M15 = timedelta(minutes=15)
 
 
 def _candles(count: int = 140) -> list[SimpleNamespace]:
@@ -19,18 +23,23 @@ def _candles(count: int = 140) -> list[SimpleNamespace]:
     bars, and the agent's timeframe selection refuses a frame with no readable
     structure. Both refusals fire before the narrative stage, so testing the LLM
     guarantee needs candles a real analysis would actually accept.
+
+    Timestamps end at *now*: the evidence gate refuses a scalp written on a stale
+    price, so a live analysis reads fresh candles. A fixed historical fixture
+    would (correctly) block on ``EVIDENCE_LIVE_PRICE`` before reaching the LLM.
     """
     bars = swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+    base = utc_now()
     return [
         SimpleNamespace(
             open=Decimal(str(bar.open)),
             high=Decimal(str(bar.high)),
             low=Decimal(str(bar.low)),
             close=Decimal(str(bar.close)),
-            ts=bar.ts,
+            ts=base - _M15 * (len(bars) - 1 - i),
             timeframe=Timeframe.M15,
         )
-        for bar in bars
+        for i, bar in enumerate(bars)
     ]
 
 

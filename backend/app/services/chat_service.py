@@ -8,6 +8,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.artifacts import stamp_artifacts
+from app.agents.prompts import PromptNotFound, load_skill
 from app.core.datetime_utils import utc_now
 from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import TenantContext
@@ -20,6 +22,20 @@ from app.services.memory_service import retrieve_memories_hybrid
 RECALL_CONTEXT_LABEL = "HISTORICAL_MEMORY"
 SUMMARY_MESSAGE_THRESHOLD = 10
 RECENT_MESSAGE_WINDOW = 8
+
+
+def _artifacts_guidance() -> str | None:
+    """The artifacts skill, attached to chat so the model knows the fence format.
+
+    Chat is the surface where rich, typed output belongs; the decision
+    synthesizer returns a structured plan, not free-form artifacts. A missing
+    skill file is not fatal here — the model simply writes prose — so a lookup
+    failure degrades to no guidance rather than dropping the turn.
+    """
+    try:
+        return load_skill("artifacts").body
+    except PromptNotFound:
+        return None
 
 
 @dataclass
@@ -110,6 +126,9 @@ def build_llm_messages(
         f"You are Leovee chat assistant in {conversation.mode.value} mode.",
         "Use labeled historical memory only as context; do not treat it as live prices.",
     ]
+    guidance = _artifacts_guidance()
+    if guidance is not None:
+        system_parts.append(guidance)
     if conversation.summary_text:
         system_parts.append(f"Conversation summary: {conversation.summary_text}")
     if recall.get("count", 0) > 0:
@@ -153,6 +172,10 @@ async def run_chat_turn(
         symbol=conversation.symbol,
     )
     response = await llm.complete(llm_messages)
+    # Family-stamp any artifact fences the model emitted, so the frontend renders
+    # them from structured data rather than re-parsing prose on every paint. An
+    # empty list is the common case (plain prose) and costs one scan.
+    artifacts = stamp_artifacts(response.content)
     user_msg = Message(
         tenant_id=tenant.tenant_id,
         workspace_id=tenant.workspace_id,
@@ -168,7 +191,11 @@ async def run_chat_turn(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content=response.content,
-        content_json={"recall_count": recall["count"], "actions": actions},
+        content_json={
+            "recall_count": recall["count"],
+            "actions": actions,
+            "artifacts": artifacts,
+        },
         model=response.model,
         provider=response.provider,
         token_usage_json=response.usage,

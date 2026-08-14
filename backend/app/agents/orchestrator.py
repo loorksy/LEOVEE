@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -45,9 +46,11 @@ from app.agents.timeframe import (
 )
 from app.agents.tools.loop import run_tool_loop
 from app.agents.tools.registry import ToolContext
+from app.core.datetime_utils import utc_now
 from app.core.errors import ProviderConfigurationError
 from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.bar import OHLCBar, bars_from_candles
+from app.engines.evidence import EconomicEvent, NewsContext, assess_evidence
 from app.engines.geometry import run_geometry_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
@@ -66,6 +69,8 @@ from app.engines.zones import run_zones_engine
 from app.models.enums import RecommendationDirection, Timeframe
 from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.providers.llm.factory import get_llm_provider
+from app.services.market.calendar import get_session_status
+from app.services.memory.cases.fingerprint import session_of
 
 __all__ = [
     "OrchestratorResult",
@@ -159,6 +164,8 @@ async def run_analysis_orchestrator(
     bars_by_timeframe: dict[str, list[OHLCBar]] | None = None,
     visual_evidence: list[dict[str, Any]] | None = None,
     tool_context: ToolContext | None = None,
+    market_context: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> OrchestratorResult:
     run_id = uuid.uuid4()
     if not candles:
@@ -293,6 +300,46 @@ async def run_analysis_orchestrator(
             narrative={
                 "degraded_reason": "PLAN_NOT_VIABLE",
                 "plan_failures": plan_sanity["failures"],
+            },
+            pipeline=ledger.to_dict(),
+        )
+
+    # The evidence gate: everything the platform insists on reading before it
+    # states a direction — the metal's session, the news and the economic
+    # calendar, the liquidity and supply/demand it already computed, and a final
+    # check that the price the plan is written at is the price on the screen. A
+    # mandatory reading that is missing or stale fails the run closed with its
+    # own name, exactly like a missing engine — the recommendation is never a
+    # claim the agent did not check.
+    moment = now or utc_now()
+    session = get_session_status(symbol, moment)
+    session_status = {
+        "is_open": session.is_open,
+        "reason": session.reason,
+        # London / New York / Asia — the metal's session, named for the reader.
+        "session": session_of(moment),
+    }
+    evidence_report = assess_evidence(
+        engines=engines,
+        session_status=session_status,
+        news=_news_context(market_context),
+        last_bar_ts=bars[-1].ts,
+        now=moment,
+        decision_timeframe=decision_timeframe,
+    )
+    engines["evidence"] = evidence_report.to_dict()
+    block_reason = evidence_report.block_reason
+    if block_reason is not None:
+        blocking = next(c for c in evidence_report.checks if c.blocking and c.failed)
+        return OrchestratorResult(
+            agent_run_id=run_id,
+            perceive=perceive,
+            recall=recall,
+            engines=engines,
+            decision=fail_closed_no_trade(block_reason, detail=blocking.detail),
+            narrative={
+                "degraded_reason": block_reason,
+                "evidence": evidence_report.to_dict(),
             },
             pipeline=ledger.to_dict(),
         )
@@ -505,5 +552,29 @@ def _evidence_digest(engines: dict[str, Any]) -> str:
         "zones": engines.get("zones", {}).get("zones", [])[:4],
         "plan_sanity": engines.get("plan_sanity"),
         "timeframe": engines.get("timeframe_selection", {}).get("timeframe"),
+        # The pre-decision reading the gate assembled: session, news, event
+        # blackout, live-price freshness. The model must weigh what was checked,
+        # not assume it.
+        "evidence": engines.get("evidence"),
     }
     return json.dumps(digest, ensure_ascii=False, default=str, indent=2)
+
+
+def _news_context(market_context: dict[str, Any] | None) -> NewsContext:
+    """Build the news read from what the caller fetched, honestly.
+
+    An absent ``market_context`` means the analysis was invoked without a news
+    read wired in — reported as an unconfigured provider, never as clear news.
+    """
+    ctx = market_context or {}
+    events = tuple(
+        EconomicEvent(ts=e["ts"], title=str(e.get("title", "")), impact=e.get("impact", "low"))
+        for e in ctx.get("upcoming_events", [])
+        if isinstance(e, dict) and e.get("ts") is not None
+    )
+    return NewsContext(
+        provider_configured=bool(ctx.get("provider_configured", False)),
+        headline_count=int(ctx.get("headline_count", 0)),
+        latest_headline_ts=ctx.get("latest_headline_ts"),
+        upcoming_events=events,
+    )

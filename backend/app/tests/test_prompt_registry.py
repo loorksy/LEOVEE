@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.agents.artifacts import ARTIFACT_FAMILIES
 from app.agents.prompts import (
     PROMPTS_ROOT,
     Prompt,
@@ -109,11 +110,26 @@ def test_the_threshold_lives_in_the_atlas_and_the_principle_in_the_constitution(
 # --- skills ------------------------------------------------------------------
 
 
-def test_both_skills_are_present_and_load_lazily() -> None:
-    assert set(available_skills()) == {"pattern-atlas", "trading-lexicon"}
+def test_the_skills_are_present_and_load_lazily() -> None:
+    assert set(available_skills()) == {"pattern-atlas", "trading-lexicon", "artifacts"}
     atlas = load_skill("pattern-atlas")
     assert atlas.metadata["name"] == "pattern-atlas"
     assert len(atlas.body) > 2_000
+
+
+@pytest.mark.parametrize("family", list(ARTIFACT_FAMILIES))
+def test_the_artifacts_skill_names_every_renderer_family(family: str) -> None:
+    """The skill and the registry are one vocabulary: a family the skill omits is
+    a renderer the model is never taught to target, and a type it can only guess
+    at falls silently to markdown."""
+    assert family in load_skill("artifacts").body
+
+
+def test_the_artifacts_skill_teaches_the_fence_format() -> None:
+    """The model has to know the exact fence the parser reads, or its structured
+    output degrades to prose."""
+    body = load_skill("artifacts").body
+    assert "```artifact" in body
 
 
 @pytest.mark.parametrize("pattern", list(PatternType))

@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.datetime_utils import utc_now
 from app.core.tenant import resolve_tenant_context
 from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import RecommendationDirection, Timeframe
@@ -18,7 +19,7 @@ from app.providers.market.base import NormalizedCandle
 from app.services.analysis_service import run_analysis
 from app.services.memory_service import retrieve_memories_for_symbol
 from app.services.recommendation_service import get_recommendation
-from app.tests.bars import EPOCH, swinging_bars
+from app.tests.bars import swinging_bars
 from app.tests.conftest import seed_user_org
 from app.tests.doubles.llm import DecidingLLMProvider, FakeLLMProvider
 from app.tests.doubles.market import FakeMarketDataProvider
@@ -40,11 +41,23 @@ def _gold_series(
     `unknown` — which is the same dead end by a different route.
     """
     interval = timedelta(minutes=15 if timeframe is Timeframe.M15 else 60)
-    return [
+    sources = swinging_bars(24, start=2000.0, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+    # End the tape at *now*: the evidence gate blocks a scalp written on a stale
+    # price, so a completed directional plan needs a fresh series (a fixed
+    # historical fixture would correctly fail closed on EVIDENCE_LIVE_PRICE).
+    #
+    # Emit newest-first. The provider double returns ``self._candles[:count]``
+    # (the first 100 by default), so a chronological list would hand back its
+    # oldest 100 bars and drop the freshly-stamped tail — the newest returned
+    # candle would then be ~22h old and (correctly) fail the live-price check.
+    # Newest-first keeps the fresh bars inside the fetch window; the store
+    # re-orders by ts on read, so downstream sees a normal chronological tape.
+    base = utc_now()
+    candles = [
         NormalizedCandle(
             symbol="XAUUSD",
             timeframe=timeframe,
-            ts=EPOCH + interval * index,
+            ts=base - interval * (len(sources) - 1 - index),
             open=Decimal(str(round(source.open, 2))),
             high=Decimal(str(round(source.high, 2))),
             low=Decimal(str(round(source.low, 2))),
@@ -53,10 +66,10 @@ def _gold_series(
             complete=True,
             source="test_double",
         )
-        for index, source in enumerate(
-            swinging_bars(60, start=2000.0, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
-        )
+        for index, source in enumerate(sources)
     ]
+    candles.reverse()
+    return candles
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
 from app.core.config import get_settings
+from app.core.datetime_utils import utc_now
 from app.core.tenant import resolve_tenant_context
 from app.infrastructure.database import get_db_session
 from app.main import app
@@ -30,11 +32,17 @@ def _synthetic_gold_series(count: int = 140) -> list[NormalizedCandle]:
     refuses a frame with no readable structure. Testing
     the LLM guarantee needs candles that get that far.
     """
+    # Timestamps end at *now*: the evidence gate blocks a scalp written on a
+    # stale price, so a live analysis reads fresh candles. A fixed historical
+    # fixture would (correctly) fail on EVIDENCE_LIVE_PRICE before the LLM stage.
+    bars = swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+    base = utc_now()
+    step = timedelta(minutes=15)
     return [
         NormalizedCandle(
             symbol="XAUUSD",
             timeframe=Timeframe.M15,
-            ts=bar.ts,
+            ts=base - step * (len(bars) - 1 - i),
             open=Decimal(str(bar.open)),
             high=Decimal(str(bar.high)),
             low=Decimal(str(bar.low)),
@@ -43,7 +51,7 @@ def _synthetic_gold_series(count: int = 140) -> list[NormalizedCandle]:
             complete=True,
             source="test_double",
         )
-        for bar in swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+        for i, bar in enumerate(bars)
     ]
 
 
