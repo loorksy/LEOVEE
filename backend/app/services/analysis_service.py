@@ -22,6 +22,7 @@ from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market.history import TIMEFRAME_MINUTES
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol, store_memory
+from app.services.strategies.matching_keys import classify
 
 
 def _plan_columns(decision: dict[str, Any], *, tenant_timeframe: Timeframe) -> dict[str, Any]:
@@ -54,6 +55,29 @@ def _plan_columns(decision: dict[str, Any], *, tenant_timeframe: Timeframe) -> d
 
 def _as_decimal(value: Any) -> Decimal | None:
     return None if value is None else Decimal(str(value))
+
+
+def _typical_atr(engines: dict[str, Any]) -> float | None:
+    """What "normal" volatility looks like on the context ladder right now.
+
+    The volatility bucket is a *ratio*, so it needs a denominator that is not
+    the same number as the numerator. The decision frame's own ATR compared
+    against itself is always 1.0 — every plan would file as NORMAL and the
+    dimension would carry no information at all. The context frames are the
+    honest baseline: they are already loaded, and they describe the same market
+    over a longer horizon.
+    """
+    by_tf = engines.get("intelligence_by_tf")
+    if not isinstance(by_tf, dict):
+        return None
+    values = [
+        float(payload["atr"])
+        for payload in by_tf.values()
+        if isinstance(payload, dict) and isinstance(payload.get("atr"), int | float)
+    ]
+    if not values:
+        return None
+    return sum(values) / len(values)
 
 
 def _validity_deadline(decision: dict[str, Any], timeframe: Timeframe) -> datetime | None:
@@ -245,6 +269,17 @@ async def run_analysis(
                 "decision": result.decision,
                 "engines": result.engines,
                 "persistence": payload.get("persistence"),
+                # The five keys every learning statistic is grouped by, derived
+                # here from the engines that just ran. Without this the terminal
+                # hook has nothing to read and files the outcome under a
+                # constant — which is what it did, for the product's whole
+                # history, into one bucket holding everything.
+                "classification": classify(
+                    result.engines,
+                    timeframe=result.decision.get("timeframe") or timeframe.value,
+                    moment=started_at,
+                    typical_atr=_typical_atr(result.engines),
+                ).to_dict(),
             },
             agent_run_id=result.agent_run_id,
             # Only a completed analysis has one. A degraded run reaches here

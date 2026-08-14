@@ -8,10 +8,17 @@ people reading that codebase all day.
 
 A written rule does not survive that. A failing test does.
 
-The forbidden term list is deliberately blunt: if a term genuinely needs to
-appear (a docstring explaining why a thing is absent, a status enum inherited
-from OANDA), add it to ALLOWED_OCCURRENCES with a reason. Widening the rule is
-a decision someone makes on purpose, in a diff, with a justification.
+The forbidden term list is deliberately blunt, but it scans **code, not prose**.
+Comments and docstrings are stripped before matching, because the terms have to
+be sayable in order to be reasoned about: `strategies/calibration.py` explains
+at length why resampling real closed outcomes is not the thing D7 forbids, and a
+guard that fails on that explanation teaches people to stop writing them — or,
+worse, to exempt the whole file and lose the protection along with it.
+
+What survives the strip is what actually builds a subsystem: identifiers,
+imports, route paths, string literals, JSX. ALLOWED_OCCURRENCES is still there
+for a genuine *code* occurrence, and using it is a decision someone makes on
+purpose, in a diff, with a reason.
 """
 
 from __future__ import annotations
@@ -121,6 +128,42 @@ def _relative(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
 
+#: A line that is *entirely* commentary. Deliberately conservative: a trailing
+#: `# metaapi` on a real statement is not stripped, because a forbidden call does
+#: not become acceptable by having a comment after it.
+_COMMENT_LINE = re.compile(r"^\s*(#|//|\*|/\*|\*/)")
+
+_TRIPLE = ('"' * 3, "'" * 3)
+
+
+def _code_lines(content: str, suffix: str) -> list[tuple[int, str]]:
+    """The lines that build something, with commentary removed.
+
+    A term inside a docstring is somebody explaining why a subsystem is absent.
+    A term inside an identifier, an import, a route or a string literal is
+    somebody building one. Only the second is what the owner decisions forbid,
+    and conflating the two made this guard fire on the paragraph justifying it.
+    """
+    lines: list[tuple[int, str]] = []
+    in_docstring = False
+    for number, line in enumerate(content.splitlines(), start=1):
+        if suffix == ".py":
+            delims = sum(line.count(token) for token in _TRIPLE)
+            if in_docstring:
+                if delims % 2 == 1:
+                    in_docstring = False
+                continue
+            stripped = line.lstrip().lstrip("rfbu")
+            if stripped.startswith(_TRIPLE):
+                if delims % 2 == 1:
+                    in_docstring = True
+                continue
+        if _COMMENT_LINE.match(line):
+            continue
+        lines.append((number, line))
+    return lines
+
+
 @pytest.mark.parametrize("term", sorted(FORBIDDEN_TERMS), ids=lambda term: str(term))
 def test_out_of_scope_subsystem_is_absent(term: str) -> None:
     pattern = re.compile(re.escape(term), re.IGNORECASE)
@@ -134,7 +177,7 @@ def test_out_of_scope_subsystem_is_absent(term: str) -> None:
             content = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        for number, line in enumerate(content.splitlines(), start=1):
+        for number, line in _code_lines(content, path.suffix):
             if pattern.search(line):
                 hits.append(f"{relative}:{number}: {line.strip()[:110]}")
 
@@ -232,3 +275,50 @@ def test_the_only_way_to_send_to_telegram_is_to_reply() -> None:
         "these look like outbound senders that do not require an inbound message "
         f"(D5 stands: nothing is ever sent unprompted): {senders}"
     )
+
+
+# --- the stripper itself ------------------------------------------------------
+#
+# A guard that got looser to fix a false positive is worth less than no guard,
+# because it still reports success. These pin the exact boundary that moved.
+
+
+def test_the_stripper_keeps_every_shape_that_builds_something() -> None:
+    source = "\n".join(
+        [
+            "import metaapi",
+            "from x import place_order",
+            "ROUTE = '/api/mt5/connect'",
+            "def close_position(): ...",
+            "url = f'https://{host}/backtest/run'",
+            "call()  # metaapi",
+        ]
+    )
+    kept = " ".join(line for _, line in _code_lines(source, ".py"))
+    for fragment in ("metaapi", "place_order", "mt5", "close_position", "backtest"):
+        assert fragment in kept, fragment
+    # A trailing comment does not launder the statement it sits on.
+    assert "call()  # metaapi" in kept
+
+
+def test_the_stripper_removes_only_commentary() -> None:
+    source = "\n".join(
+        [
+            '"""Why there is no backtest here.',
+            "",
+            "A second paragraph mentioning metaapi and mt5.",
+            '"""',
+            "# place_order is out of scope",
+            "value = 1",
+            "'''another docstring naming close_position'''",
+            "other = 2",
+        ]
+    )
+    kept = [line for _, line in _code_lines(source, ".py")]
+    assert kept == ["value = 1", "other = 2"]
+
+
+def test_line_numbers_survive_the_strip() -> None:
+    """A hit that reports the wrong line sends the reader to innocent code."""
+    source = "\n".join(['"""doc"""', "", "import metaapi"])
+    assert _code_lines(source, ".py") == [(2, ""), (3, "import metaapi")]

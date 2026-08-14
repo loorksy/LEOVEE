@@ -1,0 +1,481 @@
+{
+  "wilson": [
+    {
+      "wins": 0,
+      "samples": 0,
+      "z": 1.6448536269514722,
+      "low": 0,
+      "high": 1
+    },
+    {
+      "wins": 0,
+      "samples": 0,
+      "z": 1.959963984540054,
+      "low": 0,
+      "high": 1
+    },
+    {
+      "wins": 0,
+      "samples": 1,
+      "z": 1.6448536269514722,
+      "low": 0,
+      "high": 0.7301340512159458
+    },
+    {
+      "wins": 0,
+      "samples": 1,
+      "z": 1.959963984540054,
+      "low": 0,
+      "high": 0.7934506856227626
+    },
+    {
+      "wins": 1,
+      "samples": 1,
+      "z": 1.6448536269514722,
+      "low": 0.2698659487840541,
+      "high": 0.9999999999999999
+    },
+    {
+      "wins": 1,
+      "samples": 1,
+      "z": 1.959963984540054,
+      "low": 0.20654931437723742,
+      "high": 1
+    },
+    {
+      "wins": 0,
+      "samples": 5,
+      "z": 1.6448536269514722,
+      "low": 0,
+      "high": 0.3511165007651012
+    },
+    {
+      "wins": 0,
+      "samples": 5,
+      "z": 1.959963984540054,
+      "low": 0,
+      "high": 0.43448246478317476
+    },
+    {
+      "wins": 3,
+      "samples": 5,
+      "z": 1.6448536269514722,
+      "low": 0.2724831718661928,
+      "high": 0.8572935279807868
+    },
+    {
+      "wins": 3,
+      "samples": 5,
+      "z": 1.959963984540054,
+      "low": 0.23072428127601285,
+      "high": 0.8823792257673521
+    },
+    {
+      "wins": 5,
+      "samples": 5,
+      "z": 1.6448536269514722,
+      "low": 0.6488834992348987,
+      "high": 0.9999999999999999
+    },
+    {
+      "wins": 5,
+      "samples": 5,
+      "z": 1.959963984540054,
+      "low": 0.5655175352168252,
+      "high": 1
+    },
+    {
+      "wins": 7,
+      "samples": 10,
+      "z": 1.6448536269514722,
+      "low": 0.4416997958698351,
+      "high": 0.8731234160968021
+    },
+    {
+      "wins": 7,
+      "samples": 10,
+      "z": 1.959963984540054,
+      "low": 0.3967781474611453,
+      "high": 0.8922087325936988
+    },
+    {
+      "wins": 13,
+      "samples": 20,
+      "z": 1.6448536269514722,
+      "low": 0.46651268884847175,
+      "high": 0.797739959943239
+    },
+    {
+      "wins": 13,
+      "samples": 20,
+      "z": 1.959963984540054,
+      "low": 0.43285427668523635,
+      "high": 0.8188081758989179
+    },
+    {
+      "wins": 15,
+      "samples": 29,
+      "z": 1.6448536269514722,
+      "low": 0.3697901114205457,
+      "high": 0.661750114390371
+    },
+    {
+      "wins": 15,
+      "samples": 29,
+      "z": 1.959963984540054,
+      "low": 0.3443102188199472,
+      "high": 0.6861390984731652
+    },
+    {
+      "wins": 0,
+      "samples": 30,
+      "z": 1.6448536269514722,
+      "low": 6.364878706553033e-18,
+      "high": 0.08272430812509929
+    },
+    {
+      "wins": 0,
+      "samples": 30,
+      "z": 1.959963984540054,
+      "low": 0,
+      "high": 0.11351339317396876
+    },
+    {
+      "wins": 17,
+      "samples": 30,
+      "z": 1.6448536269514722,
+      "low": 0.41851992055777143,
+      "high": 0.7037835050255487
+    },
+    {
+      "wins": 17,
+      "samples": 30,
+      "z": 1.959963984540054,
+      "low": 0.3919730700081361,
+      "high": 0.7262251442353347
+    },
+    {
+      "wins": 30,
+      "samples": 30,
+      "z": 1.6448536269514722,
+      "low": 0.9172756918749005,
+      "high": 0.9999999999999998
+    },
+    {
+      "wins": 30,
+      "samples": 30,
+      "z": 1.959963984540054,
+      "low": 0.8864866068260312,
+      "high": 1
+    },
+    {
+      "wins": 52,
+      "samples": 100,
+      "z": 1.6448536269514722,
+      "low": 0.43838417788184564,
+      "high": 0.6005621132868275
+    },
+    {
+      "wins": 52,
+      "samples": 100,
+      "z": 1.959963984540054,
+      "low": 0.4231657776522396,
+      "high": 0.615354482419481
+    },
+    {
+      "wins": 499,
+      "samples": 1000,
+      "z": 1.6448536269514722,
+      "low": 0.47303044152616935,
+      "high": 0.5249749549603101
+    },
+    {
+      "wins": 499,
+      "samples": 1000,
+      "z": 1.959963984540054,
+      "low": 0.4680734887507241,
+      "high": 0.5299341647662471
+    }
+  ],
+  "bootstrap": [
+    {
+      "input": {
+        "wins": 0,
+        "samples": 0
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 0,
+        "iterations": 0,
+        "winRate": 0,
+        "confidenceLow": 0,
+        "confidenceHigh": 1,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 1,
+        "samples": 1
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 1,
+        "iterations": 0,
+        "winRate": 1,
+        "confidenceLow": 0.2698659487840541,
+        "confidenceHigh": 0.9999999999999999,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 3,
+        "samples": 5
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 5,
+        "iterations": 0,
+        "winRate": 0.6,
+        "confidenceLow": 0.2724831718661928,
+        "confidenceHigh": 0.8572935279807868,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 15,
+        "samples": 29
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 29,
+        "iterations": 0,
+        "winRate": 0.5172413793103449,
+        "confidenceLow": 0.3697901114205457,
+        "confidenceHigh": 0.661750114390371,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 17,
+        "samples": 30
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 30,
+        "iterations": 2000,
+        "winRate": 0.5666666666666667,
+        "confidenceLow": 0.4,
+        "confidenceHigh": 0.7,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 0,
+        "samples": 30
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 30,
+        "iterations": 2000,
+        "winRate": 0,
+        "confidenceLow": 0,
+        "confidenceHigh": 0,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 30,
+        "samples": 30
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 30,
+        "iterations": 2000,
+        "winRate": 1,
+        "confidenceLow": 1,
+        "confidenceHigh": 1,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 52,
+        "samples": 100
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 100,
+        "iterations": 2000,
+        "winRate": 0.52,
+        "confidenceLow": 0.44,
+        "confidenceHigh": 0.6,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 52,
+        "samples": 100,
+        "confidenceLevel": 0.95
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 100,
+        "iterations": 2000,
+        "winRate": 0.52,
+        "confidenceLow": 0.42,
+        "confidenceHigh": 0.61,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 52,
+        "samples": 100,
+        "seed": 12345
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 100,
+        "iterations": 2000,
+        "winRate": 0.52,
+        "confidenceLow": 0.44,
+        "confidenceHigh": 0.6,
+        "statisticallySufficient": true,
+        "seed": 12345
+      }
+    },
+    {
+      "input": {
+        "wins": 52,
+        "samples": 100,
+        "iterations": 500
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 100,
+        "iterations": 500,
+        "winRate": 0.52,
+        "confidenceLow": 0.43,
+        "confidenceHigh": 0.6,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 52,
+        "samples": 100,
+        "iterations": 10
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 100,
+        "iterations": 200,
+        "winRate": 0.52,
+        "confidenceLow": 0.43,
+        "confidenceHigh": 0.6,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 7,
+        "samples": 40,
+        "minTradesForCalibration": 50
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 40,
+        "iterations": 0,
+        "winRate": 0.175,
+        "confidenceLow": 0.09776044308911716,
+        "confidenceHigh": 0.2934192985304305,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 7,
+        "samples": 40,
+        "minTradesForCalibration": 1
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 40,
+        "iterations": 2000,
+        "winRate": 0.175,
+        "confidenceLow": 0.075,
+        "confidenceHigh": 0.275,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": 400,
+        "samples": 1000,
+        "seed": 0
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 1000,
+        "iterations": 2000,
+        "winRate": 0.4,
+        "confidenceLow": 0.373,
+        "confidenceHigh": 0.425,
+        "statisticallySufficient": true,
+        "seed": 0
+      }
+    },
+    {
+      "input": {
+        "wins": 2.7,
+        "samples": 9.9
+      },
+      "output": {
+        "method": "wilson",
+        "samples": 9,
+        "iterations": 0,
+        "winRate": 0.2222222222222222,
+        "confidenceLow": 0.07649473755439642,
+        "confidenceHigh": 0.49635721762324614,
+        "statisticallySufficient": false,
+        "seed": 10601639
+      }
+    },
+    {
+      "input": {
+        "wins": -5,
+        "samples": 40
+      },
+      "output": {
+        "method": "bootstrap_iid",
+        "samples": 40,
+        "iterations": 2000,
+        "winRate": 0,
+        "confidenceLow": 0,
+        "confidenceHigh": 0,
+        "statisticallySufficient": true,
+        "seed": 10601639
+      }
+    }
+  ]
+}

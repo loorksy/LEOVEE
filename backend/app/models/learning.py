@@ -62,12 +62,24 @@ class AgentTrace(Base):
 
 class OutcomeRecord(Base, WorkspaceOwnedMixin, TimestampMixin):
     __tablename__ = "outcome_records"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "dedupe_key", name="uq_outcome_record_dedupe"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     thesis_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
     recommendation_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
     trade_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: PLAN — the analysis was right or wrong; the only kind that calibrates
+    #: confidence. TRADE — what the user did about it, self-reported. Adding the
+    #: two together lets one plan taken twice move the statistics twice.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="PLAN")
+    #: One closed plan, one row. Enforced by a unique key rather than by a check
+    #: in application code, because the ways this gets written twice include an
+    #: ordinary retry and a genuine race — neither of which a read-then-decide
+    #: guard can catch.
+    dedupe_key: Mapped[str] = mapped_column(String(120), nullable=False)
     r_multiple: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="LIVE")
     facts_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

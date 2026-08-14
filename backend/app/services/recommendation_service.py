@@ -13,7 +13,10 @@ from app.core.tenant_rls import bind_workspace_rls
 from app.models.enums import RecommendationDirection, RecommendationStatus, ThesisStatus
 from app.models.recommendation import Recommendation, Thesis
 from app.services import market_data
-from app.services.recommendation_lifecycle import assert_recommendation_transition
+from app.services.recommendation_lifecycle import (
+    TERMINAL_RECOMMENDATION_STATUSES,
+    assert_recommendation_transition,
+)
 from app.services.recommendations.repository import assert_axes_coherent
 
 
@@ -193,9 +196,33 @@ async def transition_recommendation_status(
     new_status: RecommendationStatus,
     facts: dict[str, Any] | None = None,
 ) -> Recommendation | None:
+    """Move a plan, under the same lock the tracker takes.
+
+    Two things were missing here, and both let one closed plan be counted twice.
+
+    **The lock.** `lock_recommendation` is documented as serialising "the
+    tracker, a re-evaluation and a manual transition", and this — the manual
+    transition, also reached from the thesis-monitor worker — was the one caller
+    that never took it. Without it two writers read the same non-terminal status,
+    both pass the state machine, and both record an outcome.
+
+    **The already-terminal guard.** `assert_recommendation_transition` returns
+    *silently* when the current status already equals the requested one, so a
+    retried request or a user closing a plan the tracker just closed passed
+    straight through and re-fired the learning hook. A plan finishes once; a
+    second request to finish it is a no-op, not an error.
+    """
+    from app.services.recommendations.revisions import lock_recommendation
+
     rec = await get_recommendation(session, tenant, recommendation_id)
     if rec is None:
         return None
+    await lock_recommendation(session, rec.id)
+    # Re-read under the lock: the row this session loaded may have been moved to
+    # a terminal status by the tracker while we waited for it.
+    await session.refresh(rec)
+    if rec.status in TERMINAL_RECOMMENDATION_STATUSES:
+        return rec
     assert_recommendation_transition(rec.status, new_status)
     rec.status = new_status
     await session.flush()

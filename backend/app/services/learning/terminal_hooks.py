@@ -8,16 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import RecommendationStatus, ThesisStatus
 from app.models.recommendation import Recommendation, Thesis
-from app.services.learning.outcome_recorder import TerminalOutcome
+from app.services.learning.outcome_recorder import (
+    OutcomeKind,
+    TerminalOutcome,
+)
 from app.services.learning.pipeline import run_learning_pipeline
 
-TERMINAL_RECOMMENDATION_STATUSES = frozenset(
-    {
-        RecommendationStatus.TARGET_REACHED,
-        RecommendationStatus.INVALIDATED,
-        RecommendationStatus.EXPIRED,
-    }
+# Re-exported, not redefined. This module used to carry its own copy of the same
+# frozenset, which is two places to change and one of them will be forgotten —
+# and the two are compared against each other every time a plan closes.
+from app.services.recommendation_lifecycle import (  # noqa: E402  (grouped with its siblings)
+    TERMINAL_RECOMMENDATION_STATUSES,
 )
+from app.services.strategies.matching_keys import classification_from_evidence
 
 TERMINAL_THESIS_STATUSES = frozenset(
     {
@@ -38,11 +41,12 @@ def _terminal_from_recommendation(
     outcome: str,
     facts: dict[str, Any] | None = None,
 ) -> TerminalOutcome:
-    strategy = (rec.evidence_json or {}).get("strategy_code", "DEFAULT")
-    setup = (rec.evidence_json or {}).get("setup_type", "ANY")
-    regime = (rec.evidence_json or {}).get("regime_bucket", "ANY")
-    session_bucket = (rec.evidence_json or {}).get("session_bucket", "ANY")
-    volatility = (rec.evidence_json or {}).get("volatility_bucket", "ANY")
+    # One reader, one writer, one shape. This used to be five separate lookups
+    # of five top-level keys with five separate defaults — and nothing wrote any
+    # of them, so every outcome in the product's history filed under the
+    # constant DEFAULT/ANY/ANY/ANY/ANY and the five bucket columns aggregated
+    # everything into a single undifferentiated pile.
+    buckets = classification_from_evidence(rec.evidence_json)
     stated = rec.confidence_calibrated
     return TerminalOutcome(
         workspace_id=rec.workspace_id,
@@ -54,11 +58,11 @@ def _terminal_from_recommendation(
         r_multiple=None,
         source="LIVE",
         facts=facts or {"recommendation_id": str(rec.id)},
-        strategy_code=strategy,
-        setup_type=setup,
-        regime_bucket=regime,
-        session_bucket=session_bucket,
-        volatility_bucket=volatility,
+        strategy_code=buckets.strategy_code,
+        setup_type=buckets.setup_type,
+        regime_bucket=buckets.regime_bucket,
+        session_bucket=buckets.session_bucket,
+        volatility_bucket=buckets.volatility_bucket,
         symbol_id=rec.symbol_id,
         confidence_stated=stated,
         success=_success_for_outcome(outcome),
@@ -72,6 +76,15 @@ async def on_recommendation_terminal_status(
     new_status: RecommendationStatus,
     facts: dict[str, Any] | None = None,
 ) -> dict[str, object] | None:
+    """One plan closing, once.
+
+    The thesis monitor calls this *and* `on_thesis_terminal_status` for a single
+    market event, on purpose — a thesis and the plan behind it are both real
+    things that ended. Both produce the same dedupe key, so the second call is
+    recorded as a repeat and moves nothing. That is deliberate: the ownership
+    question ("which of the two should drive learning") has no stable answer at
+    the call site, and the key answers it at the table instead.
+    """
     if new_status not in TERMINAL_RECOMMENDATION_STATUSES:
         return None
     terminal = _terminal_from_recommendation(rec, outcome=new_status.value, facts=facts)
@@ -150,5 +163,10 @@ async def on_trade_closed(
         symbol_id=symbol_id,
         confidence_stated=None,
         success=outcome == RecommendationStatus.TARGET_REACHED.value,
+        # A trade is what the *user* did, self-reported (D4 — Leovee places no
+        # orders). It is behaviour, and behaviour cannot grade a confidence the
+        # analysis stated: a plan the user took twice would move the win rate
+        # twice, and one they ignored would not move it at all.
+        kind=OutcomeKind.TRADE,
     )
     return await run_learning_pipeline(session, terminal)
