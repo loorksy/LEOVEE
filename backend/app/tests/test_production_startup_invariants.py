@@ -19,13 +19,15 @@ pytestmark = pytest.mark.no_db
 
 #: A complete, valid production configuration. Each test breaks exactly one
 #: field so the assertion names the single invariant under test.
+#:
+#: Note what is *absent*: no OANDA token, no LLM key. Those are platform-managed
+#: secrets an admin enters after first boot, so a bootable production config must
+#: not contain them — see test_platform_managed_secrets_do_not_gate_boot below.
 _VALID = {
     "environment": "production",
     "secret_key": "x" * 40,
     "database_url": "postgresql+asyncpg://leovee_app:pw@db:5432/leovee",
     "redis_url": "redis://redis:6379/0",
-    "oanda_api_token": "token",
-    "anthropic_api_key": "key",
     "trust_proxy_headers": True,
     "dev_auth_bypass": False,
     "oanda_execution": False,
@@ -56,7 +58,6 @@ def test_execution_is_refused_in_every_environment() -> None:
         ({"secret_key": "change-me-in-production"}, "SECRET_KEY"),
         ({"database_url": "postgresql+asyncpg://leovee:pw@db:5432/leovee"}, "leovee_app"),
         ({"redis_url": ""}, "REDIS_URL"),
-        ({"oanda_api_token": ""}, "OANDA_API_TOKEN"),
         ({"cors_origins": "*"}, "CORS_ORIGINS"),
         ({"cors_origins": "http://localhost:5173"}, "CORS_ORIGINS"),
     ],
@@ -64,6 +65,30 @@ def test_execution_is_refused_in_every_environment() -> None:
 def test_each_invariant_refuses_boot(override: dict[str, object], needle: str) -> None:
     with pytest.raises(ProviderConfigurationError, match=needle):
         validate_production_startup(_settings(**override))
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"oanda_api_token": ""},
+        {"oanda_api_token": None},
+        {"anthropic_api_key": None, "openai_api_key": None, "openrouter_api_key": None},
+    ],
+)
+def test_platform_managed_secrets_do_not_gate_boot(override: dict[str, object]) -> None:
+    # Regression guard for a deadlock that made production unstartable.
+    #
+    # These keys live in platform_secrets.MANAGED_SECRET_KEYS: an admin enters
+    # them in the panel and they are applied from the encrypted DB row without a
+    # redeploy. But this validator runs in the API lifespan *before*
+    # load_runtime_overrides reads that table (app/main.py), so a DB value can
+    # never satisfy the check — and the panel that would set it sits behind the
+    # API that refuses to start. Requiring them here meant a fresh production
+    # install could not boot on the first attempt or any attempt after it.
+    #
+    # A missing provider must degrade the feature (analysis returns NO_TRADE with
+    # a named reason), not refuse traffic.
+    validate_production_startup(_settings(**override))
 
 
 def test_a_short_secret_key_is_rejected_by_length_not_only_by_default() -> None:

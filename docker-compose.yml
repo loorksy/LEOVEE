@@ -3,7 +3,10 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: leovee
-      POSTGRES_PASSWORD: leovee
+      # Interpolated so production can set a real password in .env. The default
+      # keeps `docker compose up` working for local dev with no .env at all —
+      # it is only ever reached when POSTGRES_PASSWORD is unset.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leovee}
       POSTGRES_DB: leovee
     ports:
       - "5432:5432"

@@ -49,14 +49,43 @@ services:
           cpus: "2"
           memory: 1G
 
+  # TLS edge. Caddy is otherwise only defined in docker-compose.staging.yml, so
+  # the production overlay had nothing listening on 80/443 at all. Unlike staging
+  # (which binds loopback behind the nginx SNI edge) this binds the host directly:
+  # ACME's HTTP-01/TLS-ALPN-01 challenges have to be reachable from the internet.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      LEOVEE_DOMAIN: ${LEOVEE_DOMAIN:?LEOVEE_DOMAIN is required for TLS}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required for certificate issuance}
+    volumes:
+      - ./docker/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
   migrate:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
+    # DATABASE_MIGRATION_URL deliberately comes from .env and is NOT pinned in an
+    # `environment:` block: compose gives `environment:` precedence over
+    # `env_file:`, so pinning it here silently discarded the operator's password
+    # and the migrate step would authenticate with the built-in `leovee:leovee`.
     env_file:
       - .env
-    environment:
-      DATABASE_MIGRATION_URL: postgresql+asyncpg://leovee:leovee@postgres:5432/leovee
     command: ["alembic", "upgrade", "head"]
     depends_on:
       postgres:
@@ -66,3 +95,5 @@ services:
 
 volumes:
   redisdata: {}
+  caddy_data: {}
+  caddy_config: {}

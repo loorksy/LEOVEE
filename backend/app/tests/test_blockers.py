@@ -20,35 +20,36 @@ from app.tests.conftest import seed_user_org
 from app.tests.doubles.market import FakeMarketDataProvider
 
 
-def test_production_startup_refuses_missing_credentials() -> None:
+def test_production_startup_refuses_a_privileged_database_role() -> None:
+    # RLS is the tenancy boundary, so the runtime login must be leovee_app.
     settings = Settings(
         ENVIRONMENT="production",
         DATABASE_URL="postgresql+asyncpg://u:p@localhost/db",
         REDIS_URL="redis://localhost:6379/0",
         SECRET_KEY="x" * 32,
-        OANDA_API_TOKEN=None,
-        OPENAI_API_KEY=None,
-        ANTHROPIC_API_KEY=None,
-        OPENROUTER_API_KEY=None,
+        TRUST_PROXY_HEADERS=True,
+        CORS_ORIGINS="https://app.leovee.example",
     )
-    with pytest.raises(ProviderConfigurationError):
+    with pytest.raises(ProviderConfigurationError, match="leovee_app"):
         validate_production_startup(settings)
 
 
-def test_production_startup_accepts_openrouter_as_llm() -> None:
+def test_production_boots_with_no_provider_credentials_at_all() -> None:
+    # The bootstrap-minimum contract: scripts/generate_prod_env.sh deliberately
+    # leaves OANDA and every LLM key blank because an admin sets them in the panel
+    # after first boot. If this config could not boot, that path would deadlock —
+    # the panel is served by the API being started here.
     settings = Settings(
         ENVIRONMENT="production",
         DATABASE_URL="postgresql+asyncpg://leovee_app:p@localhost/db",
         REDIS_URL="redis://localhost:6379/0",
         SECRET_KEY="x" * 32,
-        OANDA_API_TOKEN="practice-token",
-        # The other production invariants must be satisfied so this test
-        # isolates the one thing it asserts: OpenRouter alone counts as the LLM.
         TRUST_PROXY_HEADERS=True,
         CORS_ORIGINS="https://app.leovee.example",
+        OANDA_API_TOKEN=None,
         OPENAI_API_KEY=None,
         ANTHROPIC_API_KEY=None,
-        OPENROUTER_API_KEY="sk-or-test",
+        OPENROUTER_API_KEY=None,
     )
     validate_production_startup(settings)
 
