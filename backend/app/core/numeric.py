@@ -22,11 +22,12 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Sequence
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
 
 __all__ = [
     "js_round",
+    "js_to_fixed",
     "js_mod",
     "js_trunc_div",
     "to_float",
@@ -53,6 +54,26 @@ def js_round(value: float) -> int:
     if math.isnan(value) or math.isinf(value):
         raise ValueError(f"js_round received a non-finite value: {value}")
     return math.floor(value + 0.5)
+
+
+def js_to_fixed(value: float, digits: int) -> float:
+    """``Number(x.toFixed(n))`` semantics: ties round away from zero.
+
+    Python's :func:`round` is banker's rounding, so ``round(2.675, 2)`` gives
+    ``2.67`` while ``(2.675).toFixed(2)`` gives ``"2.68"``. The reference
+    implementation rounds every stored fingerprint feature this way, and the
+    stored value is what every later similarity is computed from — so a
+    half-cent disagreement here does not stay a half-cent, it changes which past
+    cases a decision is compared against.
+
+    ``Decimal(value)`` takes the *exact* binary double, which is what ``toFixed``
+    inspects. Going via ``str`` or via ``Decimal(repr(value))`` would round the
+    shortest-repr first and disagree on precisely the tie cases this exists for.
+    """
+    if math.isnan(value) or math.isinf(value):
+        raise ValueError(f"js_to_fixed received a non-finite value: {value}")
+    quantum = Decimal(1).scaleb(-digits)
+    return float(Decimal(value).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
 def js_mod(numerator: float, denominator: float) -> float:
