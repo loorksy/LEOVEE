@@ -22,7 +22,7 @@ from app.services.market.engine_persistence import persist_engine_outputs
 from app.services.market.history import TIMEFRAME_MINUTES
 from app.services.market_intelligence_service import build_mtf_intelligence
 from app.services.memory_service import retrieve_memories_for_symbol, store_memory
-from app.services.strategies.matching_keys import classify
+from app.services.strategies import assess_support, classify
 
 
 def _plan_columns(decision: dict[str, Any], *, tenant_timeframe: Timeframe) -> dict[str, Any]:
@@ -210,6 +210,20 @@ async def run_analysis(
         "visual": {"frames": [s.timeframe for s in visual.snapshots], "missing": visual.missing},
         "as_of": candles[-1].ts.isoformat(),
     }
+    # Derived once and used twice: the recommendation row is filed under this
+    # classification, and the response reports the support that classification
+    # has. Two derivations would eventually disagree, and the disagreement would
+    # be invisible — the reader would see one number and the statistics another.
+    classification = classify(
+        result.engines,
+        timeframe=result.decision.get("timeframe") or timeframe.value,
+        moment=started_at,
+        typical_atr=_typical_atr(result.engines),
+    )
+    support = await assess_support(session, tenant, classification)
+    payload["classification"] = classification.to_dict()
+    payload["support"] = support.to_dict()
+
     if persist_engines:
         counts = await persist_engine_outputs(
             session,
@@ -274,12 +288,12 @@ async def run_analysis(
                 # hook has nothing to read and files the outcome under a
                 # constant — which is what it did, for the product's whole
                 # history, into one bucket holding everything.
-                "classification": classify(
-                    result.engines,
-                    timeframe=result.decision.get("timeframe") or timeframe.value,
-                    moment=started_at,
-                    typical_atr=_typical_atr(result.engines),
-                ).to_dict(),
+                "classification": classification.to_dict(),
+                # What the record behind this plan actually says — including,
+                # explicitly, that it says nothing yet. Stored with the plan so
+                # a card rendered later shows the support that was true when the
+                # call was made, not today's.
+                "support": support.to_dict(),
             },
             agent_run_id=result.agent_run_id,
             # Only a completed analysis has one. A degraded run reaches here
