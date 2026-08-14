@@ -17,6 +17,7 @@ from app.models.memory import AgentMemory
 from app.models.recommendation import Thesis
 from app.providers.market.base import NormalizedCandle
 from app.services.analysis_service import run_analysis
+from app.services.market.calendar import SessionStatus
 from app.services.memory_service import retrieve_memories_for_symbol
 from app.services.recommendation_service import get_recommendation
 from app.tests.bars import swinging_bars
@@ -165,6 +166,13 @@ async def test_a_completed_analysis_publishes_a_directional_plan(
     """
     decider = DecidingLLMProvider(direction="BUY")
     monkeypatch.setattr("app.agents.orchestrator.get_llm_provider", lambda: decider)
+    # Pin the session open: the evidence gate correctly blocks a scalp on a
+    # closed gold market, which would flip this directional assertion every night
+    # and weekend. The closed-market block is covered in test_evidence_gate.py.
+    monkeypatch.setattr(
+        "app.agents.orchestrator.get_session_status",
+        lambda *_a, **_k: SessionStatus(is_open=True, reason="MARKET_OPEN"),
+    )
 
     user, _org, _membership = await seed_user_org(db_session)
     await db_session.commit()

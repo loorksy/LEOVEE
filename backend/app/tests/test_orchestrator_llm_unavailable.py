@@ -10,9 +10,26 @@ from app.agents.orchestrator import run_analysis_orchestrator
 from app.core.datetime_utils import utc_now
 from app.core.errors import ProviderConfigurationError
 from app.models.enums import RecommendationDirection, Timeframe
+from app.services.market.calendar import SessionStatus
 from app.tests.bars import flat_bars, swinging_bars
 
 _M15 = timedelta(minutes=15)
+
+
+def _force_market_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the trading session open for the evidence gate.
+
+    These tests verify what happens once a run reaches the LLM / decision stage
+    — a missing provider fails closed, a completed run reports its frame. The
+    evidence gate sits in front of that stage and, correctly, blocks a scalp on
+    a closed gold market. Left to the wall clock the assertions would flip every
+    weekend and every night, so the session is pinned here; the closed-market
+    block itself is covered in ``test_evidence_gate.py``.
+    """
+    monkeypatch.setattr(
+        "app.agents.orchestrator.get_session_status",
+        lambda *_a, **_k: SessionStatus(is_open=True, reason="MARKET_OPEN"),
+    )
 
 
 def _candles(count: int = 140) -> list[SimpleNamespace]:
@@ -56,6 +73,7 @@ async def test_orchestrator_fail_closed_when_llm_not_configured(
     letting this guarantee go untested until then.
     """
     monkeypatch.setattr("app.agents.orchestrator.unavailable_engines", lambda _engines: [])
+    _force_market_open(monkeypatch)
 
     def boom() -> None:
         raise ProviderConfigurationError("No LLM provider API key configured")

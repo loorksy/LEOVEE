@@ -19,6 +19,7 @@ from app.main import app
 from app.models.enums import RecommendationDirection, Timeframe
 from app.models.symbol import Symbol
 from app.providers.market.base import NormalizedCandle
+from app.services.market.calendar import SessionStatus
 from app.tests.bars import swinging_bars
 from app.tests.conftest import seed_user_org
 
@@ -68,6 +69,13 @@ async def test_analysis_without_llm_returns_no_trade_never_directional(
     it. The engines-are-placeholders path is covered separately below.
     """
     monkeypatch.setattr("app.agents.orchestrator.unavailable_engines", lambda _engines: [])
+    # Pin the session open so the run reaches the LLM stage this test is about,
+    # rather than failing closed on the wall-clock market session (covered in
+    # test_evidence_gate.py).
+    monkeypatch.setattr(
+        "app.agents.orchestrator.get_session_status",
+        lambda *_a, **_k: SessionStatus(is_open=True, reason="MARKET_OPEN"),
+    )
     for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "")
