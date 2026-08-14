@@ -1,4 +1,4 @@
-import type { KLineChartLike, SemanticAnnotation } from "./ChartTypes";
+import type { AnnotationSurface, SemanticAnnotation } from "./ChartTypes";
 
 export type AnnotationDiff = {
   added: SemanticAnnotation[];
@@ -31,66 +31,56 @@ export function diffAnnotations(
   return { added, updated, removed };
 }
 
-function overlayNameFor(annotation: SemanticAnnotation): string {
-  switch (annotation.semantic_type) {
-    case "DRAW_ZONE":
-      return "rect";
-    case "DRAW_LEVEL":
-    case "DRAW_LIQUIDITY":
-      return "horizontalStraightLine";
-    case "DRAW_STRUCTURE":
-    case "DRAW_SETUP":
-      return "segment";
-    case "LABEL":
-      return "simpleAnnotation";
-    default:
-      return "segment";
-  }
-}
-
-function overlayPoints(annotation: SemanticAnnotation): Array<{ timestamp: number; value: number }> {
-  return annotation.geometry.anchors.map((anchor) => ({
-    timestamp: new Date(anchor.ts).getTime(),
-    value: anchor.price,
-  }));
-}
-
+/**
+ * Diffs annotations and tells a surface what changed.
+ *
+ * It knows nothing about which library draws. It used to map semantic types
+ * onto KLineChart overlay names right here — `DRAW_ZONE` to `"rect"` — which
+ * put the renderer's vocabulary in the one class that was supposed to be
+ * independent of it. Choosing a tool is now the surface's job, because only the
+ * surface knows what tools it has.
+ */
 export class ChartAnnotationRenderer {
-  private readonly chart: KLineChartLike;
-  private readonly overlayByAnnotationId = new Map<string, string>();
+  private readonly surface: AnnotationSurface;
+  private readonly handleByAnnotationId = new Map<string, string>();
   private readonly snapshot = new Map<string, SemanticAnnotation>();
 
-  constructor(chart: KLineChartLike) {
-    this.chart = chart;
+  constructor(surface: AnnotationSurface) {
+    this.surface = surface;
   }
 
+  /**
+   * Apply only what changed.
+   *
+   * Clearing and redrawing would be simpler and wrong: re-evaluation republishes
+   * the annotation set every cycle, and a full redraw makes the whole chart
+   * flicker every time one level moves — including the user's own drawings, if
+   * the surface cannot tell them apart.
+   */
   applyIncremental(annotations: SemanticAnnotation[]): AnnotationDiff {
     const diff = diffAnnotations(this.snapshot, annotations);
     for (const id of diff.removed) {
-      const overlayId = this.overlayByAnnotationId.get(id);
-      if (overlayId) {
-        this.chart.removeOverlay(overlayId);
-        this.overlayByAnnotationId.delete(id);
+      const handle = this.handleByAnnotationId.get(id);
+      if (handle) {
+        this.surface.remove(handle);
+        this.handleByAnnotationId.delete(id);
       }
       this.snapshot.delete(id);
     }
     for (const ann of [...diff.added, ...diff.updated]) {
-      const existing = this.overlayByAnnotationId.get(ann.id);
-      const payload = {
-        name: overlayNameFor(ann),
-        id: ann.id,
-        points: overlayPoints(ann),
-        extendData: { semantic_type: ann.semantic_type, style: ann.style ?? {} },
-      };
-      if (existing && this.chart.overrideOverlay) {
-        this.chart.overrideOverlay(existing, payload);
+      const existing = this.handleByAnnotationId.get(ann.id);
+      if (existing && this.surface.update) {
+        this.surface.update(existing, ann);
       } else {
+        // No in-place update available: remove first, so a surface without one
+        // does not accumulate a second drawing on top of the first every cycle.
         if (existing) {
-          this.chart.removeOverlay(existing);
+          this.surface.remove(existing);
+          this.handleByAnnotationId.delete(ann.id);
         }
-        const overlayId = this.chart.createOverlay(payload);
-        if (overlayId) {
-          this.overlayByAnnotationId.set(ann.id, overlayId);
+        const handle = this.surface.create(ann);
+        if (handle) {
+          this.handleByAnnotationId.set(ann.id, handle);
         }
       }
       this.snapshot.set(ann.id, ann);
@@ -99,10 +89,10 @@ export class ChartAnnotationRenderer {
   }
 
   clear(): void {
-    for (const overlayId of this.overlayByAnnotationId.values()) {
-      this.chart.removeOverlay(overlayId);
+    for (const handle of this.handleByAnnotationId.values()) {
+      this.surface.remove(handle);
     }
-    this.overlayByAnnotationId.clear();
+    this.handleByAnnotationId.clear();
     this.snapshot.clear();
   }
 }

@@ -5,16 +5,16 @@ import {
   type BackendCandlePayload,
   normalizeBackendCandle,
 } from "./ChartDataAdapter";
-import { KLineChartAdapter } from "./KLineChartAdapter";
+import { ChartCandleAdapter } from "./ChartCandleAdapter";
 import { resolveTimeframe } from "./ChartTimeframeManager";
 
 export type ChartControllerOptions = {
-  adapter: KLineChartAdapter;
+  adapter: ChartCandleAdapter;
   annotationRenderer: ChartAnnotationRenderer;
 };
 
 export class ChartController implements ChartEngine {
-  private readonly adapter: KLineChartAdapter;
+  private readonly adapter: ChartCandleAdapter;
   private readonly annotationRenderer: ChartAnnotationRenderer;
   private candles: NormalizedCandle[] = [];
   private annotations: SemanticAnnotation[] = [];

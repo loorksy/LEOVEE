@@ -37,3 +37,34 @@ rather than fetched at build time.
   moment the repository becomes public. A CI guard fails the build if repository
   visibility changes. This constraint is the reason the decision is recorded
   rather than merely implemented.
+
+## Implementation notes (M9)
+
+**How it is stored.** Runtime assets (`frontend/public/charting_library/`, ~26 MB
+across ~1,900 chunks) through Git LFS; type definitions
+(`frontend/vendor/tradingview/*.d.ts`, ~1.2 MB of text) in plain git, because
+TypeScript reads them on every `tsc` and an unsmudged LFS pointer would break
+compilation anywhere the filter has not run.
+
+**The licence is enforced by the build.** `scripts/check_repo_visibility.sh`
+fails when the repository reports itself public while the vendored library is
+present. "Keep the repo private" is a setting someone can flip in a web UI
+months from now, with no diff and no review — and the moment it flips, 27 MB of
+licensed third-party code becomes public redistribution.
+
+**The boundary held.** Swapping the renderer touched `chart/index.ts` and the
+new `TradingViewAdapter.ts`, and nothing else: every consumer binds to
+`ChartEngine` and `AnnotationSurface`. `src/chart/rendererBoundary.test.ts`
+keeps it that way — the first component to import the widget directly would
+work perfectly and quietly cost the abstraction.
+
+**Two things the port fixed along the way:**
+
+- `ChartAnnotationRenderer` mapped semantic types onto KLineChart overlay names
+  (`DRAW_ZONE` → `"rect"`) inside the one class that was supposed to be
+  independent of the renderer. Choosing a tool is now the surface's job, since
+  only the surface knows what tools it has.
+- The timeframe picker still offered M30 and D1 after the platform became
+  scalp-only (D11), so the UI listed two frames the API rejects with 422. An
+  option that cannot work is worse than no option: the failure reads as a bug in
+  the analysis rather than as a frame that does not exist.

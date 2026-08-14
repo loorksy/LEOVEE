@@ -1,0 +1,17 @@
+# TradingView Advanced Charts — how the vendored library is stored.
+#
+# The runtime assets (~26 MB across ~1,900 minified chunks) belong in Git LFS,
+# not in plain git: committed as ordinary blobs they sit in every clone's
+# history forever, including the clones of everyone who never touches the chart.
+#
+# **These patterns are configured and currently unused.** The push failed with
+# "This repository exceeded its LFS budget", so `frontend/public/charting_library/`
+# is not in this commit — see frontend/vendor/tradingview/README.md. The rules
+# stay so that the moment the budget is raised, `git add` of those files does
+# the right thing without anyone having to remember this.
+#
+# Type definitions are deliberately excluded: they are ~1.2 MB of plain text
+# that TypeScript reads on every `tsc`, and an unsmudged LFS pointer would break
+# compilation anywhere the filter has not run.
+frontend/public/charting_library/bundles/** filter=lfs diff=lfs merge=lfs -text
+frontend/public/charting_library/*.js filter=lfs diff=lfs merge=lfs -text

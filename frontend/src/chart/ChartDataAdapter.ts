@@ -26,24 +26,6 @@ export function normalizeBackendCandle(raw: BackendCandlePayload): NormalizedCan
   };
 }
 
-export function toKLineData(candle: NormalizedCandle): {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-} {
-  return {
-    timestamp: candle.timestamp,
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close,
-    volume: candle.volume,
-  };
-}
-
 export function mergeCandleUpdate(
   series: NormalizedCandle[],
   patch: NormalizedCandle,

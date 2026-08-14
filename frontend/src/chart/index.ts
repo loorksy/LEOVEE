@@ -1,26 +1,42 @@
-import { dispose, init, type Chart } from "klinecharts";
+/**
+ * Assembling the chart engine. The only place the pieces meet.
+ *
+ * `createChartEngine` returns the renderer-neutral `ChartEngine` contract, so
+ * every consumer above this line is unaware of which library draws. Swapping
+ * KLineChart for TradingView (ADR 0004) touched this file and
+ * `TradingViewAdapter.ts`, and nothing else — which is the property the
+ * abstraction exists to buy, and the one to protect.
+ */
 
-import type { ChartEngine, KLineChartLike, NormalizedCandle, SemanticAnnotation } from "./ChartTypes";
 import { ChartAnnotationRenderer } from "./ChartAnnotationRenderer";
+import { ChartCandleAdapter } from "./ChartCandleAdapter";
 import { ChartController } from "./ChartController";
-import { KLineChartAdapter } from "./KLineChartAdapter";
-
-function asKLineChartLike(chart: Chart): KLineChartLike {
-  return chart as unknown as KLineChartLike;
-}
+import type {
+  AnnotationSurface,
+  ChartEngine,
+  NormalizedCandle,
+  SemanticAnnotation,
+} from "./ChartTypes";
+import {
+  TradingViewAnnotationSurface,
+  type TradingViewShapeApi,
+} from "./TradingViewAdapter";
 
 export type CreateChartEngineOptions = {
-  container: HTMLElement;
+  /**
+   * The drawing surface. Injected rather than constructed here so a test — and
+   * a future renderer — can supply its own without this module importing a
+   * charting library at all.
+   */
+  surface: AnnotationSurface;
+  onCandles?: (candles: NormalizedCandle[]) => void;
 };
 
 export function createChartEngine(options: CreateChartEngineOptions): ChartEngine {
-  const chart = init(options.container);
-  if (!chart) {
-    throw new Error("KLineChart failed to initialize");
-  }
-  const like = asKLineChartLike(chart);
-  const adapter = new KLineChartAdapter({ chart: like });
-  const annotationRenderer = new ChartAnnotationRenderer(like);
+  const adapter = new ChartCandleAdapter({
+    sink: options.onCandles ? (candles) => options.onCandles?.(candles) : undefined,
+  });
+  const annotationRenderer = new ChartAnnotationRenderer(options.surface);
   const controller = new ChartController({ adapter, annotationRenderer });
 
   return {
@@ -30,16 +46,19 @@ export function createChartEngine(options: CreateChartEngineOptions): ChartEngin
     applyCandlePatch: (candle) => controller.applyCandlePatch(candle),
     applyAnnotations: (annotations: SemanticAnnotation[]) =>
       controller.applyAnnotations(annotations),
-    destroy: () => {
-      controller.destroy();
-      dispose(chart);
-    },
+    destroy: () => controller.destroy(),
   };
 }
 
+/** Convenience for the live app: wire the engine to a TradingView widget. */
+export function createTradingViewChartEngine(shapes: TradingViewShapeApi): ChartEngine {
+  return createChartEngine({ surface: new TradingViewAnnotationSurface({ shapes }) });
+}
+
 export { ChartAnnotationRenderer } from "./ChartAnnotationRenderer";
+export { ChartCandleAdapter } from "./ChartCandleAdapter";
 export { ChartController } from "./ChartController";
 export * from "./ChartDataAdapter";
 export * from "./ChartTimeframeManager";
 export * from "./ChartTypes";
-export { KLineChartAdapter } from "./KLineChartAdapter";
+export * from "./TradingViewAdapter";

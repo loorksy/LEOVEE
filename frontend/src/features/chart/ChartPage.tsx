@@ -1,8 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { createChartEngine, type ChartEngine, type SemanticAnnotation } from "@/chart";
+import {
+  createChartEngine,
+  TradingViewAnnotationSurface,
+  type ChartEngine,
+  type SemanticAnnotation,
+} from "@/chart";
+import { TradingViewChart } from "@/chart/tradingview/TradingViewChart";
+import {
+  resolutionForTimeframe,
+  timeframeForResolution,
+} from "@/chart/tradingview/datafeed";
+import type { TradingViewShapeApi } from "@/chart";
 import { normalizeBackendCandle } from "@/chart/ChartDataAdapter";
 import { getCandles } from "@/api/markets";
 import { listChartAnnotations } from "@/api/chart";
@@ -23,12 +34,27 @@ export function ChartPage() {
   const symbol = (searchParams.get("symbol") ?? DEFAULT_SYMBOL).toUpperCase();
   const timeframe = searchParams.get("timeframe") ?? DEFAULT_TIMEFRAME;
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<ChartEngine | null>(null);
   const annotationsRef = useRef<Map<string, SemanticAnnotation>>(new Map());
   const [annotationCount, setAnnotationCount] = useState(0);
 
   const workspaceQuery = useWorkspaceId();
+  const chartResolution = resolutionForTimeframe(backendTimeframeToChart(timeframe));
+
+  // The library asks for history by its own resolution string; the API speaks
+  // frame codes. Translating here keeps the mapping in one direction and one
+  // place — two translations of the same pair drift, and the symptom is a chart
+  // that quietly renders the wrong frame.
+  const loadCandlesForChart = useCallback(
+    async (requestedSymbol: string, resolution: string) => {
+      const response = await getCandles(
+        requestedSymbol,
+        timeframeForResolution(resolution),
+      );
+      return response.candles.map(normalizeBackendCandle);
+    },
+    [],
+  );
 
   const candlesQuery = useQuery({
     queryKey: ["candles", symbol, timeframe],
@@ -40,12 +66,28 @@ export function ChartPage() {
     queryFn: () => listChartAnnotations(),
   });
 
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-    const engine = createChartEngine({ container: containerRef.current });
+  // The engine is created when the chart hands over its drawing surface, not on
+  // mount: an engine with nowhere to draw would silently accept annotations and
+  // discard them, which looks exactly like an analysis that produced none.
+  const handleShapesReady = useCallback((shapes: TradingViewShapeApi) => {
+    const engine = createChartEngine({
+      surface: new TradingViewAnnotationSurface({ shapes }),
+    });
     engineRef.current = engine;
+    engine.setSymbol(symbol);
+    engine.setTimeframe(backendTimeframeToChart(timeframe));
+    if (candlesQuery.data) {
+      engine.applyCandles(candlesQuery.data.candles.map(normalizeBackendCandle));
+    }
+    if (annotationsRef.current.size) {
+      engine.applyAnnotations(annotationMapToList(annotationsRef.current));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     return () => {
-      engine.destroy();
+      engineRef.current?.destroy();
       engineRef.current = null;
     };
   }, []);
@@ -127,10 +169,16 @@ export function ChartPage() {
         <p className="text-amber-400">Could not load candles for {symbol}.</p>
       )}
       <div
-        ref={containerRef}
         data-testid="chart-container"
         className="min-h-[420px] flex-1 rounded-lg border border-slate-800 bg-leovee-panel"
-      />
+      >
+        <TradingViewChart
+          symbol={symbol}
+          resolution={chartResolution}
+          loadCandles={loadCandlesForChart}
+          onShapesReady={handleShapesReady}
+        />
+      </div>
       <p className="text-xs text-slate-500" data-testid="annotation-count">
         {annotationCount} annotation(s) loaded · live updates via /ws/v1/stream
         (channels=annotations)
