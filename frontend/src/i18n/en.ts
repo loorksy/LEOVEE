@@ -96,6 +96,10 @@ export const en: Dictionary = {
 
   "evidence.noStatisticalSupport": "Direct analysis, no statistical support",
 
+  "artifact.loading": "Loading…",
+  "artifact.error": "This artifact could not be rendered; here is its raw content.",
+  "artifact.streaming": "Receiving artifact…",
+
   // "analysis.blocked" is deliberately not "no trade": an operational blocker,
   // not a verdict the analyst reached. See ADR 0002.
   "analysis.asOf": "As of {date}",

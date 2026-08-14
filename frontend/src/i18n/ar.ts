@@ -99,6 +99,10 @@ export const ar = {
 
   "evidence.noStatisticalSupport": "تحليل مباشر بلا دعم إحصائي",
 
+  "artifact.loading": "…جارٍ التحميل",
+  "artifact.error": "تعذّر عرض هذا المصنوع؛ هذا هو محتواه الخام.",
+  "artifact.streaming": "…يصل مصنوع",
+
   // "analysis.blocked" is deliberately not "no trade": an operational blocker,
   // not a verdict the analyst reached. See ADR 0002.
   "analysis.asOf": "حتى {date}",

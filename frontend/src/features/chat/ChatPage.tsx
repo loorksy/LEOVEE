@@ -15,6 +15,8 @@ import {
   llmCredentialNames,
 } from "@/components/ProviderNotConfiguredBanner";
 import { useLocale } from "@/i18n/context";
+import { MessageContent } from "@/artifacts/MessageContent";
+import type { ChatArtifact } from "@/artifacts/types";
 
 export function ChatPage() {
   const { t } = useLocale();
@@ -154,23 +156,28 @@ export function ChatPage() {
                     key={message.id}
                     className={message.role === "user" ? "text-end" : "text-start"}
                   >
-                    <p
-                      className={`inline-block max-w-lg rounded px-3 py-2 text-sm ${
-                        message.role === "user"
-                          ? "bg-leovee-accent text-white"
-                          : "bg-slate-800 text-slate-100"
-                      }`}
-                    >
-                      {message.content}
-                    </p>
+                    {message.role === "user" ? (
+                      <p className="inline-block max-w-lg rounded bg-leovee-accent px-3 py-2 text-sm text-white">
+                        {message.content}
+                      </p>
+                    ) : (
+                      <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
+                        <MessageContent
+                          content={message.content}
+                          artifacts={
+                            (message.content_json?.artifacts as ChatArtifact[] | undefined) ?? null
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {streamingText ? (
                   <div className="text-start" data-testid="streaming-assistant">
-                    <p className="inline-block max-w-lg rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
-                      {streamingText}
+                    <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
+                      <MessageContent content={streamingText} />
                       <span className="ms-1 inline-block h-3 w-1 animate-pulse bg-slate-400" />
-                    </p>
+                    </div>
                   </div>
                 ) : null}
               </div>
