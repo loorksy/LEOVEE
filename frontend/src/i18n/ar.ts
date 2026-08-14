@@ -103,6 +103,20 @@ export const ar = {
   "artifact.error": "تعذّر عرض هذا المصنوع؛ هذا هو محتواه الخام.",
   "artifact.streaming": "…يصل مصنوع",
 
+  "evidence.title": "الأدلة المقروءة قبل القرار",
+  "evidence.blockedBy": "حُجب النشر بسبب: {reason}",
+  "evidence.blocking": "حاجب",
+  "evidence.check.market_structure": "بنية السوق",
+  "evidence.check.liquidity_map": "خريطة السيولة",
+  "evidence.check.supply_demand": "مناطق العرض والطلب",
+  "evidence.check.institutional_behavior": "سلوك المؤسسات",
+  "evidence.check.multi_timeframe_bias": "الانحياز متعدّد الأطر",
+  "evidence.check.volatility_regime": "نظام التقلّب",
+  "evidence.check.trading_session": "جلسة التداول",
+  "evidence.check.market_intelligence": "الأخبار والأحداث الاقتصادية",
+  "evidence.check.event_blackout": "نافذة حظر الأحداث",
+  "evidence.check.live_price": "التحقّق من السعر الحيّ",
+
   // "analysis.blocked" is deliberately not "no trade": an operational blocker,
   // not a verdict the analyst reached. See ADR 0002.
   "analysis.asOf": "حتى {date}",

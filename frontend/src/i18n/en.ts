@@ -100,6 +100,20 @@ export const en: Dictionary = {
   "artifact.error": "This artifact could not be rendered; here is its raw content.",
   "artifact.streaming": "Receiving artifact…",
 
+  "evidence.title": "Evidence read before the decision",
+  "evidence.blockedBy": "Publication blocked by: {reason}",
+  "evidence.blocking": "blocking",
+  "evidence.check.market_structure": "Market structure",
+  "evidence.check.liquidity_map": "Liquidity map",
+  "evidence.check.supply_demand": "Supply & demand zones",
+  "evidence.check.institutional_behavior": "Institutional behaviour",
+  "evidence.check.multi_timeframe_bias": "Multi-timeframe bias",
+  "evidence.check.volatility_regime": "Volatility regime",
+  "evidence.check.trading_session": "Trading session",
+  "evidence.check.market_intelligence": "News & economic events",
+  "evidence.check.event_blackout": "Event blackout window",
+  "evidence.check.live_price": "Live-price verification",
+
   // "analysis.blocked" is deliberately not "no trade": an operational blocker,
   // not a verdict the analyst reached. See ADR 0002.
   "analysis.asOf": "As of {date}",

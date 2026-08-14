@@ -2,7 +2,8 @@ import { useState } from "react";
 import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { runAnalysis, type AnalysisRunResponse } from "@/api/analysis";
+import { evidenceFromEngines, runAnalysis, type AnalysisRunResponse } from "@/api/analysis";
+import { EvidencePanel } from "./EvidencePanel";
 import { buildSemanticModel, persistSemanticModel } from "@/api/chart";
 import { getProvidersStatus } from "@/api/providers";
 import {
@@ -216,6 +217,7 @@ function AnalysisResult({
   const { t } = useLocale();
   const degradedReason = getAnalysisDegradedReason(result);
   const narrativeText = formatAnalysisNarrative(result.narrative, t);
+  const evidence = evidenceFromEngines(result.engines);
 
   if (degradedReason) {
     return (
@@ -233,6 +235,7 @@ function AnalysisResult({
         </p>
         <p className="mt-1 text-sm text-amber-200/80">{t("analysis.degraded.explanation")}</p>
         {narrativeText && <p className="mt-3 text-sm text-amber-100/80">{narrativeText}</p>}
+        {evidence && <EvidencePanel report={evidence} />}
       </section>
     );
   }
@@ -268,6 +271,7 @@ function AnalysisResult({
           {chartStatus}
         </p>
       )}
+      {evidence && <EvidencePanel report={evidence} />}
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
