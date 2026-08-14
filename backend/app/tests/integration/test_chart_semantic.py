@@ -30,16 +30,18 @@ async def test_chart_semantic_persist_and_list(db_session: AsyncSession) -> None
 
     as_of = datetime(2024, 6, 1, tzinfo=UTC)
     engines = {
-        "zones": {"zones": [{"type": "DEMAND", "low": 1.08, "high": 1.09}]},
-        "structure": {"swing_low": 1.08, "swing_high": 1.12},
-        "risk": {"entry": 1.1, "stop": 1.08},
-        "decision": {"direction": "BUY"},
+        "zones": {"zones": [{"type": "DEMAND", "low": 2000.0, "high": 2004.0}]},
+        "liquidity": {"equal_highs": [{"price": 2030.0}]},
     }
     model = build_chart_semantic_model(
         symbol="XAUUSD",
-        timeframe="H1",
+        timeframe="M15",
         as_of=as_of,
         engines=engines,
+        decision={
+            "direction": "BUY",
+            "levels": {"entry": 2005.0, "stop": 1998.0, "targets": [2018.0]},
+        },
     )
     chart_semantic_service.validate_semantic_model(model.model_dump())
     rows = await chart_semantic_service.persist_semantic_model(db_session, ctx, model)
@@ -72,7 +74,7 @@ async def test_chart_api_create_annotation(db_session: AsyncSession) -> None:
         response = await client.post(
             "/api/v1/chart/annotations",
             json={
-                "semantic_type": "DRAW_LEVEL",
+                "semantic_type": "price_line",
                 "geometry_json": {
                     "anchors": [{"ts": "2024-01-01T00:00:00+00:00", "price": 1.2345}],
                 },
@@ -92,7 +94,7 @@ async def test_chart_api_create_annotation(db_session: AsyncSession) -> None:
         select(ChartAnnotation).where(ChartAnnotation.id == uuid.UUID(ann_id))
     )
     assert row is not None
-    assert row.semantic_type == "DRAW_LEVEL"
+    assert row.semantic_type == "price_line"
 
 
 @pytest.mark.asyncio
@@ -104,10 +106,11 @@ async def test_semantic_model_adapter_contract_shape() -> None:
         timeframe="H1",
         as_of=as_of,
         engines={
-            "zones": {"zones": [{"low": 1.0, "high": 1.1}]},
-            "structure": {"swing_low": 1.0, "swing_high": 1.2},
+            "zones": {"zones": [{"type": "DEMAND", "low": 2000.0, "high": 2004.0}]},
+            "liquidity": {"equal_lows": [{"price": 1996.0}]},
         },
     )
+    assert model.operations, "the contract is vacuous if nothing was produced"
     payload = model.model_dump()
     for op in payload["operations"]:
         for anchor in op["geometry"]["anchors"]:
