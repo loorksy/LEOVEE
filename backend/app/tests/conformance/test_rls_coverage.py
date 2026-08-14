@@ -84,6 +84,12 @@ PLATFORM_GLOBAL_TABLES: dict[str, str] = {
     # workspace-specific (per-workspace thresholds, user-tuned parameters),
     # these three tables must gain workspace_id at that point.
     "market_events": "deterministic market fact, shared across workspaces (revisit in M4)",
+    # A fingerprint of a past moment on XAUUSD plus how it resolved. Objective
+    # market history, in the same class as `candles`. Per-workspace copies would
+    # multiply storage by the tenant count *and* leave every new workspace with
+    # no memory of the market itself — not merely none of its own decisions.
+    # What stays private is `strategy_stats`: how a workspace's own plans fared.
+    "market_cases": "shared market history; no tenant-derived column",
     "structures": "deterministic market fact, shared across workspaces (revisit in M4)",
     "price_zones": "deterministic market fact, shared across workspaces (revisit in M4)",
 }

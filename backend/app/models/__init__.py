@@ -19,6 +19,7 @@ from app.models.learning import (
     SymbolProfile,
 )
 from app.models.market_artifacts import MarketEvent, PriceZone, Structure
+from app.models.market_case import MarketCase
 from app.models.mcp import McpAuditEvent, McpSession
 from app.models.memory import AgentEpisode, AgentMemory, Lesson, MemoryEmbedding
 from app.models.model_config import ModelConfig
@@ -79,6 +80,7 @@ __all__ = [
     "PriceZone",
     "Structure",
     "NewsEvent",
+    "MarketCase",
     "Notification",
     "Organization",
     "OrganizationMember",
