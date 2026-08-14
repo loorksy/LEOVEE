@@ -36,7 +36,7 @@ __all__ = [
     "ACTIVE_TIMEFRAMES",
     "MTF_CONTEXT_STACK",
     "MTF_CONTEXT_STACK_CODES",
-    "INTERIM_DECISION_TIMEFRAME",
+    "DEFAULT_SERIES_TIMEFRAME",
     "MIN_CANDLES_FOR_ANALYSIS",
     "ANALYSIS_WINDOW_BARS",
     "is_decision_timeframe",
@@ -65,13 +65,24 @@ MTF_CONTEXT_STACK: tuple[Timeframe, ...] = (Timeframe.H4, Timeframe.H1, Timefram
 #: The same stack as plain strings, for engines keyed on timeframe codes.
 MTF_CONTEXT_STACK_CODES: tuple[str, ...] = tuple(tf.value for tf in MTF_CONTEXT_STACK)
 
-#: Used until the agent's real timeframe selection lands in M6.
+#: The frame to assume when nothing says which one this is.
 #:
-#: This is a stand-in, and it is named as one rather than dressed up as a
-#: choice: the top of the scalping range is the most stable frame to hold the
-#: pipeline together while the selection logic is still to be ported. Nothing
-#: reads it as evidence, and M6 replaces every use.
-INTERIM_DECISION_TIMEFRAME: Timeframe = Timeframe.M15
+#: It began life as ``INTERIM_DECISION_TIMEFRAME``, a stand-in until the agent's
+#: real selection logic landed. That logic has landed
+#: (``app/agents/timeframe.py``), so the name is now wrong in the way the engine
+#: ledger exists to prevent: a symbol that describes itself as temporary
+#: scaffolding, long after the thing it was scaffolding was built, is a comment
+#: that has quietly become false.
+#:
+#: What remains is a narrower and permanent job. Three places have a single
+#: candle series and no record of its frame — an engine called with one series,
+#: a stored plan whose ``timeframe`` column is null or unparseable, an MTF read
+#: with nothing to compare. Each needs *a* frame to label the series with, and
+#: the top of the scalping range is the most stable choice. **It is never a
+#: decision**: where a frame is actually chosen, ``select_decision_timeframe``
+#: chooses it, and a run that cannot choose fails closed with
+#: ``NO_VIABLE_TIMEFRAME`` rather than reaching for this.
+DEFAULT_SERIES_TIMEFRAME: Timeframe = Timeframe.M15
 
 #: Below this, the deterministic engines have nothing to work with. The bound
 #: comes from AiChart's detectGeometry, which needs enough bars to confirm

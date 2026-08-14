@@ -46,7 +46,7 @@ from app.agents.timeframe import (
 from app.agents.tools.loop import run_tool_loop
 from app.agents.tools.registry import ToolContext
 from app.core.errors import ProviderConfigurationError
-from app.core.timeframes import INTERIM_DECISION_TIMEFRAME
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.bar import OHLCBar, bars_from_candles
 from app.engines.decision import run_decision_engine
 from app.engines.geometry import run_geometry_engine
@@ -189,16 +189,16 @@ async def run_analysis_orchestrator(
         mtf = mtf_context["mtf"]
         intelligence_by_tf = mtf_context.get("intelligence_by_tf", {})
     else:
-        intelligence_by_tf = {INTERIM_DECISION_TIMEFRAME.value: intelligence}
-        mtf = run_mtf_engine({INTERIM_DECISION_TIMEFRAME.value: bars})
+        intelligence_by_tf = {DEFAULT_SERIES_TIMEFRAME.value: intelligence}
+        mtf = run_mtf_engine({DEFAULT_SERIES_TIMEFRAME.value: bars})
 
     # The agent picks its own frame (D11). Falls back to the frame the caller
     # analysed only when the ladder was never loaded — with the fallback
     # recorded, not hidden.
-    frames = bars_by_timeframe or {INTERIM_DECISION_TIMEFRAME.value: bars}
+    frames = bars_by_timeframe or {DEFAULT_SERIES_TIMEFRAME.value: bars}
     leading_bias = mtf.get("trade_bias") if isinstance(mtf, dict) else None
     choice = _choose_timeframe(ledger, frames, leading_bias=leading_bias)
-    decision_timeframe: Timeframe = choice.timeframe if choice else INTERIM_DECISION_TIMEFRAME
+    decision_timeframe: Timeframe = choice.timeframe if choice else DEFAULT_SERIES_TIMEFRAME
 
     scenarios = run_scenario_engine(structure, volatility, liquidity, zones, mtf)
 

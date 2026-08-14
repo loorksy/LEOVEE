@@ -9,7 +9,7 @@ from app.core.timeframes import (
     ANALYSIS_WINDOW_BARS,
     CONTEXT_TIMEFRAMES,
     DECISION_TIMEFRAMES,
-    INTERIM_DECISION_TIMEFRAME,
+    DEFAULT_SERIES_TIMEFRAME,
     MIN_CANDLES_FOR_ANALYSIS,
     MTF_CONTEXT_STACK,
     MTF_CONTEXT_STACK_CODES,
@@ -77,10 +77,10 @@ def test_mtf_stack_frames_are_all_fetched() -> None:
         assert is_active_timeframe(timeframe)
 
 
-def test_interim_selection_is_a_scalp_frame() -> None:
-    # A stand-in until M6 ports the real selection, but it still has to be a
-    # frame a scalp can legitimately live on.
-    assert is_decision_timeframe(INTERIM_DECISION_TIMEFRAME)
+def test_the_default_series_frame_is_a_scalp_frame() -> None:
+    """A label for an unlabelled series, never a decision — but still a frame a
+    scalp can legitimately live on, since a plan may end up tracked against it."""
+    assert is_decision_timeframe(DEFAULT_SERIES_TIMEFRAME)
 
 
 def test_analysis_bounds_are_ordered() -> None:

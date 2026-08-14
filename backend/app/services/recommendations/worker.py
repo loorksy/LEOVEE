@@ -28,7 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenant import TenantContext, resolve_tenant_context
-from app.core.timeframes import INTERIM_DECISION_TIMEFRAME
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.bar import OHLCBar, bars_from_candles
 from app.models.enums import Timeframe
 from app.models.recommendation import Recommendation
@@ -142,7 +142,7 @@ async def run_recommendation_tracker_cycle(
 
 
 def _timeframe_of(plan: Recommendation) -> Timeframe:
-    """The frame the plan was made on, or the interim default.
+    """The frame the plan was made on, or the default series frame.
 
     A plan tracked on the wrong frame is checked against candles it was never
     sized for: an M1 stop evaluated on H4 bars is "hit" by a wick that an M1
@@ -153,4 +153,4 @@ def _timeframe_of(plan: Recommendation) -> Timeframe:
             return Timeframe(plan.timeframe)
         except ValueError:
             logger.warning("tracker_unknown_timeframe", timeframe=plan.timeframe)
-    return INTERIM_DECISION_TIMEFRAME
+    return DEFAULT_SERIES_TIMEFRAME

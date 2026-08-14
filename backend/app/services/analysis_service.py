@@ -10,6 +10,7 @@ from app.agents.orchestrator import fail_closed_no_trade, run_analysis_orchestra
 from app.agents.prompts import Prompt, PromptNotFound, constitution
 from app.agents.tools.registry import ToolContext
 from app.core.tenant import TenantContext
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.reasoning import run_devils_advocate, run_reasoning_engine
 from app.models.enums import RecommendationDirection, RecommendationStatus, Timeframe
 from app.models.memory import MemoryType
@@ -100,7 +101,11 @@ async def run_analysis(
     tenant: TenantContext,
     *,
     symbol: str,
-    timeframe: Timeframe = Timeframe.H1,
+    # Which series to fetch as the primary one — *not* the frame the decision is
+    # made on. H1 used to be the default here, which is a context frame the API
+    # itself rejects with 422 under D11; an internal caller that omitted the
+    # argument got an analysis anchored to a frame no scalp may be taken on.
+    timeframe: Timeframe = DEFAULT_SERIES_TIMEFRAME,
     persist_engines: bool = True,
     market_provider: MarketDataProvider | None = None,
     complete_pipeline: bool = False,
@@ -165,7 +170,13 @@ async def run_analysis(
         "agent_run_id": str(result.agent_run_id),
         "workspace_id": str(tenant.workspace_id),
         "symbol": symbol,
-        "timeframe": timeframe.value,
+        # The frame the *agent* chose, which is the honest direction for this
+        # information to flow (ADR 0008) and what the UI labels the result with.
+        # Reporting the requested frame here told the reader the analysis was
+        # decided on a chart it merely started from.
+        "timeframe": (result.decision.get("timeframe") or timeframe.value),
+        # What was fetched, kept separately so the two can never be confused.
+        "source_timeframe": timeframe.value,
         "perceive": result.perceive,
         "recall": result.recall,
         "engines": result.engines,

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_workspace_context
 from app.core.symbols import DEFAULT_SYMBOL
 from app.core.tenant import TenantContext
-from app.core.timeframes import INTERIM_DECISION_TIMEFRAME, is_decision_timeframe
+from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME, is_decision_timeframe
 from app.infrastructure.database import get_db_session
 from app.models.enums import Timeframe
 from app.services import analysis_service
@@ -46,7 +46,7 @@ async def run_analysis_endpoint(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     tenant: Annotated[TenantContext, Depends(get_workspace_context)],
 ) -> dict[str, Any]:
-    timeframe = body.timeframe or INTERIM_DECISION_TIMEFRAME
+    timeframe = body.timeframe or DEFAULT_SERIES_TIMEFRAME
     if not is_decision_timeframe(timeframe):
         raise HTTPException(
             status_code=422,

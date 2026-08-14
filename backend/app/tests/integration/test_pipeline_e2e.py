@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -18,33 +18,45 @@ from app.providers.market.base import NormalizedCandle
 from app.services.analysis_service import run_analysis
 from app.services.memory_service import retrieve_memories_for_symbol
 from app.services.recommendation_service import get_recommendation
+from app.tests.bars import EPOCH, swinging_bars
 from app.tests.conftest import seed_user_org
-from app.tests.doubles.llm import FakeLLMProvider
+from app.tests.doubles.llm import DecidingLLMProvider, FakeLLMProvider
 from app.tests.doubles.market import FakeMarketDataProvider
 
 
-def _synthetic_h1_series(count: int = 40) -> list[NormalizedCandle]:
-    start = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
-    candles: list[NormalizedCandle] = []
-    price = Decimal("1.1000")
-    for i in range(count):
-        ts = start + timedelta(hours=i)
-        o = price + Decimal(i) * Decimal("0.0002")
-        candles.append(
-            NormalizedCandle(
-                symbol="XAUUSD",
-                timeframe=Timeframe.H1,
-                ts=ts,
-                open=o,
-                high=o + Decimal("0.0010"),
-                low=o - Decimal("0.0008"),
-                close=o + Decimal("0.0005"),
-                volume=Decimal("0"),
-                complete=True,
-                source="test_double",
-            )
+def _gold_series(
+    count: int = 200, *, timeframe: Timeframe = Timeframe.M15
+) -> list[NormalizedCandle]:
+    """A gold tape the engines can actually read.
+
+    The fixture this replaces was 40 candles priced at 1.1000 and labelled
+    XAUUSD — a currency pair wearing gold's name, from before ADR 0007, and
+    twenty bars short of `MIN_CANDLES_FOR_ANALYSIS`. Every run on it failed
+    closed on `ENGINE_UNAVAILABLE`, so the pipeline test could only ever cover
+    the refusal path.
+
+    A swinging series, not a ramp: a monotonic climb has no local extreme, so the
+    swing detectors correctly find nothing and the structure engine reads
+    `unknown` — which is the same dead end by a different route.
+    """
+    interval = timedelta(minutes=15 if timeframe is Timeframe.M15 else 60)
+    return [
+        NormalizedCandle(
+            symbol="XAUUSD",
+            timeframe=timeframe,
+            ts=EPOCH + interval * index,
+            open=Decimal(str(round(source.open, 2))),
+            high=Decimal(str(round(source.high, 2))),
+            low=Decimal(str(round(source.low, 2))),
+            close=Decimal(str(round(source.close, 2))),
+            volume=Decimal("0"),
+            complete=True,
+            source="test_double",
         )
-    return candles
+        for index, source in enumerate(
+            swinging_bars(60, start=2000.0, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
+        )
+    ]
 
 
 @pytest.mark.asyncio
@@ -70,12 +82,12 @@ async def test_pipeline_market_to_thesis(
     await db_session.commit()
     ctx = await resolve_tenant_context(db_session, user.id)
 
-    provider = FakeMarketDataProvider(_synthetic_h1_series())
+    provider = FakeMarketDataProvider(_gold_series())
     result = await run_analysis(
         db_session,
         ctx,
         symbol="XAUUSD",
-        timeframe=Timeframe.H1,
+        timeframe=Timeframe.M15,
         market_provider=provider,
         complete_pipeline=True,
     )
@@ -120,3 +132,59 @@ async def test_pipeline_market_to_thesis(
 
     events = await db_session.execute(select(MarketEvent))
     assert len(events.scalars().all()) >= 1
+
+
+@pytest.mark.asyncio
+async def test_a_completed_analysis_publishes_a_directional_plan(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The path a user actually gets, end to end, with nothing stubbed but the model.
+
+    Every other pipeline test here exercises a refusal — no candles, no engine,
+    no provider — which are the paths that must never publish. This is the one
+    that must: real candles through real engines, a grounded plan back, and a
+    stored recommendation carrying a direction (ADR 0002).
+
+    The model double is not handed a plan. It reads the measured-level menu out
+    of the prompt and builds one from those prices, so the grounding check is
+    passed by construction rather than by the fixture agreeing with itself.
+    """
+    decider = DecidingLLMProvider(direction="BUY")
+    monkeypatch.setattr("app.agents.orchestrator.get_llm_provider", lambda: decider)
+
+    user, _org, _membership = await seed_user_org(db_session)
+    await db_session.commit()
+    ctx = await resolve_tenant_context(db_session, user.id)
+
+    result = await run_analysis(
+        db_session,
+        ctx,
+        symbol="XAUUSD",
+        timeframe=Timeframe.M15,
+        market_provider=FakeMarketDataProvider(_gold_series()),
+        complete_pipeline=True,
+    )
+    await db_session.commit()
+
+    decision = result["decision"]
+    assert decision["direction"] == RecommendationDirection.BUY.value, decision
+    assert decision.get("degraded") is not True, decision
+    assert decision["confidence"] is not None
+    # A completed analysis carries a full plan, not a direction on its own.
+    assert decision["levels"]["entry"] and decision["levels"]["stop"]
+    assert decision["levels"]["targets"]
+
+    # D11: the frame is the agent's answer, and the payload reports *that* frame
+    # rather than the series the caller happened to fetch.
+    assert result["timeframe"] == result["engines"]["timeframe_selection"]["timeframe"]
+    assert result["source_timeframe"] == Timeframe.M15.value
+
+    # The plan went through the same tape check any plan would.
+    assert result["engines"]["plan_sanity"]["viable"] is True
+
+    rec = await get_recommendation(db_session, ctx, uuid.UUID(result["recommendation_id"]))
+    assert rec is not None
+    assert rec.direction is RecommendationDirection.BUY
+    assert rec.entry is not None and rec.stop is not None
+    assert rec.timeframe == decision["timeframe"]

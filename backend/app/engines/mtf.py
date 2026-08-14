@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.timeframes import (
-    INTERIM_DECISION_TIMEFRAME,
+    DEFAULT_SERIES_TIMEFRAME,
     MTF_CONTEXT_STACK_CODES,
 )
 from app.engines.bar import OHLCBar
@@ -76,7 +76,7 @@ def _frame_bias(bars: list[OHLCBar]) -> dict[str, Any]:
 def run_mtf_engine(
     bars_by_timeframe: dict[str, list[OHLCBar]],
     *,
-    decision_timeframe: str = INTERIM_DECISION_TIMEFRAME.value,
+    decision_timeframe: str = DEFAULT_SERIES_TIMEFRAME.value,
     stack: tuple[str, ...] = MTF_CONTEXT_STACK_CODES,
 ) -> dict[str, Any]:
     """Bias per frame, the alignment between them, and the three roles."""

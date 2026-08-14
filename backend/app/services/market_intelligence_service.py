@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.timeframes import (
     ANALYSIS_WINDOW_BARS,
     DECISION_TIMEFRAMES,
-    INTERIM_DECISION_TIMEFRAME,
+    DEFAULT_SERIES_TIMEFRAME,
 )
 from app.engines.bar import OHLCBar, bars_from_candles
 from app.engines.market_intelligence import run_market_intelligence_engine
@@ -45,7 +45,7 @@ async def build_mtf_intelligence(
     symbol: str,
     provider: MarketDataProvider | None = None,
     stack: tuple[str, ...] | None = None,
-    decision_timeframe: Timeframe = INTERIM_DECISION_TIMEFRAME,
+    decision_timeframe: Timeframe = DEFAULT_SERIES_TIMEFRAME,
 ) -> dict[str, Any]:
     timeframes = stack or default_mtf_stack()
     # Context ladder plus every frame the agent may decide on. Anything missing

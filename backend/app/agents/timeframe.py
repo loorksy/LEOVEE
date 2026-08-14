@@ -1,6 +1,6 @@
 """Which frame carries the setup — chosen by the agent, never by the user.
 
-This replaces ``INTERIM_DECISION_TIMEFRAME``, which held the pipeline together
+This replaces ``DEFAULT_SERIES_TIMEFRAME``, which held the pipeline together
 while the selection logic was still to be written and was named as a stand-in
 rather than dressed up as a decision.
 
