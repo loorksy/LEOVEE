@@ -15,6 +15,13 @@ stop. The distance is now signed by the plan's own direction, which is derived
 from the levels rather than passed in — the levels are the authority, and a
 direction argument that disagreed with them would just be a second thing to
 keep in step.
+
+**No spread is modelled here.** A default of thirty gold pips inflated every
+risk distance and, past a threshold, refused the plan outright with
+``spread_too_wide`` — a rejection produced entirely by a constant nobody had
+measured, on a platform with no broker and no order to fill. Sizing is now the
+plan's own risk distance, which is a fact about the plan. Whether the live tape
+leaves that stop any room is asked in ``plan_sanity``, against the candles.
 """
 
 from __future__ import annotations
@@ -24,12 +31,7 @@ from typing import Any
 
 from app.core.symbols import DEFAULT_SYMBOL, pip_size
 
-__all__ = ["run_risk_engine", "MAX_SPREAD_MULTIPLE"]
-
-#: Beyond this the spread is not a cost, it is the trade. A stop three times its
-#: own width away from being paid for is not a wide stop, it is a plan whose
-#: arithmetic never closes.
-MAX_SPREAD_MULTIPLE = Decimal("3")
+__all__ = ["run_risk_engine"]
 
 
 def run_risk_engine(
@@ -39,7 +41,6 @@ def run_risk_engine(
     targets: list[Decimal] | None = None,
     account_risk_pct: Decimal = Decimal("1"),
     symbol: str = DEFAULT_SYMBOL,
-    spread_pips: Decimal = Decimal("30"),
 ) -> dict[str, Any]:
     size = Decimal(str(pip_size(symbol) or 0.01))
     risk_distance = abs(entry - stop)
@@ -57,18 +58,7 @@ def run_risk_engine(
     # to keep in step for no gain.
     direction = "SELL" if stop > entry else "BUY"
 
-    spread_cost = spread_pips * size
-    adjusted_risk = risk_distance + spread_cost
-    if adjusted_risk > risk_distance * MAX_SPREAD_MULTIPLE:
-        return {
-            "approved": False,
-            "decision": "NO_TRADE",
-            "reason": "spread_too_wide",
-            "position_size_units": None,
-            "direction": direction,
-        }
-
-    units = (account_risk_pct / Decimal("100")) / adjusted_risk
+    units = (account_risk_pct / Decimal("100")) / risk_distance
     reward_risk: float | None = None
     if targets:
         first = targets[0]
@@ -87,7 +77,6 @@ def run_risk_engine(
         "position_size_units": float(units),
         "risk_distance": float(risk_distance),
         "risk_pips": float(risk_distance / size),
-        "spread_cost": float(spread_cost),
         "reward_risk": reward_risk,
         "pip_size": float(size),
     }

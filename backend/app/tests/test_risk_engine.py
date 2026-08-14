@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+import pytest
+
 from app.engines.risk import run_risk_engine
 
 
@@ -8,8 +10,7 @@ def test_risk_engine_approves_valid_setup() -> None:
 
     The fixture used to be 1.1000/1.0980 — a currency pair, from before ADR
     0007. Under gold's pip size a two-pip currency stop is a fifth of a gold
-    pip, and the spread swallows it whole: the engine correctly refuses, and the
-    test was measuring a market that does not exist here.
+    pip, so the test was measuring a market that does not exist here.
     """
     result = run_risk_engine(
         entry=Decimal("2000.00"),
@@ -60,3 +61,28 @@ def test_risk_engine_rejects_invalid_stop() -> None:
     )
     assert result["approved"] is False
     assert result["decision"] == "NO_TRADE"
+
+
+def test_sizing_carries_no_invented_cost() -> None:
+    """Risk is the distance to the stop. Nothing is added to it.
+
+    A thirty-pip gold spread used to be assumed here, inflating every size and —
+    past three times the stop's own width — refusing the plan outright as
+    `spread_too_wide`. That rejection came from a constant, not a market: this
+    platform has no broker, places no order, and had never measured the number.
+    One percent risked over a 4.00 stop is 1/400 of the account per unit, and
+    the arithmetic says so exactly.
+    """
+    result = run_risk_engine(
+        entry=Decimal("2000.00"),
+        stop=Decimal("1996.00"),
+        account_risk_pct=Decimal("1"),
+    )
+    assert result["position_size_units"] == pytest.approx(float(Decimal("0.01") / Decimal("4")))
+    assert "spread_cost" not in result
+
+    # And a stop tight enough that any assumed spread would have swallowed it is
+    # still priced, not refused.
+    tight = run_risk_engine(entry=Decimal("2000.00"), stop=Decimal("1999.95"))
+    assert tight["approved"] is True
+    assert tight["risk_pips"] == pytest.approx(5.0)

@@ -2,9 +2,10 @@
 
 A separate axis from confidence, and conflating them is the mistake this
 prevents. A plan can be entirely convincing and untradeable — the entry is forty
-points away, or the session is closed, or the spread has widened past what the
-stop can absorb. Publishing that as "low confidence" tells the reader the
-analysis is weak when the analysis is fine and the *moment* is wrong.
+points away, the session is closed, or the stop sits inside movement these very
+candles show price giving back. Publishing that as "low confidence" tells the
+reader the analysis is weak when the analysis is fine and the *moment* is
+wrong.
 
 Four classes, and the boundaries between them are decisions rather than
 gradations:
@@ -12,10 +13,10 @@ gradations:
 ``now`` — price is at the entry and nothing blocks it.
 ``soon`` — the plan is sound and the entry is within reach; worth watching.
 ``watch_only`` — the structure is real but something concrete is in the way.
-``rejected`` — never rendered as a card at all. Two ways to earn it: the
-arithmetic does not close, or the entry is so far away that publishing it as any
-kind of plan is noise. Neither is a weak opportunity, and showing either invites
-someone to take it.
+``rejected`` — never rendered as a card at all. Two ways to earn it: the plan
+does not survive the tape it was written for, or the entry is so far away that
+publishing it as any kind of plan is noise. Neither is a weak opportunity, and
+showing either invites someone to take it.
 
 The order of the checks is deliberate: a blocked market beats a distant entry,
 because "the market is closed" is a complete explanation and "the entry is far"
@@ -99,7 +100,7 @@ def assess_tradability(
     if not plan_viable:
         return TradabilityAssessment(
             Tradability.REJECTED,
-            reason="the plan does not clear its own costs",
+            reason="the plan does not survive the tape it was written for",
             blockers=failures,
         )
 
@@ -128,8 +129,10 @@ def assess_tradability(
 
     absolute = abs(current_price - entry)
     if spread is not None and spread > 0 and absolute <= spread:
-        # Inside the spread, waiting for a better price costs more than the
-        # trade's own round trip. It is at the entry in every sense that matters.
+        # An *observed* quote, never a modelled one (ADR 0010): when the gap to
+        # the entry is narrower than the live bid-ask, price is at the entry in
+        # every sense a reader can act on. Absent a quote this is simply skipped
+        # rather than filled in from an assumption.
         return TradabilityAssessment(
             Tradability.NOW,
             reason="price is inside the spread of the entry",

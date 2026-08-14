@@ -47,15 +47,20 @@ times the entry, so the context has to exist for that sentence to be true.
 - The timeframe selector is removed from the analysis page. The result reports
   which frame the agent chose, which is the honest direction for that
   information to flow.
-- `INTERIM_DECISION_TIMEFRAME` stands in until M6 ports the real selection
-  logic. It is named as a stand-in rather than dressed up as a choice, on the
-  same principle as the engine ledger: a placeholder that looks like a decision
-  is worse than one that admits what it is.
+- `INTERIM_DECISION_TIMEFRAME` stood in until the real selection logic landed. It
+  was named as a stand-in rather than dressed up as a choice, on the same
+  principle as the engine ledger: a placeholder that looks like a decision is
+  worse than one that admits what it is.
 
-## Open question deferred to M6
+## Resolved: how the agent chooses
 
-Selection itself — how the agent picks between M1, M5 and M15 — is agent logic
-and lands with the specialist fleet. The candidate signals are volatility
-regime, where the nearest structure sits relative to current price, and spread
-as a fraction of the expected move. Until then the interim constant holds the
-pipeline together and nothing reads it as evidence.
+`app/agents/timeframe.py::select_decision_timeframe` now carries the choice, and
+it is deterministic rather than a model call — two runs on the same candles must
+choose the same frame and be able to say why.
+
+Structure legibility dominates, agreement with the leading context frame is a
+bonus rather than a filter, and volatility regime ranks. The third signal
+originally named here — *spread as a fraction of the expected move* — was
+implemented and then **removed**: it excluded one-minute gold on every ordinary
+tape against a spread nobody had measured. ADR 0010 replaces it with a floor read
+off the candles, and makes room-to-trade a score rather than an exclusion.

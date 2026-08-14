@@ -27,7 +27,7 @@ def _synthetic_gold_series(count: int = 140) -> list[NormalizedCandle]:
     Forty forex-priced bars used to reach the narrative stage because the
     engines were placeholders. They no longer are, and the gates in front of the
     model layer are real: the geometry engine needs sixty bars, and the agent
-    refuses a frame whose volatility cannot clear the round-trip cost. Testing
+    refuses a frame with no readable structure. Testing
     the LLM guarantee needs candles that get that far.
     """
     return [

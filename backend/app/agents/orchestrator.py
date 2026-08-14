@@ -31,7 +31,6 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -54,7 +53,11 @@ from app.engines.geometry import run_geometry_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
 from app.engines.mtf import run_mtf_engine
-from app.engines.plan_sanity import risk_policy_for, run_plan_sanity_engine
+from app.engines.plan_sanity import (
+    measure_price_context,
+    risk_policy_for,
+    run_plan_sanity_engine,
+)
 from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
 from app.engines.status import unavailable_engines
@@ -131,17 +134,10 @@ def _choose_timeframe(
     bars_by_timeframe: dict[str, list[OHLCBar]],
     *,
     leading_bias: str | None,
-    symbol: str,
-    moment: datetime | None,
 ) -> TimeframeChoice | None:
     """Let the agent pick its frame, or record why it could not."""
     try:
-        return select_decision_timeframe(
-            bars_by_timeframe,
-            leading_bias=leading_bias,
-            symbol=symbol,
-            moment=moment,
-        )
+        return select_decision_timeframe(bars_by_timeframe, leading_bias=leading_bias)
     except NoViableTimeframeError as exc:
         ledger.failures.append(
             StageFailure(
@@ -182,11 +178,6 @@ async def run_analysis_orchestrator(
     recall = {"memories": memories or [], "count": len(memories or [])}
 
     bars = bars_from_candles(candles)
-    # The moment the candles belong to, not the wall clock: the cost floor is
-    # session-shaped, so reading `now()` would make an identical replay of this
-    # analysis reach a different answer.
-    as_of = bars[-1].ts
-
     volatility = run_volatility_engine(bars)
     structure = run_structure_engine(bars)
     geometry = run_geometry_engine(bars)
@@ -206,9 +197,7 @@ async def run_analysis_orchestrator(
     # recorded, not hidden.
     frames = bars_by_timeframe or {INTERIM_DECISION_TIMEFRAME.value: bars}
     leading_bias = mtf.get("trade_bias") if isinstance(mtf, dict) else None
-    choice = _choose_timeframe(
-        ledger, frames, leading_bias=leading_bias, symbol=symbol, moment=as_of
-    )
+    choice = _choose_timeframe(ledger, frames, leading_bias=leading_bias)
     decision_timeframe: Timeframe = choice.timeframe if choice else INTERIM_DECISION_TIMEFRAME
 
     scenarios = run_scenario_engine(structure, volatility, liquidity, zones, mtf)
@@ -240,9 +229,9 @@ async def run_analysis_orchestrator(
         )
 
     if choice is None:
-        # Every scalping frame was excluded — unreadable, too thin, or unable to
-        # clear its own costs. That is an answer, and a more useful one than a
-        # plan on a chart the agent has just established it cannot trade.
+        # Every scalping frame was excluded — no readable shape, or too few bars.
+        # That is an answer, and a more useful one than a plan on a chart the
+        # agent has just established it cannot read.
         return OrchestratorResult(
             agent_run_id=run_id,
             perceive=perceive,
@@ -273,13 +262,14 @@ async def run_analysis_orchestrator(
         symbol=symbol,
     )
 
+    # Measured from the bars this analysis read, not from an assumed cost.
+    price_context = measure_price_context(bars, atr=atr)
     plan_sanity = run_plan_sanity_engine(
         entry=entry_f,
         stop=entry_f - stop_distance,
         targets=[entry_f + stop_distance * r for r in policy.target_r],
-        atr=atr,
+        context=price_context,
         symbol=symbol,
-        moment=as_of,
     )
 
     decision = run_decision_engine(scenarios, risk)
@@ -392,9 +382,8 @@ async def run_analysis_orchestrator(
             entry=model_plan.levels.entry,
             stop=model_plan.levels.stop,
             targets=list(model_plan.levels.targets),
-            atr=atr,
+            context=price_context,
             symbol=symbol,
-            moment=as_of,
         )
         engines["plan_sanity"] = model_sanity
         # Re-priced from the model's own levels. Leaving the geometric figure in

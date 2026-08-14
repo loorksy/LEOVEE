@@ -8,7 +8,7 @@ import pytest
 from app.agents.orchestrator import run_analysis_orchestrator
 from app.core.errors import ProviderConfigurationError
 from app.models.enums import RecommendationDirection, Timeframe
-from app.tests.bars import swinging_bars
+from app.tests.bars import flat_bars, swinging_bars
 
 
 def _candles(count: int = 140) -> list[SimpleNamespace]:
@@ -16,10 +16,9 @@ def _candles(count: int = 140) -> list[SimpleNamespace]:
 
     A short, quiet, forex-priced series used to be enough here because every
     engine was a placeholder. It no longer is: the geometry engine wants sixty
-    bars, and the agent's timeframe selection refuses a frame whose volatility
-    cannot produce a first target clearing the round-trip cost. Both refusals
-    fire before the narrative stage, so testing the LLM guarantee needs candles
-    a real analysis would actually accept.
+    bars, and the agent's timeframe selection refuses a frame with no readable
+    structure. Both refusals fire before the narrative stage, so testing the LLM
+    guarantee needs candles a real analysis would actually accept.
     """
     bars = swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4)[:count]
     return [
@@ -92,13 +91,17 @@ async def test_a_tape_no_scalping_frame_can_trade_fails_closed_with_its_own_reas
 ) -> None:
     """Declining to trade is an answer, and a different one from a broken engine.
 
-    Every scalping frame excluded — unreadable, too thin, or unable to clear its
-    own costs — is more useful than a plan on a chart the agent has just
-    established it cannot trade. It gets its own reason so the operator can tell
-    a quiet market from a fault.
+    Every scalping frame excluded — no readable shape, or too few bars — is more
+    useful than a plan on a chart the agent has just established it cannot read.
+    It gets its own reason so the operator can tell a dead tape from a fault.
+
+    A dead tape, not a quiet one: a thin market used to land here too, excluded
+    against a modelled cost floor. Now only the candles can exclude a frame, so
+    the fixture is a chart with nothing on it rather than one that was merely
+    cheap to disqualify.
     """
     monkeypatch.setattr("app.agents.orchestrator.unavailable_engines", lambda _engines: [])
-    quiet = [
+    dead = [
         SimpleNamespace(
             open=Decimal(str(bar.open)),
             high=Decimal(str(bar.high)),
@@ -107,9 +110,9 @@ async def test_a_tape_no_scalping_frame_can_trade_fails_closed_with_its_own_reas
             ts=bar.ts,
             timeframe=Timeframe.M15,
         )
-        for bar in swinging_bars(18, drift=0.02, swing=0.06, bars_per_leg=4)
+        for bar in flat_bars(120, price=2000.0, spread=0.001)
     ]
-    result = await run_analysis_orchestrator(symbol="XAUUSD", candles=quiet)
+    result = await run_analysis_orchestrator(symbol="XAUUSD", candles=dead)
 
     assert result.decision["degraded_reason"] == "NO_VIABLE_TIMEFRAME"
     assert result.decision["confidence"] is None

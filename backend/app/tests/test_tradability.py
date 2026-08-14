@@ -54,10 +54,10 @@ def test_a_distant_entry_is_watch_only() -> None:
 
 def test_an_unviable_plan_is_rejected_and_never_rendered() -> None:
     """Not a weak opportunity. Rendering it invites someone to take it."""
-    assessment = _at(0.0, plan_viable=False, plan_failures=["TARGET_BELOW_COST_FLOOR"])
+    assessment = _at(0.0, plan_viable=False, plan_failures=["TARGET_INSIDE_NOISE"])
     assert assessment.tradability is Tradability.REJECTED
     assert assessment.renderable is False
-    assert assessment.blockers == ["TARGET_BELOW_COST_FLOOR"]
+    assert assessment.blockers == ["TARGET_INSIDE_NOISE"]
 
 
 def test_rejection_outranks_a_perfect_entry() -> None:

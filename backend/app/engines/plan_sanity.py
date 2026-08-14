@@ -1,101 +1,92 @@
-"""Does this plan survive its own costs?
+"""Does this plan survive the market it was written for?
 
 A new name for a deliberate reason. AiChart's guard stage mixed two unrelated
-jobs: it asked whether the *user* was permitted to send an order and had
-confirmed it, and it asked whether the *plan* was any good. The first is out of
-scope here — Leovee never places orders (D4) — but the second is not
-order-placement logic at all. A stop that falls inside the live spread, or a
-target that does not clear the round trip, is a **bad recommendation**, and it
-stays a bad recommendation on a platform that only ever recommends.
+jobs: whether the *user* was permitted to send an order and had confirmed it,
+and whether the *plan* was any good. The first is out of scope here — Leovee
+never places orders (D4) — but the second is not order-placement logic at all. A
+stop that ordinary bar noise takes out, or a target price does not reach inside
+the plan's own lifetime, is a **bad recommendation**, and it stays one on a
+platform that only ever recommends.
 
-So the order machinery is dropped entirely and the arithmetic is kept, under a
-name that says what it actually does.
+**Everything here is measured from the live price. Nothing is modelled.**
 
-What it checks, in the order that matters:
+An earlier version priced viability against a *modelled* retail spread — thirty
+gold pips, shaped by a session table. It was a plausible number and it was
+invented, and it drove a real decision: at that assumed cost the first target
+had to clear 1.92 USD, which excluded one-minute gold on any ordinary tape. The
+platform refused a whole timeframe because of a constant nobody had measured.
 
-1. **The stop must be a real stop.** Zero or inverted distance is not a wide
-   plan, it is an unpriceable one.
-2. **The stop must clear the spread.** A stop three tenths of a point away on
-   gold, where the spread is three tenths of a point, is stopped out by the
-   quote itself before price has moved at all.
-3. **The first target must clear the round trip by a margin.** Spread and
-   slippage are paid on entry *and* exit. A plan whose first target does not
-   clear three times that is not slightly worse than a good one — it is
-   structurally losing, and its win rate is irrelevant.
-4. **Reward:risk must be positive and real**, computed from the plan's own
-   levels rather than asserted by whoever wrote them.
+That is the same failure as a fabricated zone or a hardcoded confidence, wearing
+a cost model. So the cost model is gone, and the floor comes from the candles:
 
-The cost model is session-aware and honest about its provenance. When no live
-spread has been observed, the fallback is *returned as* a fallback
-(``source: "static_model"``) rather than as a number that implies measurement.
+**The noise floor is the median wick.** Not the bar range — that is ATR under
+another name, and a stop sized as a fraction of ATR can never clear a multiple
+of it, which made the first attempt at this check self-contradictory. The wick
+is the part of a bar price gave back: how far it probes and returns *within* one
+candle, having gone nowhere. A stop inside that is swept by a single ordinary
+probe, and saying so involves no assumption about anyone's broker — the number
+is in the data.
+
+**The target floor is a multiple of ATR.** Measured volatility, not assumed
+friction: a target price cannot reach in the plan's lifetime is unreachable
+whatever the execution costs.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from statistics import median
 from typing import Any
 
 from app.core.symbols import DEFAULT_SYMBOL, pip_size
 from app.core.timeframes import DECISION_TIMEFRAMES
+from app.engines.bar import OHLCBar
 from app.models.enums import Timeframe
 
 __all__ = [
-    "MIN_COST_MULTIPLE",
-    "SESSION_SPREAD_MULTIPLIER",
-    "GOLD_STATIC_SPREAD_PIPS",
+    "MIN_STOP_NOISE_MULTIPLE",
+    "MIN_TARGET_ATR",
     "TimeframeRiskPolicy",
-    "SpreadEstimate",
+    "PriceContext",
+    "measure_price_context",
     "risk_policy_for",
-    "session_at",
-    "estimate_spread_pips",
-    "round_trip_cost_pips",
     "reward_risk",
-    "spread_too_high",
     "run_plan_sanity_engine",
 ]
 
-#: A first target must clear this multiple of the round-trip cost.
+#: A stop must clear the typical wick.
 #:
-#: Governance, not a tuning knob: below it the plan is structurally losing
-#: however often it wins, so lowering it does not trade accuracy for volume —
-#: it just stops the check from firing.
-MIN_COST_MULTIPLE = 3.0
+#: One, not a tuned constant: the claim is exactly "a stop inside the movement
+#: price routinely gives back within a single candle is swept by that movement,
+#: not by the thesis being wrong". Any larger multiple would be a preference
+#: dressed as a measurement.
+MIN_STOP_NOISE_MULTIPLE = 1.0
 
-#: Spread relative to the London baseline, by session. The *ordering* carries
-#: more weight than the exact multipliers: liquidity is deepest across the
-#: London/New York overlap and thinnest in Asia, and a plan that only works at
-#: overlap spreads should fail at Asian ones rather than quietly pass.
-SESSION_SPREAD_MULTIPLIER: dict[str, float] = {
-    "asia": 1.4,
-    "london": 1.0,
-    "new_york": 1.1,
-    "london_new_york_overlap": 0.9,
-}
+#: A first target must be at least this much ATR away.
+#:
+#: Below half an average bar's range the target is inside the next candle's
+#: ordinary movement, which makes the plan a coin flip on noise rather than a
+#: read of the market.
+MIN_TARGET_ATR = 0.5
 
-#: Conservative retail gold spread at the London baseline, in gold pips
-#: (pip = 0.01, so 30 pips = 0.30 USD). A MODEL, never reported as a
-#: measurement.
-GOLD_STATIC_SPREAD_PIPS = 30.0
+#: Bars the noise floor is measured over. Long enough that one violent candle
+#: does not set the floor for the next hour; short enough to describe the
+#: session actually being traded.
+NOISE_WINDOW_BARS = 50
 
-#: Slippage assumption, in pips, added on entry and on exit.
-STATIC_SLIPPAGE_PIPS = 2.0
-
-#: Spread is "too high" past either bound: a share of the volatility the plan
-#: is sized against, or a share of the plan's own stop.
-SPREAD_ATR_LIMIT = 0.15
-SPREAD_STOP_LIMIT = 0.2
+#: Spread is *reported* when a live quote is available, because it is real
+#: information for the reader. It never gates anything: an observed spread is a
+#: fact about this moment, and a plan is not made unviable by one wide print.
+SPREAD_ATR_WARNING = 0.15
 
 
 @dataclass(frozen=True, slots=True)
 class TimeframeRiskPolicy:
     """Stop and target geometry per decision frame.
 
-    A scalp is not a slow trade in miniature — it lives or dies on execution
-    cost — so the faster frames get a tighter structural stop and a first target
-    chosen to clear the round trip rather than to look ambitious. Under D11
-    every frame here is a scalp; what differs is how much room the structure on
-    that frame actually has.
+    A scalp is not a slow trade in miniature, so the faster frames get a tighter
+    structural stop. Under D11 every frame here is a scalp; what differs is how
+    much room the structure on that frame actually has.
     """
 
     timeframe: Timeframe
@@ -108,8 +99,7 @@ class TimeframeRiskPolicy:
 
 _POLICY: dict[Timeframe, TimeframeRiskPolicy] = {
     # A one-minute scalp invalidates fast or it was never a scalp. Twelve bars
-    # is twelve minutes; past that the edge has decayed and the idea is just
-    # occupying attention.
+    # is twelve minutes; past that the edge has decayed.
     Timeframe.M1: TimeframeRiskPolicy(Timeframe.M1, 0.8, (1.2, 2.0), 12, 0.8),
     Timeframe.M5: TimeframeRiskPolicy(Timeframe.M5, 0.8, (1.2, 2.0), 12, 0.8),
     Timeframe.M15: TimeframeRiskPolicy(Timeframe.M15, 1.2, (1.5, 2.5), 18, 1.0),
@@ -126,63 +116,61 @@ def risk_policy_for(timeframe: Timeframe | str) -> TimeframeRiskPolicy:
     return _POLICY[tf]
 
 
-def session_at(moment: datetime | None = None) -> str:
-    """Which liquidity session a moment falls in, by UTC hour."""
-    hour = (moment or datetime.now(UTC)).astimezone(UTC).hour
-    london = 7 <= hour < 16
-    new_york = 12 <= hour < 21
-    if london and new_york:
-        return "london_new_york_overlap"
-    if london:
-        return "london"
-    if new_york:
-        return "new_york"
-    return "asia"
-
-
 @dataclass(frozen=True, slots=True)
-class SpreadEstimate:
-    pips: float
-    price: float
-    session: str
-    #: "observed" when a live quote anchored it, "static_model" otherwise.
-    source: str
+class PriceContext:
+    """What the candles say about how this market moves right now."""
+
+    #: Median wick per bar — the part of the range price gave back. Movement
+    #: that went nowhere, measured rather than assumed.
+    noise: float
+    atr: float
+    last_close: float
+    bars: int
+    #: Present only when a live quote was supplied. Reported, never a gate.
+    observed_spread: float | None = None
+
+    @property
+    def usable(self) -> bool:
+        return self.bars > 0 and self.noise > 0 and self.atr > 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "pips": round(self.pips, 3),
-            "price": self.price,
-            "session": self.session,
-            "source": self.source,
+            "noise": round(self.noise, 5),
+            "atr": round(self.atr, 5),
+            "last_close": self.last_close,
+            "bars": self.bars,
+            "observed_spread": self.observed_spread,
         }
 
 
-def estimate_spread_pips(
+def measure_price_context(
+    bars: list[OHLCBar],
     *,
-    symbol: str = DEFAULT_SYMBOL,
-    observed_pips: float | None = None,
-    moment: datetime | None = None,
-) -> SpreadEstimate:
-    """The spread to price this plan against, and where the number came from.
+    atr: float,
+    observed_spread: float | None = None,
+    window: int = NOISE_WINDOW_BARS,
+) -> PriceContext:
+    """Read the floor off the tape.
 
-    An observed quote is treated as a London-session reading — that is where
-    most quotes are sampled, and it is the conservative anchor for the sessions
-    that are cheaper than London rather than dearer.
+    The wick, not the range: the range *is* ATR, so a floor built on it makes a
+    stop sized as a fraction of ATR unable to clear a multiple of it by
+    construction — the check would reject every scalp for arithmetic reasons.
+    The wick is what price gave back, which is the thing a stop has to survive.
+
+    The median, not the mean: one payrolls candle drags a mean far enough that
+    every stop after it looks generous, which is exactly backwards.
     """
-    session = session_at(moment)
-    multiplier = SESSION_SPREAD_MULTIPLIER[session]
-    if observed_pips is not None and observed_pips > 0:
-        base, source = observed_pips, "observed"
-    else:
-        base, source = GOLD_STATIC_SPREAD_PIPS, "static_model"
-    pips = base * multiplier
-    size = pip_size(symbol) or 0.01
-    return SpreadEstimate(pips=pips, price=pips * size, session=session, source=source)
-
-
-def round_trip_cost_pips(spread_pips: float, slippage_pips: float = STATIC_SLIPPAGE_PIPS) -> float:
-    """Both are paid twice: once getting in, once getting out."""
-    return max(0.0, spread_pips) * 2 + max(0.0, slippage_pips) * 2
+    recent = bars[-window:]
+    wicks = [
+        (bar.high - bar.low) - abs(bar.close - bar.open) for bar in recent if bar.high > bar.low
+    ]
+    return PriceContext(
+        noise=median(wicks) if wicks else 0.0,
+        atr=atr,
+        last_close=recent[-1].close if recent else 0.0,
+        bars=len(recent),
+        observed_spread=observed_spread,
+    )
 
 
 def reward_risk(entry: float | None, stop: float | None, target: float | None) -> float | None:
@@ -196,27 +184,16 @@ def reward_risk(entry: float | None, stop: float | None, target: float | None) -
     return reward / risk
 
 
-def spread_too_high(*, spread_price: float, atr: float, stop_distance: float) -> bool:
-    if not spread_price > 0:
-        return False
-    if atr > 0 and spread_price > atr * SPREAD_ATR_LIMIT:
-        return True
-    return stop_distance > 0 and spread_price > stop_distance * SPREAD_STOP_LIMIT
-
-
 def run_plan_sanity_engine(
     *,
     entry: float,
     stop: float,
     targets: list[float],
-    atr: float,
+    context: PriceContext,
     symbol: str = DEFAULT_SYMBOL,
-    observed_spread_pips: float | None = None,
-    moment: datetime | None = None,
 ) -> dict[str, Any]:
-    """Check a plan against its own cost floor. Never touches an order."""
+    """Check a plan against the market it was written for. Never touches an order."""
     size = pip_size(symbol) or 0.01
-    spread = estimate_spread_pips(symbol=symbol, observed_pips=observed_spread_pips, moment=moment)
     stop_distance = abs(entry - stop)
     first_target = targets[0] if targets else None
 
@@ -226,34 +203,42 @@ def run_plan_sanity_engine(
     if not stop_distance > 0:
         # Everything below divides by this, and a zero-distance stop is not a
         # wide plan — it is an unpriceable one.
-        failures.append("STOP_DISTANCE_ZERO")
         return {
             "viable": False,
-            "failures": failures,
+            "failures": ["STOP_DISTANCE_ZERO"],
             "warnings": warnings,
-            "spread": spread.to_dict(),
+            "context": context.to_dict(),
             "stop_distance": stop_distance,
             "stop_distance_pips": 0.0,
-            "round_trip_pips": round(round_trip_cost_pips(spread.pips), 2),
-            "required_target_pips": None,
-            "first_target_pips": None,
+            "stop_noise_multiple": None,
+            "first_target_atr": None,
+            "required_stop_distance": None,
             "reward_risk": None,
         }
 
-    if stop_distance <= spread.price:
-        # The quote alone closes this trade before price has moved.
-        failures.append("STOP_INSIDE_SPREAD")
-    elif spread_too_high(spread_price=spread.price, atr=atr, stop_distance=stop_distance):
-        warnings.append("SPREAD_HIGH_VS_RISK")
+    if not context.usable:
+        # No measured floor means the check cannot run. Declining to judge is
+        # honest; passing everything would turn a missing measurement into a
+        # blanket approval.
+        failures.append("NO_PRICE_CONTEXT")
 
-    round_trip = round_trip_cost_pips(spread.pips)
-    required_pips = round_trip * MIN_COST_MULTIPLE
-    first_target_pips = abs(first_target - entry) / size if first_target is not None else None
+    stop_noise_multiple: float | None = None
+    required_stop = None
+    if context.noise > 0:
+        stop_noise_multiple = stop_distance / context.noise
+        required_stop = context.noise * MIN_STOP_NOISE_MULTIPLE
+        if stop_distance < required_stop:
+            # Taken out by ordinary movement rather than by the thesis being
+            # wrong. Measured from this market's own candles, not assumed.
+            failures.append("STOP_INSIDE_NOISE")
 
+    first_target_atr: float | None = None
     if first_target is None:
         failures.append("NO_TARGET")
-    elif first_target_pips is not None and first_target_pips < required_pips:
-        failures.append("TARGET_BELOW_COST_FLOOR")
+    elif context.atr > 0:
+        first_target_atr = abs(first_target - entry) / context.atr
+        if first_target_atr < MIN_TARGET_ATR:
+            failures.append("TARGET_INSIDE_NOISE")
 
     rr = reward_risk(entry, stop, first_target)
     if rr is None:
@@ -263,18 +248,26 @@ def run_plan_sanity_engine(
         # it must never pass unremarked.
         warnings.append("REWARD_RISK_BELOW_ONE")
 
-    if spread.source == "static_model":
-        warnings.append("SPREAD_MODELLED_NOT_OBSERVED")
+    if (
+        context.observed_spread is not None
+        and context.atr > 0
+        and context.observed_spread > context.atr * SPREAD_ATR_WARNING
+    ):
+        # A warning, never a gate. One wide print is a fact about this instant,
+        # and a plan is not unviable because of it.
+        warnings.append("SPREAD_WIDE_RIGHT_NOW")
 
     return {
         "viable": not failures,
         "failures": failures,
         "warnings": warnings,
-        "spread": spread.to_dict(),
+        "context": context.to_dict(),
         "stop_distance": stop_distance,
         "stop_distance_pips": round(stop_distance / size, 2),
-        "round_trip_pips": round(round_trip, 2),
-        "required_target_pips": round(required_pips, 2),
-        "first_target_pips": round(first_target_pips, 2) if first_target_pips is not None else None,
+        "stop_noise_multiple": (
+            round(stop_noise_multiple, 2) if stop_noise_multiple is not None else None
+        ),
+        "required_stop_distance": round(required_stop, 5) if required_stop is not None else None,
+        "first_target_atr": round(first_target_atr, 2) if first_target_atr is not None else None,
         "reward_risk": round(rr, 3) if rr is not None else None,
     }

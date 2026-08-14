@@ -22,3 +22,4 @@ gets amended alongside.
 | [0007](0007-gold-only.md) | The tradable universe is XAUUSD alone | §17, §60 |
 | [0008](0008-scalp-only-agent-chosen-timeframe.md) | Scalp only; the agent picks M1/M5/M15 | §21, §49, §106 |
 | [0009](0009-telegram-as-a-conversation-transport.md) | Telegram is a conversation transport; nothing is ever sent unprompted | §105 |
+| [0010](0010-viability-is-measured-from-live-price.md) | Viability is measured from live price; no spread or cost model | — |

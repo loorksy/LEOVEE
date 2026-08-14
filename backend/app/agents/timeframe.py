@@ -21,36 +21,35 @@ outright rather than penalised.
 that disagrees with H4 can still be the right one to trade — that is what a
 counter-trend scalp is — but it has to earn it.
 
-**Room to trade is a hard floor.** If the frame's own volatility cannot produce
-a first target clearing the round-trip cost, no plan on it can ever be viable,
-so it is excluded for the same reason as an unreadable frame: not "worse", but
-*impossible*.
+**Room to trade is a score, not an exclusion, and it is measured.** How far a
+frame's stop clears the movement price routinely gives back within a candle is
+real information about that frame, so it ranks — but it does not disqualify.
+
+It used to disqualify, against a *modelled* retail spread, and that was wrong in
+a way worth naming: an invented constant excluded one-minute gold on every
+ordinary tape, and the platform refused a whole timeframe because of a number
+nobody had measured. Only two things exclude a frame now, and both are facts
+about the candles: there are not enough of them, or they carry no readable
+structure.
 
 When every frame is excluded the selector says so instead of falling back to a
 default. A default here is a confident answer about the wrong chart.
 
-**The moment is an input, not the wall clock.** Spread is session-shaped, so the
-cost floor moves between Asia and the London/New York overlap — and a selector
-that read ``now()`` would return different frames for identical candles
-depending on when it ran, with nothing in the output explaining why. Replaying
-an analysis would not reproduce it either. The caller passes the moment the
-candles belong to.
+**Nothing here reads the clock.** An earlier version did, indirectly: the cost
+floor was session-shaped, so identical candles chose different frames depending
+on when the run happened, and a replay could not reproduce it. Measuring the
+floor from the candles removes the clock from the decision entirely — the same
+bars now always give the same answer, whenever they are read.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from app.core.timeframes import DECISION_TIMEFRAMES, MIN_CANDLES_FOR_ANALYSIS
 from app.engines.bar import OHLCBar
-from app.engines.plan_sanity import (
-    MIN_COST_MULTIPLE,
-    estimate_spread_pips,
-    risk_policy_for,
-    round_trip_cost_pips,
-)
+from app.engines.plan_sanity import measure_price_context, risk_policy_for
 from app.engines.primitives.pivots import geometry_atr
 from app.engines.primitives.regime import detect_market_regime
 from app.engines.primitives.structure import detect_structure_levels
@@ -130,9 +129,6 @@ def _assess(
     bars: list[OHLCBar],
     *,
     leading_bias: str | None,
-    symbol: str,
-    moment: datetime | None,
-    observed_spread_pips: float | None,
 ) -> TimeframeCandidate:
     if len(bars) < MIN_CANDLES_FOR_ANALYSIS:
         return TimeframeCandidate(
@@ -163,23 +159,14 @@ def _assess(
             excluded="NO_READABLE_STRUCTURE",
         )
 
-    # Room to trade: does this frame's own volatility reach past the costs?
+    # How much room a stop on this frame has above the movement price gives back
+    # inside a candle. Real information, so it ranks — but a frame is never
+    # excluded for it, because that judgement belongs to the plan, not the
+    # timeframe, and the plan is checked directly.
     policy = risk_policy_for(timeframe)
-    spread = estimate_spread_pips(symbol=symbol, observed_pips=observed_spread_pips, moment=moment)
-    required_pips = round_trip_cost_pips(spread.pips) * MIN_COST_MULTIPLE
-    pip = spread.price / spread.pips if spread.pips else 0.01
-    first_target_pips = (atr * policy.stop_atr_multiple * policy.target_r[0]) / pip
-    if first_target_pips < required_pips:
-        return TimeframeCandidate(
-            timeframe=timeframe,
-            score=0.0,
-            atr=atr,
-            shape=structure.structure,
-            regime=regime.regime if regime.is_known else None,
-            bars=len(bars),
-            excluded="NO_ROOM_AFTER_COSTS",
-            reasons=[f"first target ~{first_target_pips:.0f} pips vs {required_pips:.0f} required"],
-        )
+    context = measure_price_context(bars, atr=atr)
+    stop_distance = atr * policy.stop_atr_multiple
+    headroom = stop_distance / context.noise if context.noise > 0 else 0.0
 
     score = _SHAPE_SCORE[structure.structure]
     reasons.append(f"structure={structure.structure}")
@@ -203,9 +190,10 @@ def _assess(
             score -= _CONFLICT_PENALTY
             reasons.append("against context")
 
-    # Headroom past the cost floor, capped: a frame with enormous range is not
-    # proportionally better, it is just noisier.
-    score += min(10.0, (first_target_pips / required_pips - 1) * 5)
+    # Capped: a frame whose stop is twenty times its wick noise is not
+    # proportionally better, it is just slower.
+    score += min(10.0, max(0.0, headroom - 1) * 3)
+    reasons.append(f"stop={headroom:.1f}x wick noise")
 
     return TimeframeCandidate(
         timeframe=timeframe,
@@ -222,24 +210,18 @@ def select_decision_timeframe(
     bars_by_timeframe: dict[str, list[OHLCBar]],
     *,
     leading_bias: str | None = None,
-    symbol: str = "XAUUSD",
-    moment: datetime | None = None,
-    observed_spread_pips: float | None = None,
 ) -> TimeframeChoice:
-    """Pick the scalping frame that can actually carry a plan at this moment.
+    """Pick the scalping frame that can actually carry a plan on this tape.
 
-    `moment` shapes the spread and therefore the cost floor. Passing the last
-    candle's timestamp — rather than letting it default to the clock — is what
-    keeps the choice reproducible and replayable.
+    Deterministic in the strongest sense: the same bars always give the same
+    answer, with no clock, no session table and no assumption about anyone's
+    execution costs entering the decision.
     """
     candidates = [
         _assess(
             tf,
             bars_by_timeframe.get(tf.value) or [],
             leading_bias=leading_bias,
-            symbol=symbol,
-            moment=moment,
-            observed_spread_pips=observed_spread_pips,
         )
         for tf in DECISION_TIMEFRAMES
     ]

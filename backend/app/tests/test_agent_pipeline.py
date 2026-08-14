@@ -207,7 +207,7 @@ def _frames(**overrides: object) -> dict[str, list[OHLCBar]]:
 
 
 def test_a_frame_is_chosen_and_the_reasoning_is_reported() -> None:
-    choice = select_decision_timeframe(_frames(), moment=LONDON)
+    choice = select_decision_timeframe(_frames())
     assert choice.timeframe in (Timeframe.M1, Timeframe.M5, Timeframe.M15)
     assert choice.rationale
     assert len(choice.candidates) == 3
@@ -217,37 +217,42 @@ def test_an_unreadable_frame_is_excluded_not_merely_scored_low() -> None:
     """A frame with no structure cannot carry a plan however good it looks
     otherwise, so it is not allowed to win on volatility."""
     choice = select_decision_timeframe(
-        _frames(M15=rising_bars(200, start=2000.0, step=0.5, spread=0.4)), moment=LONDON
+        _frames(M15=rising_bars(200, start=2000.0, step=0.5, spread=0.4))
     )
     by_tf = {c.timeframe: c for c in choice.candidates}
     assert by_tf[Timeframe.M15].excluded == "NO_READABLE_STRUCTURE"
     assert choice.timeframe is not Timeframe.M15
 
 
-def test_a_frame_with_no_room_after_costs_is_excluded() -> None:
-    """Not "worse" — impossible. No plan on it can ever be viable.
+def test_room_to_trade_ranks_a_frame_and_never_vetoes_it() -> None:
+    """Real information about a frame, so it scores — but it does not disqualify.
 
-    This is the check that makes the platform refuse a structurally losing
-    trade rather than rank it below a better one and take it anyway when the
-    better one is unavailable.
+    Whether a *plan* survives the noise is a question about that plan, and
+    `plan_sanity` asks it directly against the plan's own levels. Asking it
+    here, against a stop nobody has proposed yet, threw away whole timeframes
+    on a hypothetical.
     """
-    quiet = swinging_bars(18, drift=0.02, swing=0.06, bars_per_leg=4)
-    choice = select_decision_timeframe(_frames(M1=quiet), moment=LONDON)
-    by_tf = {c.timeframe: c for c in choice.candidates}
-    assert by_tf[Timeframe.M1].excluded == "NO_ROOM_AFTER_COSTS"
-    assert by_tf[Timeframe.M1].reasons  # says by how much it fell short
+    calm = swinging_bars(18, drift=1.2, swing=3.5, bars_per_leg=4, spread=0.1)
+    choppy = swinging_bars(18, drift=1.2, swing=3.5, bars_per_leg=4, spread=2.0)
+    roomy = {c.timeframe: c for c in select_decision_timeframe(_frames(M1=calm)).candidates}
+    tight = {c.timeframe: c for c in select_decision_timeframe(_frames(M1=choppy)).candidates}
+
+    assert roomy[Timeframe.M1].score > tight[Timeframe.M1].score
+    assert roomy[Timeframe.M1].excluded is None
+    assert tight[Timeframe.M1].excluded is None
+    assert "wick noise" in tight[Timeframe.M1].reasons[-1]
 
 
 def test_a_thin_frame_is_excluded_for_want_of_bars() -> None:
-    choice = select_decision_timeframe(_frames(M1=swinging_bars(2, bars_per_leg=2)), moment=LONDON)
+    choice = select_decision_timeframe(_frames(M1=swinging_bars(2, bars_per_leg=2)))
     by_tf = {c.timeframe: c for c in choice.candidates}
     assert by_tf[Timeframe.M1].excluded == "INSUFFICIENT_BARS"
 
 
 def test_agreement_with_the_context_frame_is_a_bonus_not_a_filter() -> None:
     """Trading against the higher frame is a real setup; it just has to earn it."""
-    aligned = select_decision_timeframe(_frames(), leading_bias="BULLISH", moment=LONDON)
-    against = select_decision_timeframe(_frames(), leading_bias="BEARISH", moment=LONDON)
+    aligned = select_decision_timeframe(_frames(), leading_bias="BULLISH")
+    against = select_decision_timeframe(_frames(), leading_bias="BEARISH")
     aligned_best = max(c.score for c in aligned.candidates if c.excluded is None)
     against_best = max(c.score for c in against.candidates if c.excluded is None)
     assert aligned_best > against_best
@@ -260,65 +265,75 @@ def test_no_viable_frame_raises_rather_than_defaulting() -> None:
     established it cannot read."""
     dead = {tf: flat_bars(120, price=2000.0, spread=0.001) for tf in ("M1", "M5", "M15")}
     with pytest.raises(NoViableTimeframeError, match="no scalping frame"):
-        select_decision_timeframe(dead, moment=LONDON)
-
-
-def test_a_quiet_gold_tape_excludes_the_fastest_frames_on_cost_alone() -> None:
-    """The finding this check exists to surface, pinned so it cannot drift.
-
-    Gold's modelled retail spread is 30 pips (0.30 USD). With slippage charged
-    on both sides that is a 64-pip round trip, so the 3x floor demands a first
-    target of 1.92 USD — which on M1, at a stop of 0.8xATR and a first target of
-    1.2R, needs an ATR of 2.00 USD. Ordinary one-minute gold runs far below
-    that.
-
-    So on a normal tape the platform declines to scalp gold on M1, and that is
-    the correct answer rather than a miscalibration: at those costs the
-    arithmetic never closes, whatever the win rate. The frame comes back into
-    play when a real observed spread replaces the conservative model.
-    """
-    ordinary = {
-        "M1": swinging_bars(18, drift=0.15, swing=0.5, bars_per_leg=4),
-        "M5": swinging_bars(18, drift=0.4, swing=1.2, bars_per_leg=4),
-        "M15": swinging_bars(18, drift=3.0, swing=9.0, bars_per_leg=4),
-    }
-    choice = select_decision_timeframe(ordinary, moment=LONDON)
-    by_tf = {c.timeframe: c for c in choice.candidates}
-    assert by_tf[Timeframe.M1].excluded == "NO_ROOM_AFTER_COSTS"
-    assert choice.timeframe is Timeframe.M15
+        select_decision_timeframe(dead)
 
 
 def test_selection_is_deterministic() -> None:
     frames = _frames()
-    first = select_decision_timeframe(frames, moment=LONDON).to_dict()
+    first = select_decision_timeframe(frames).to_dict()
     for _ in range(10):
-        assert select_decision_timeframe(frames, moment=LONDON).to_dict() == first
+        assert select_decision_timeframe(frames).to_dict() == first
 
 
-def test_selection_does_not_read_the_clock() -> None:
-    """Spread is session-shaped, so the cost floor moves between Asia and the
-    overlap. Reading `now()` would return different frames for identical candles
-    depending on when the run happened, with nothing in the output saying why —
-    and replaying the analysis would not reproduce it.
+def test_only_facts_about_the_candles_can_exclude_a_frame() -> None:
+    """Two exclusions, both readable off the tape: not enough bars, or no shape.
+
+    A frame whose stop would sit inside its own wick noise still competes —
+    it simply scores badly. Excluding it was the last place an unmeasured
+    assumption could refuse a timeframe outright, and it is gone.
     """
-    frames = _frames()
-    asia = select_decision_timeframe(frames, moment=datetime(2026, 6, 10, 2, tzinfo=UTC))
-    overlap = select_decision_timeframe(frames, moment=datetime(2026, 6, 10, 14, tzinfo=UTC))
-    asia_best = max(c.score for c in asia.candidates if c.excluded is None)
-    overlap_best = max(c.score for c in overlap.candidates if c.excluded is None)
-    # Thinner books in Asia mean less headroom past the cost floor.
-    assert overlap_best > asia_best
+    barely = swinging_bars(18, drift=0.02, swing=0.06, bars_per_leg=4)
+    choice = select_decision_timeframe(_frames(M1=barely))
+    by_tf = {c.timeframe: c for c in choice.candidates}
+    assert by_tf[Timeframe.M1].excluded is None
+    assert by_tf[Timeframe.M1].score < by_tf[choice.timeframe].score
 
-
-def test_a_tighter_observed_spread_brings_a_fast_frame_back() -> None:
-    """The exclusion is about costs, not about the frame itself."""
-    ordinary = {
-        "M1": swinging_bars(18, drift=0.5, swing=1.6, bars_per_leg=4),
-        "M5": swinging_bars(18, drift=0.6, swing=1.8, bars_per_leg=4),
-        "M15": swinging_bars(18, drift=0.7, swing=2.0, bars_per_leg=4),
+    excluded = {
+        c.excluded
+        for c in (
+            *select_decision_timeframe(_frames(M1=swinging_bars(2, bars_per_leg=2))).candidates,
+            *select_decision_timeframe(
+                _frames(M15=rising_bars(200, start=2000.0, step=0.5, spread=0.4))
+            ).candidates,
+        )
+        if c.excluded is not None
     }
-    modelled = select_decision_timeframe(ordinary, moment=LONDON)
-    observed = select_decision_timeframe(ordinary, moment=LONDON, observed_spread_pips=4.0)
-    excluded_modelled = {c.timeframe for c in modelled.candidates if c.excluded}
-    excluded_observed = {c.timeframe for c in observed.candidates if c.excluded}
-    assert excluded_observed < excluded_modelled
+    assert excluded == {"INSUFFICIENT_BARS", "NO_READABLE_STRUCTURE"}
+
+
+def test_selection_reads_no_clock_at_all() -> None:
+    """Not merely "takes the moment as a parameter" — there is no moment.
+
+    The cost floor used to be session-shaped, so identical candles chose
+    different frames depending on when the run happened and a replay could not
+    reproduce it. Measuring the floor from the candles removes time from the
+    decision entirely.
+    """
+    import inspect
+
+    parameters = inspect.signature(select_decision_timeframe).parameters
+    assert "moment" not in parameters
+    assert "observed_spread_pips" not in parameters
+    frames = _frames()
+    assert (
+        select_decision_timeframe(frames).to_dict() == select_decision_timeframe(frames).to_dict()
+    )
+
+
+def test_the_fastest_frames_are_selectable_on_an_ordinary_tape() -> None:
+    """The finding this change exists to correct.
+
+    A modelled 30-pip gold spread demanded a 1.92 USD first target, which needs
+    an ATR of 2.00 USD on M1 — far above ordinary one-minute gold. The platform
+    refused a whole timeframe because of a constant nobody had measured. With
+    the floor read off the candles, a normal M1 tape competes.
+    """
+    ordinary = {
+        "M1": swinging_bars(18, drift=0.15, swing=0.5, bars_per_leg=4),
+        "M5": swinging_bars(18, drift=0.4, swing=1.2, bars_per_leg=4),
+        "M15": swinging_bars(18, drift=1.0, swing=3.0, bars_per_leg=4),
+    }
+    choice = select_decision_timeframe(ordinary)
+    by_tf = {c.timeframe: c for c in choice.candidates}
+    assert by_tf[Timeframe.M1].excluded is None, "M1 is unselectable on a normal tape"
+    assert by_tf[Timeframe.M5].excluded is None
