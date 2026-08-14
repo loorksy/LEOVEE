@@ -15,7 +15,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
+# Which side terminates TLS.
+#   caddy    — dedicated host: the caddy service takes :80/:443 and does its own ACME.
+#   external — a reverse proxy already on this host (nginx, another Caddy) holds the
+#              certificate and proxies to 127.0.0.1:3000 (web) and :8000 (api).
+#              Nothing in the compose stack binds a public port in this mode.
+LEOVEE_EDGE="${LEOVEE_EDGE:-caddy}"
+case "${LEOVEE_EDGE}" in
+  caddy | external) ;;
+  *) echo "ERROR: LEOVEE_EDGE must be 'caddy' or 'external' (got '${LEOVEE_EDGE}')" >&2 && exit 1 ;;
+esac
+
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
+[[ "${LEOVEE_EDGE}" == "caddy" ]] && COMPOSE_FILES+=(--profile edge)
 
 compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
@@ -38,23 +50,21 @@ dump_and_fail() {
 command -v docker >/dev/null 2>&1 || fail "docker is not installed on this host."
 docker compose version >/dev/null 2>&1 || fail "the docker compose plugin is not available (need 'docker compose', not 'docker-compose')."
 
-# This overlay gives Caddy the host's :80 and :443 so it can answer ACME
-# challenges. That is only true of a dedicated box. On a host already serving
-# other sites the bind fails partway through `up`, after migrations have already
-# run — and the fix is not to force it, it is to use a different topology. Check
-# before touching anything rather than half-deploying and then discovering it.
-if command -v ss >/dev/null 2>&1; then
+# In caddy mode the stack needs the host's :80 and :443 for ACME. On a host
+# already serving other sites the bind fails partway through `up`, after
+# migrations have already run — and the fix is not to force it. Check before
+# touching anything rather than half-deploying and then discovering it.
+if [[ "${LEOVEE_EDGE}" == "caddy" ]] && command -v ss >/dev/null 2>&1; then
   occupied="$(ss -tlnH '( sport = :80 or sport = :443 )' 2>/dev/null |
     awk '{print $4}' | grep -vE '^(127\.|\[::1\])' || true)"
   if [[ -n "${occupied}" ]]; then
     fail "something already listens on :80/:443 —
 $(ss -tlnpH '( sport = :80 or sport = :443 )' 2>/dev/null | sed 's/^/       /')
-       This overlay needs both ports for Caddy and its ACME challenge.
-       On a shared host, do NOT free them by stopping the other service. Either
-       deploy to a dedicated VPS, or put Leovee behind the existing edge: add a
-       server block proxying your domain to 127.0.0.1:3000 (web) and
-       127.0.0.1:8000 (api), skip the caddy service, and let that edge hold the
-       certificate. docs/VPS_DEPLOY.md covers both."
+       Caddy needs both ports for its ACME challenge.
+       Do NOT free them by stopping the incumbent — that takes down whatever it
+       serves. Either deploy to a dedicated host, or keep that proxy as the edge
+       and re-run with LEOVEE_EDGE=external, having pointed it at
+       127.0.0.1:3000 (web) and 127.0.0.1:8000 (api). docs/VPS_DEPLOY.md covers both."
   fi
 fi
 
@@ -135,8 +145,11 @@ role_flags="${role_flags//[$'\r\n ']/}"
   fail "leovee_app has superuser/BYPASSRLS (rolsuper,rolbypassrls = ${role_flags:-missing}) — it would bypass RLS. Refusing."
 
 # ---------------------------------------------------------------- services ----
-echo "[deploy] building and starting redis api worker web leovee-mcp caddy…"
-compose up -d --build redis api worker web leovee-mcp caddy
+SERVICES=(redis api worker web leovee-mcp)
+[[ "${LEOVEE_EDGE}" == "caddy" ]] && SERVICES+=(caddy)
+
+echo "[deploy] building and starting ${SERVICES[*]}…"
+compose up -d --build "${SERVICES[@]}"
 
 echo "[deploy] waiting for /health/ready…"
 ready=0

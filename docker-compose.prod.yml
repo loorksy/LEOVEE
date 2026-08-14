@@ -49,13 +49,19 @@ services:
           cpus: "2"
           memory: 1G
 
-  # TLS edge. Caddy is otherwise only defined in docker-compose.staging.yml, so
-  # the production overlay had nothing listening on 80/443 at all. Unlike staging
-  # (which binds loopback behind the nginx SNI edge) this binds the host directly:
-  # ACME's HTTP-01/TLS-ALPN-01 challenges have to be reachable from the internet.
+  # TLS edge for a DEDICATED host — Caddy takes :80/:443 and does its own ACME.
+  # Caddy was otherwise only defined in docker-compose.staging.yml, so the
+  # production overlay had nothing listening on 80/443 at all.
+  #
+  # Behind the `edge` profile because it is not always wanted: on a host that
+  # already runs nginx for other sites, those ports are taken and the right
+  # answer is to point that nginx at web:3000/api:8000 rather than fight it.
+  # `deploy_prod_vps.sh` selects between the two with LEOVEE_EDGE.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    profiles:
+      - edge
     ports:
       - "80:80"
       - "443:443"
