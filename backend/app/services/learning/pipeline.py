@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.rls import set_rls_session_context
+from app.observability.prometheus import recommendation_outcomes_total
 from app.services.learning.calibration import update_calibration_bins
 from app.services.learning.decay import detect_strategy_decay
 from app.services.learning.memory_writer import LessonProposal, propose_lessons_from_outcome
@@ -46,6 +47,8 @@ async def run_learning_pipeline(
     )
 
     recorded = await OutcomeRecorder.record(session, terminal)
+    if recorded.created:
+        recommendation_outcomes_total.labels(terminal.outcome, terminal.kind.value).inc()
     if not recorded.created:
         # Already counted. Saying so is the whole point: the caller gets to
         # distinguish "recorded" from "recorded again", and nothing downstream

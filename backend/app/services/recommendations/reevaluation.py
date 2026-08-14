@@ -67,6 +67,7 @@ from app.engines.bar import OHLCBar
 from app.engines.plan_sanity import measure_price_context
 from app.models.enums import RecommendationDirection
 from app.models.recommendation import Recommendation, RecommendationReevaluation
+from app.observability.prometheus import reevaluation_triggers_total
 from app.schemas.decision import ExecutionState
 from app.services.recommendation_lifecycle import TERMINAL_RECOMMENDATION_STATUSES
 from app.services.recommendations.revisions import (
@@ -569,6 +570,8 @@ async def _write_trigger_row(
     )
     written = await session.scalar(statement)
     await session.flush()
+    if written is not None:
+        reevaluation_triggers_total.labels(trigger.reason.value, outcome).inc()
     return written is not None
 
 

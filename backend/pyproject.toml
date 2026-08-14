@@ -28,6 +28,10 @@ dependencies = [
     # only — the chart is drawn from the same candle rows the engines read,
     # so no browser or JS runtime is involved.
     "Pillow>=11.0.0",
+    # Real Prometheus metrics (M11). The registry is process-global on purpose:
+    # the in-memory counters it replaces vanished on every restart and could
+    # not express histograms, so latency percentiles were unknowable.
+    "prometheus-client>=0.21.0",
 ]
 
 [project.optional-dependencies]

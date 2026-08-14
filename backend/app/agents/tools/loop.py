@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.agents.tools.registry import ToolContext, dispatch_tool, tool_definitions
+from app.observability.prometheus import tool_loop_iterations
 from app.providers.llm.base import LLMMessage, LLMResponse, LLMToolCall
 
 __all__ = [
@@ -149,6 +150,7 @@ async def run_tool_loop(
         spent += int(response.usage.get("total_tokens") or 0)
 
         if not response.tool_calls:
+            tool_loop_iterations.observe(iteration)
             return ToolLoopResult(
                 response=response,
                 messages=conversation,
@@ -218,6 +220,7 @@ async def run_tool_loop(
         )
     )
     final = await complete(conversation, [])
+    tool_loop_iterations.observe(iteration)
     return ToolLoopResult(
         response=final,
         messages=conversation,

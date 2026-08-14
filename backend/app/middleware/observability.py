@@ -10,6 +10,11 @@ from starlette.responses import Response
 
 from app.core.request_context import bind_request_id, reset_context
 from app.observability.http_metrics import record_http_request
+from app.observability.prometheus import (
+    http_request_duration_seconds,
+    http_requests_total,
+    normalize_path,
+)
 
 
 class ObservabilityMiddleware(BaseHTTPMiddleware):
@@ -29,5 +34,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             duration_seconds=duration,
         )
+        # The real collectors. The legacy in-memory recorder above stays through
+        # the cutover so existing dashboards keep a signal; it goes when they do.
+        path = normalize_path(request.url.path)
+        status_bucket = f"{response.status_code // 100}xx"
+        http_requests_total.labels(request.method.upper(), path, status_bucket).inc()
+        http_request_duration_seconds.labels(request.method.upper(), path).observe(duration)
         response.headers["X-Request-ID"] = request_id
         return response

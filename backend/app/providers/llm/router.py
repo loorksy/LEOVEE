@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.errors import ProviderConfigurationError
 from app.models.model_config import ModelConfig
+from app.observability.prometheus import llm_tokens_total
 from app.providers.llm.anthropic import AnthropicProvider
 from app.providers.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.providers.llm.errors import LLMError, LLMRateLimitError
@@ -103,7 +104,19 @@ class ModelRouter:
                 retryable=False,
             )
 
-    def record_usage(self, task: str, usage: dict[str, int]) -> None:
+    def record_usage(
+        self, task: str, usage: dict[str, int], *, provider: str = "", model: str = ""
+    ) -> None:
+        # Prometheus alongside the budget ledger: the ledger answers "may this
+        # task spend more", the counter answers "what did this deploy spend" —
+        # different questions, and the second used to vanish on every restart.
+        if provider or model:
+            llm_tokens_total.labels(provider or "unknown", model or "unknown", "prompt").inc(
+                int(usage.get("prompt_tokens") or 0)
+            )
+            llm_tokens_total.labels(provider or "unknown", model or "unknown", "completion").inc(
+                int(usage.get("completion_tokens") or 0)
+            )
         total = int(usage.get("total_tokens") or 0)
         if total <= 0:
             total = int(usage.get("prompt_tokens") or 0) + int(usage.get("completion_tokens") or 0)
@@ -160,7 +173,9 @@ class ModelRouter:
                 response_format=response_format,
                 tools=tools,
             )
-            self.record_usage(task, response.usage)
+            self.record_usage(
+                task, response.usage, provider=response.provider, model=response.model
+            )
             return response
         except Exception as primary_exc:  # noqa: BLE001
             code = getattr(primary_exc, "code", type(primary_exc).__name__)
@@ -182,5 +197,7 @@ class ModelRouter:
                 response_format=response_format,
                 tools=tools,
             )
-            self.record_usage(task, response.usage)
+            self.record_usage(
+                task, response.usage, provider=response.provider, model=response.model
+            )
             return response

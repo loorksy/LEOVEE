@@ -49,6 +49,10 @@ from app.agents.errors import (
     ledger_silent_timeout,
     stage_failure_from_error,
 )
+from app.observability.prometheus import (
+    agent_stage_duration_seconds,
+    agent_stage_failures_total,
+)
 
 __all__ = [
     "StageResult",
@@ -164,13 +168,21 @@ async def run_stage(
     except Exception as exc:  # noqa: BLE001 — every stage failure is classified
         failure = stage_failure_from_error(stage, exc, provider)
 
+    duration = time.monotonic() - started
     result = StageResult(
         stage=stage,
         value=value,
         failure=failure,
-        duration_ms=int((time.monotonic() - started) * 1000),
+        duration_ms=int(duration * 1000),
     )
     ledger.record(result)
+    # One observation per stage run, whatever happened: a stage that only
+    # reported its successes would show latency improving during an outage.
+    agent_stage_duration_seconds.labels(stage.value).observe(duration)
+    if failure is not None:
+        # Labelled by the taxonomy, so a provider outage, a billing stop and a
+        # data gap are three different graphs rather than one climbing line.
+        agent_stage_failures_total.labels(stage.value, failure.code.value).inc()
     # Catches the stage that returned nothing without raising: the deadline is
     # the only thing that can produce that, and nothing else would notice.
     ledger_silent_timeout(ledger.failures, stage, value, budget)
