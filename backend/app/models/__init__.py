@@ -31,7 +31,12 @@ from app.models.plan import Plan
 from app.models.platform_secret import PlatformSecret
 from app.models.prompt import PromptVersion
 from app.models.rbac import Permission, Role, RolePermission
-from app.models.recommendation import Recommendation, RecommendationRevision, Thesis
+from app.models.recommendation import (
+    Recommendation,
+    RecommendationReevaluation,
+    RecommendationRevision,
+    Thesis,
+)
 from app.models.session import Session
 from app.models.subscription import Subscription
 from app.models.symbol import Symbol
@@ -82,6 +87,7 @@ __all__ = [
     "PromptVersion",
     "PlatformSecret",
     "Recommendation",
+    "RecommendationReevaluation",
     "RecommendationRevision",
     "ResearchItem",
     "Role",

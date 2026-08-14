@@ -1,12 +1,11 @@
+import importlib
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from app.engines.decision import run_decision_engine
 from app.engines.liquidity import run_liquidity_engine
-from app.engines.risk import run_risk_engine
 from app.engines.scenario import run_scenario_engine
 from app.engines.status import (
     ENGINE_NOT_IMPLEMENTED,
@@ -17,6 +16,7 @@ from app.engines.status import (
 from app.engines.structure import run_structure_engine
 from app.engines.volatility import OHLCBar, run_volatility_engine
 from app.engines.zones import run_zones_engine
+from app.schemas.engines import EngineName
 from app.services.learning.calibration import apply_calibration
 from app.services.market.candle_aggregator import CandleAggregator, PriceTick
 from app.tests.bars import flat_bars, rising_bars, swinging_bars
@@ -125,24 +125,22 @@ def test_scenarios_follow_the_structural_bias() -> None:
     assert leading(down) == "BEARISH"
 
 
-def test_decision_engine_fails_closed_without_scenarios() -> None:
-    """A missing input must degrade the decision, never raise out of the pipeline."""
-    risk = run_risk_engine(entry=Decimal("2000.00"), stop=Decimal("1996.00"))
-    decision = run_decision_engine({"status": "unavailable"}, risk)
-    assert decision["direction"] == "NO_TRADE"
-    assert decision["confidence"] is None
+def test_there_is_no_second_decider() -> None:
+    """`engines/decision.py` is gone, and its absence is the assertion.
 
+    It mapped the leading scenario to a direction — a deterministic decider from
+    before the synthesizer landed. Every value it produced was overwritten before
+    the orchestrator returned, on every path, so it decided nothing; but it could
+    still emit `WAIT` and a confidence of 0.0 alongside NO_TRADE, both of which
+    ADR 0002 forbids. A dead decider that would violate the contract the moment
+    anyone rewired it is worse than no decider, so it was deleted rather than
+    corrected.
+    """
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("app.engines.decision")
 
-def test_decision_engine_maps_scenarios_when_they_exist() -> None:
-    risk = run_risk_engine(entry=Decimal("2000.00"), stop=Decimal("1996.00"))
-    scenarios = {
-        "scenarios": [
-            {"label": "BULLISH", "confidence": 0.7},
-            {"label": "BEARISH", "confidence": 0.2},
-        ]
-    }
-    decision = run_decision_engine(scenarios, risk)
-    assert decision["direction"] == "BUY"
+    assert "decision" not in ENGINE_STATUS
+    assert "decision" not in {engine.value for engine in EngineName}
 
 
 def test_calibration_never_returns_raw_only() -> None:

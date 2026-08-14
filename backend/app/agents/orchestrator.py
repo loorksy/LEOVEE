@@ -48,7 +48,6 @@ from app.agents.tools.registry import ToolContext
 from app.core.errors import ProviderConfigurationError
 from app.core.timeframes import DEFAULT_SERIES_TIMEFRAME
 from app.engines.bar import OHLCBar, bars_from_candles
-from app.engines.decision import run_decision_engine
 from app.engines.geometry import run_geometry_engine
 from app.engines.liquidity import run_liquidity_engine
 from app.engines.market_intelligence import run_market_intelligence_engine
@@ -271,10 +270,6 @@ async def run_analysis_orchestrator(
         context=price_context,
         symbol=symbol,
     )
-
-    decision = run_decision_engine(scenarios, risk)
-    decision["timeframe"] = decision_timeframe.value
-    decision["timeframe_rationale"] = choice.rationale
 
     engines = {
         **evidence,

@@ -40,6 +40,8 @@ __all__ = [
     "ScenarioOutput",
     "MarketIntelligenceOutput",
     "MtfOutput",
+    "RiskOutput",
+    "PriceContextModel",
     "PlanSanityOutput",
     "EngineBundle",
     "parse_engine_output",
@@ -60,7 +62,6 @@ class EngineName(StrEnum):
     MTF = "mtf"
     RISK = "risk"
     PLAN_SANITY = "plan_sanity"
-    DECISION = "decision"
 
 
 class UnavailableReason(StrEnum):
@@ -184,26 +185,62 @@ class MtfOutput(_Base):
     frames: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
-class SpreadEstimateModel(BaseModel):
+class RiskOutput(_Base):
+    """Position risk from the plan's own levels.
+
+    Untyped until now, which is how it kept a `spread_cost` field describing a
+    thirty-pip constant nobody had measured (ADR 0010) with nothing to notice.
+    The direction is *read off the levels* rather than passed in, so a stop above
+    entry is a short rather than an invalid plan.
+    """
+
+    approved: bool
+    decision: Literal["TRADE", "NO_TRADE"]
+    reason: str | None = None
+    direction: Literal["BUY", "SELL"] | None = None
+    position_size_units: float | None = None
+    risk_distance: float | None = None
+    risk_pips: float | None = None
+    #: None rather than a negative number when a target sits on the stop's side:
+    #: a negative ratio downstream reads as a very confident bad trade.
+    reward_risk: float | None = None
+    pip_size: float | None = None
+
+
+class PriceContextModel(BaseModel):
+    """What the candles say about how this market moves right now.
+
+    This replaced a `SpreadEstimateModel` carrying pips, a trading session and a
+    `source: "observed" | "static_model"` provenance flag — the typed face of a
+    cost model that no longer exists (ADR 0010). Nothing here is estimated:
+    `noise` is the median wick measured off the bars, `atr` is measured
+    volatility, and `observed_spread` is present only when a live quote was
+    supplied and gates nothing.
+    """
+
     model_config = ConfigDict(frozen=True)
 
-    pips: float
-    price: float
-    session: Literal["asia", "london", "new_york", "london_new_york_overlap"]
-    #: The provenance rule in one field.
-    source: Literal["observed", "static_model"]
+    #: Median wick per bar — the part of the range price gave back.
+    noise: float
+    atr: float
+    last_close: float
+    bars: int
+    #: A live quote when there was one. Never modelled, never a gate.
+    observed_spread: float | None = None
 
 
 class PlanSanityOutput(_Base):
     viable: bool
     failures: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-    spread: SpreadEstimateModel
+    context: PriceContextModel
     stop_distance: float
     stop_distance_pips: float
-    round_trip_pips: float
-    required_target_pips: float | None = None
-    first_target_pips: float | None = None
+    #: How many times the plan's stop covers the measured wick noise.
+    stop_noise_multiple: float | None = None
+    required_stop_distance: float | None = None
+    #: The first target's distance in ATR.
+    first_target_atr: float | None = None
     reward_risk: float | None = None
 
 
@@ -217,6 +254,7 @@ _OUTPUT_MODELS: dict[EngineName, type[_Base]] = {
     EngineName.SCENARIOS: ScenarioOutput,
     EngineName.MARKET_INTELLIGENCE: MarketIntelligenceOutput,
     EngineName.MTF: MtfOutput,
+    EngineName.RISK: RiskOutput,
     EngineName.PLAN_SANITY: PlanSanityOutput,
 }
 
@@ -251,3 +289,8 @@ class EngineBundle(BaseModel):
     scenarios: ScenarioOutput | EngineUnavailable
     market_intelligence: MarketIntelligenceOutput | EngineUnavailable
     mtf: MtfOutput | EngineUnavailable
+    # Both were missing, so the bundle described eight of the ten engines the
+    # orchestrator actually assembles — and the two it omitted are the two
+    # that carry the plan's own numbers.
+    risk: RiskOutput | EngineUnavailable
+    plan_sanity: PlanSanityOutput | EngineUnavailable

@@ -89,3 +89,10 @@ candles: `INSUFFICIENT_BARS` and `NO_READABLE_STRUCTURE`.
   candidate signals it named — "spread as a fraction of the expected move" is
   precisely the modelled quantity being removed here.
 - `docs/AICHART_MIGRATION_PLAN.md` records this as owner decision **D12**.
+- `PlanSanityOutput`'s typed contract carried a `SpreadEstimateModel` — pips, a
+  trading session, and a `source: "observed" | "static_model"` provenance flag —
+  for a whole phase after the model it described was deleted. Nothing noticed,
+  because the parser it feeds is not wired in yet. It is now `PriceContextModel`,
+  and `test_engine_contracts.py` runs every engine on real bars and validates
+  what actually comes back, so a contract that drifts from its engine fails
+  there instead of at the moment something first tries to parse it.

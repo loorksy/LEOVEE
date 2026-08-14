@@ -58,7 +58,6 @@ ENGINE_STATUS: dict[str, EngineStatus] = {
     "volatility": EngineStatus.IMPLEMENTED,
     # Genuine arithmetic over its inputs (garbage-in still applies).
     "risk": EngineStatus.IMPLEMENTED,
-    "decision": EngineStatus.IMPLEMENTED,
     # Ported in M4 over the M2 primitives: swing detection, level clustering
     # and trend inference.
     "structure": EngineStatus.IMPLEMENTED,
@@ -82,6 +81,10 @@ ENGINE_STATUS: dict[str, EngineStatus] = {
     # M4: bias measured per frame from the bars, with conflict reported rather
     # than averaged away, and the three constitutional roles named.
     "mtf": EngineStatus.IMPLEMENTED,
+    # Whether the plan survives the tape it was written for, measured from the
+    # candles: the stop against the median wick, the target against ATR. No cost
+    # model and no assumed spread (ADR 0010).
+    "plan_sanity": EngineStatus.IMPLEMENTED,
 }
 
 

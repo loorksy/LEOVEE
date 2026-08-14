@@ -244,6 +244,33 @@ async def recommendation_tracker_job(_ctx: dict[str, object]) -> str:
     )
 
 
+async def recommendation_reevaluation_job(_ctx: dict[str, object]) -> str:
+    """Ask whether each open plan is still the plan the analysis would write today.
+
+    Distinct from the tracker, which asks a cheap deterministic question about
+    price against the plan's own levels. This one may spend a model call, so it
+    runs on the cooldown's cadence and its own admission rules — one automatic
+    cycle per sweep, a cooldown between them, and a lifetime cap — bound what it
+    spends. Nothing here changes a plan directly: a trigger requests a decision,
+    and only the decision's output may revise anything.
+    """
+    factory = get_session_factory()
+    if factory is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    from app.services.recommendations.worker import run_reevaluation_sweep
+
+    async with factory() as session:
+        report = await run_reevaluation_sweep(session)
+        await session.commit()
+    verdicts = ",".join(f"{name}={count}" for name, count in sorted(report.cycles.items()))
+    return (
+        "recommendation_reevaluation_ok:"
+        f"plans={report.plans},detected={report.detected},"
+        f"admitted={report.admitted},suppressed={report.suppressed}"
+        f"{',' + verdicts if verdicts else ''}"
+    )
+
+
 async def reload_platform_secrets_job(_ctx: dict[str, object]) -> str:
     """Keep worker Settings in sync with admin-managed DB secrets."""
     factory = get_session_factory()
@@ -277,6 +304,7 @@ class WorkerSettings:
         alert_evaluation_job,
         reload_platform_secrets_job,
         recommendation_tracker_job,
+        recommendation_reevaluation_job,
     ]
     cron_jobs = [
         cron(candle_backfill_job, hour={0}, minute=5),  # type: ignore[arg-type]
@@ -289,6 +317,11 @@ class WorkerSettings:
         # break inside one M15 candle, so an hourly sweep would routinely record
         # the outcome after the move it describes is over.
         cron(recommendation_tracker_job, minute=set(range(0, 60, 5))),  # type: ignore[arg-type]
+        # On the cooldown's cadence. Sweeping faster than the cooldown only
+        # writes suppression rows: the admission rules would refuse every
+        # extra pass, so the work would be a database round trip per plan to
+        # record that nothing was allowed to happen.
+        cron(recommendation_reevaluation_job, minute={0, 15, 30, 45}),  # type: ignore[arg-type]
         cron(memory_decay_job, hour={3}, minute=30),  # type: ignore[arg-type]
         cron(alert_evaluation_job, minute={2, 17, 32, 47}),  # type: ignore[arg-type]
         cron(reload_platform_secrets_job, minute=set(range(60))),  # type: ignore[arg-type]

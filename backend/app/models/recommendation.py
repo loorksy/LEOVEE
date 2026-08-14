@@ -122,3 +122,39 @@ class RecommendationRevision(Base, TimestampMixin, WorkspaceOwnedMixin):
     snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     changes_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RecommendationReevaluation(Base, TimestampMixin, WorkspaceOwnedMixin):
+    """One trigger and what became of it.
+
+    The row exists whether or not a cycle followed. A suppressed trigger is not
+    a non-event — it is the answer to "the structure broke, why did nothing
+    happen", and without it that question has no record to consult.
+
+    ``outcome`` carries both halves of the story: ``requested``/``suppressed``
+    describe admission, and ``confirmed``/``revised``/``invalidated``/``skipped``
+    describe what the cycle concluded. They are one column because a trigger has
+    exactly one fate, and splitting them into two invites rows where both are set
+    and disagree.
+    """
+
+    __tablename__ = "recommendation_reevaluations"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    recommendation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("recommendations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    reason: Mapped[str] = mapped_column(String(48), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Which component noticed — never the decider.
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: The revision in force when the trigger was raised. A trigger whose plan
+    #: has been revised since is about a plan that no longer exists.
+    revision_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False)
+    raised_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    evidence_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    trigger_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    decision_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

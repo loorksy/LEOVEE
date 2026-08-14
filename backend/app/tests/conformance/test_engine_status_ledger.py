@@ -12,29 +12,27 @@ import pytest
 
 from app.agents import orchestrator
 from app.engines.status import ENGINE_STATUS, EngineStatus, engine_unavailable, is_unavailable
+from app.schemas.engines import EngineName
 
 pytestmark = pytest.mark.no_db
 
-# Engines the orchestrator assembles into its evidence bundle. Kept here so a
-# new engine cannot be added to the pipeline without a status decision.
-EXPECTED_ENGINES = {
-    "volatility",
-    "structure",
-    "geometry",
-    "liquidity",
-    "zones",
-    "scenarios",
-    "market_intelligence",
-    "mtf",
-    "risk",
-    "decision",
-}
+#: Derived, not listed. This used to be a third hand-written set of engine
+#: names beside the ledger and the contract registry, and three copies of a list
+#: do not check each other — they agree on the same omission. `plan_sanity` was
+#: absent from both this set and the ledger for a whole phase while being one of
+#: the engines the orchestrator actually runs, and the guard reported agreement.
+#:
+#: `EngineName` is the single authority for what an engine *is*, because it is
+#: what `parse_engine_output` dispatches on. Anything the orchestrator assembles
+#: that is not in it — the timeframe selection, the per-frame intelligence — is
+#: not an engine and has no status to declare.
+EXPECTED_ENGINES = {engine.value for engine in EngineName}
 
 
 def test_ledger_covers_exactly_the_pipeline_engines() -> None:
     assert set(ENGINE_STATUS) == EXPECTED_ENGINES, (
-        "app/engines/status.py and the orchestrator's engine set have diverged; "
-        "every engine in the pipeline needs an explicit status"
+        "app/engines/status.py and the engine contract registry have diverged; "
+        "every engine needs an explicit status and a typed output contract"
     )
 
 
