@@ -50,6 +50,16 @@ export const en: Dictionary = {
   "nav.trades": "Trades",
   "nav.watchlist": "Watchlist",
 
+  "shell.openMenu": "Open menu",
+  "shell.closeMenu": "Close menu",
+  "shell.collapseSidebar": "Collapse sidebar",
+  "shell.expandSidebar": "Expand sidebar",
+  "shell.navigation": "Navigation",
+  "shell.account": "Account",
+
+  "theme.switchToLight": "Switch to light mode",
+  "theme.switchToDark": "Switch to dark mode",
+
   "auth.creatingAccount": "Creating account…",
   "auth.email": "Email",
   "auth.error.loginFailed": "Login failed",

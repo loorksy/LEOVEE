@@ -116,7 +116,11 @@ describe("AA contrast on the trading palette", () => {
   //: Tokens that color text: AA normal text, 4.5:1.
   const TEXT_TOKENS = ["foreground", "muted-foreground", "buy", "sell", "success", "warning", "destructive"];
   //: Tokens that color UI components and large accents: AA non-text, 3:1.
-  const COMPONENT_TOKENS = ["info", "accent"];
+  // `accent` itself is a neutral hover/highlight background tint, not a
+  // foreground role — it is deliberately low-contrast against its own
+  // surface, so it is excluded here. `primary` is the actionable, legible
+  // accent this product spends color on (monochrome, no brand indigo).
+  const COMPONENT_TOKENS = ["info", "primary"];
   const SURFACES = ["background", "card"];
 
   function paletteFor(mode: string): Record<string, string> {

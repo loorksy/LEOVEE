@@ -17,7 +17,8 @@ export function LocaleSwitcher() {
   const { locale, setLocale, t } = useLocale();
   return (
     <label className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span>{t("settings.language")}</span>
+      <span className="hidden sm:inline">{t("settings.language")}</span>
+      <span className="sr-only sm:hidden">{t("settings.language")}</span>
       <select
         data-testid="locale-switcher"
         value={locale}

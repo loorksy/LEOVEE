@@ -302,13 +302,12 @@ describe("Batch 3 mocked end-to-end flow", () => {
     fireEvent.click(screen.getByTestId("nav-recommendations"));
     expect(await screen.findByText("XAUUSD BUY")).toBeInTheDocument();
 
-    // See the recalled memory in chat. The "new conversation" button is the only
-    // button on the chat page besides the shell's sign-out control.
+    // See the recalled memory in chat. The "new conversation" button is the
+    // page's own first button — scoped to app-main so shell chrome (menu
+    // toggle, theme toggle, sign-out) is never a candidate.
     fireEvent.click(screen.getByTestId("nav-chat"));
     const newConversationButton = await waitFor(() => {
-      const candidate = screen
-        .getAllByRole("button")
-        .find((button) => button.getAttribute("data-testid") !== "nav-signout");
+      const candidate = within(screen.getByTestId("app-main")).getAllByRole("button")[0];
       expect(candidate).toBeDefined();
       return candidate as HTMLElement;
     });

@@ -1,5 +1,49 @@
+/* Self-hosted, not CDN-linked: the build stays network-independent and the
+   Arabic weight range (Cairo) plus numeric weights (JetBrains Mono, for
+   every price/id/code per DESIGN.md) are pinned exactly. */
+@import "@fontsource/cairo/400.css";
+@import "@fontsource/cairo/500.css";
+@import "@fontsource/cairo/600.css";
+@import "@fontsource/cairo/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
 @import "../styles/tokens.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    /* Motion is limited to state feedback per DESIGN.md — this is the one
+       global exception, for viewers who ask the OS to skip non-essential
+       animation entirely. */
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  body {
+    font-family: theme("fontFamily.sans");
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: theme("fontFamily.mono");
+  }
+}

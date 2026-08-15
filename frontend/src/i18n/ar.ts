@@ -53,6 +53,16 @@ export const ar = {
   "nav.trades": "الصفقات",
   "nav.watchlist": "قائمة المتابعة",
 
+  "shell.openMenu": "فتح القائمة",
+  "shell.closeMenu": "إغلاق القائمة",
+  "shell.collapseSidebar": "طيّ القائمة الجانبية",
+  "shell.expandSidebar": "توسيع القائمة الجانبية",
+  "shell.navigation": "التنقّل",
+  "shell.account": "الحساب",
+
+  "theme.switchToLight": "التبديل إلى الوضع الفاتح",
+  "theme.switchToDark": "التبديل إلى الوضع الداكن",
+
   "auth.creatingAccount": "جارٍ إنشاء الحساب…",
   "auth.email": "البريد الإلكتروني",
   "auth.error.loginFailed": "تعذّر تسجيل الدخول",
