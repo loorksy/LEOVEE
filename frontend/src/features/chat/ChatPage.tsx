@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Plus } from "lucide-react";
 import {
   createConversation,
   listConversations,
@@ -17,6 +18,13 @@ import {
 import { useLocale } from "@/i18n/context";
 import { MessageContent } from "@/artifacts/MessageContent";
 import type { ChatArtifact } from "@/artifacts/types";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/lib/cn";
 
 export function ChatPage() {
   const { t } = useLocale();
@@ -27,6 +35,10 @@ export function ChatPage() {
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  // Mobile only: the conversation list and the active thread share one
+  // column and only one shows at a time. sm:+ always shows both side by
+  // side regardless of this flag — see the className ternaries below.
+  const [mobileListOpen, setMobileListOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
   const providersQuery = useQuery({
@@ -46,6 +58,10 @@ export function ChatPage() {
     enabled: Boolean(activeId),
   });
 
+  const activeConversation = conversationsQuery.data?.items.find(
+    (conversation) => conversation.id === activeId,
+  );
+
   const createMutation = useMutation({
     mutationFn: () => createConversation({ title: t("chat.new") }),
     onSuccess: async ({ id }) => {
@@ -53,9 +69,18 @@ export function ChatPage() {
       setLastRecall(null);
       setStreamingText("");
       setStreamError(null);
+      setMobileListOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
   });
+
+  const selectConversation = (id: string) => {
+    setActiveId(id);
+    setLastRecall(null);
+    setStreamingText("");
+    setStreamError(null);
+    setMobileListOpen(false);
+  };
 
   const sendStreaming = async (content: string) => {
     if (!activeId) return;
@@ -105,7 +130,8 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6">
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <PageHeader title={t("nav.chat")} testId="chat-title" />
       {providersQuery.isSuccess && !llmConfigured && (
         <ProviderNotConfiguredBanner
           title={t("chat.error.llm")}
@@ -113,78 +139,121 @@ export function ChatPage() {
           testId="chat-llm-not-configured"
         />
       )}
-      <div className="flex flex-1 gap-4">
-        <aside className="w-64 shrink-0 rounded-lg border border-slate-800 bg-leovee-panel p-3">
-          <button
+      <div className="flex min-h-0 flex-1 gap-4">
+        <Card
+          className={cn(
+            "w-full min-w-0 flex-col gap-3 p-3 sm:flex sm:w-64 sm:shrink-0",
+            mobileListOpen ? "flex" : "hidden sm:flex",
+          )}
+        >
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("chat.conversations")}
+          </h2>
+          <Button
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
-            className="mb-3 w-full rounded bg-leovee-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+            data-testid="chat-new-conversation"
+            className="w-full"
           >
+            <Plus className="size-4" aria-hidden="true" />
             {t("chat.new")}
-          </button>
-          <ul className="space-y-1 text-sm">
-            {conversationsQuery.data?.items.map((conversation) => (
-              <li key={conversation.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveId(conversation.id);
-                    setLastRecall(null);
-                    setStreamingText("");
-                    setStreamError(null);
-                  }}
-                  className={`block w-full truncate rounded px-2 py-1.5 text-start ${
-                    activeId === conversation.id
-                      ? "bg-slate-800 text-white"
-                      : "text-slate-300 hover:bg-slate-800"
-                  }`}
-                >
-                  {conversation.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-        <section className="flex flex-1 flex-col rounded-lg border border-slate-800 bg-leovee-panel p-4">
-          {!activeId && <p className="text-slate-400">{t("chat.select")}</p>}
+          </Button>
+          {conversationsQuery.isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-11 w-full sm:h-8" />
+              <Skeleton className="h-11 w-full sm:h-8" />
+              <Skeleton className="h-11 w-full sm:h-8" />
+            </div>
+          ) : conversationsQuery.data && conversationsQuery.data.items.length > 0 ? (
+            <ul className="flex-1 space-y-1 overflow-y-auto text-sm">
+              {conversationsQuery.data.items.map((conversation) => (
+                <li key={conversation.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectConversation(conversation.id)}
+                    className={cn(
+                      "flex min-h-11 w-full items-center truncate rounded-md px-2 text-start text-sm transition-colors sm:min-h-0 sm:py-1.5",
+                      activeId === conversation.id
+                        ? "bg-muted font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {conversation.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="flex-1 text-sm text-muted-foreground">{t("chat.noConversations")}</p>
+          )}
+        </Card>
+        <Card
+          className={cn(
+            "min-w-0 flex-1 flex-col p-4",
+            mobileListOpen ? "hidden sm:flex" : "flex",
+          )}
+        >
+          {!activeId && <p className="text-muted-foreground">{t("chat.select")}</p>}
           {activeId && (
             <>
-              <div className="flex-1 space-y-3 overflow-auto" data-testid="message-list">
-                {messagesQuery.data?.items.map((message) => (
-                  <div
-                    key={message.id}
-                    className={message.role === "user" ? "text-end" : "text-start"}
-                  >
-                    {message.role === "user" ? (
-                      <p className="inline-block max-w-lg rounded bg-leovee-accent px-3 py-2 text-sm text-white">
-                        {message.content}
-                      </p>
-                    ) : (
-                      <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
-                        <MessageContent
-                          content={message.content}
-                          artifacts={
-                            (message.content_json?.artifacts as ChatArtifact[] | undefined) ?? null
-                          }
-                        />
+              <div className="mb-3 flex items-center gap-2 border-b border-border pb-3 sm:hidden">
+                <IconButton
+                  aria-label={t("chat.backToConversations")}
+                  data-testid="chat-mobile-back"
+                  onClick={() => setMobileListOpen(true)}
+                >
+                  <ArrowLeft className="size-5 rtl:rotate-180" aria-hidden="true" />
+                </IconButton>
+                <span className="truncate text-sm font-medium text-foreground">
+                  {activeConversation?.title}
+                </span>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto" data-testid="message-list">
+                {messagesQuery.isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-2/3" />
+                    <Skeleton className="ms-auto h-12 w-1/2" />
+                  </div>
+                ) : (
+                  <>
+                    {messagesQuery.data?.items.map((message) => (
+                      <div
+                        key={message.id}
+                        className={message.role === "user" ? "text-end" : "text-start"}
+                      >
+                        {message.role === "user" ? (
+                          <p className="inline-block max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground sm:max-w-lg">
+                            {message.content}
+                          </p>
+                        ) : (
+                          <div className="inline-block max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm text-foreground sm:max-w-2xl">
+                            <MessageContent
+                              content={message.content}
+                              artifacts={
+                                (message.content_json?.artifacts as ChatArtifact[] | undefined) ??
+                                null
+                              }
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
-                {streamingText ? (
-                  <div className="text-start" data-testid="streaming-assistant">
-                    <div className="inline-block max-w-2xl rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">
-                      <MessageContent content={streamingText} />
-                      <span className="ms-1 inline-block h-3 w-1 animate-pulse bg-slate-400" />
-                    </div>
-                  </div>
-                ) : null}
+                    ))}
+                    {streamingText ? (
+                      <div className="text-start" data-testid="streaming-assistant">
+                        <div className="inline-block max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm text-foreground sm:max-w-2xl">
+                          <MessageContent content={streamingText} />
+                          <span className="ms-1 inline-block h-3 w-1 animate-pulse bg-muted-foreground" />
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
               {lastRecall && (
                 <div
                   data-testid="recall-panel"
-                  className="mt-3 rounded border border-sky-800 bg-sky-950/40 p-3 text-xs text-sky-200"
+                  className="mt-3 rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info"
                 >
                   <p className="font-semibold uppercase tracking-wide">
                     {lastRecall.label ?? t("chat.recall")} ·{" "}
@@ -199,38 +268,37 @@ export function ChatPage() {
                   )}
                 </div>
               )}
-              {streamError && <p className="mt-2 text-sm text-amber-400">{streamError}</p>}
+              {streamError && (
+                <p className="mt-2 text-sm text-destructive" data-testid="chat-stream-error">
+                  {streamError}
+                </p>
+              )}
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (draft.trim() && !isStreaming && llmConfigured) void sendStreaming(draft.trim());
                 }}
-                className="mt-3 flex gap-2"
+                className="mt-3 flex flex-col gap-2 sm:flex-row"
               >
                 <label htmlFor="chat-draft" className="sr-only">
                   {t("chat.message")}
                 </label>
-                <input
+                <Input
                   id="chat-draft"
                   data-testid="chat-draft-input"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder={t("chat.placeholder")}
-                  className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
+                  className="flex-1"
                   disabled={isStreaming || !llmConfigured}
                 />
-                <button
-                  type="submit"
-                  data-testid="chat-send"
-                  disabled={isStreaming || !llmConfigured}
-                  className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-                >
+                <Button type="submit" data-testid="chat-send" disabled={isStreaming || !llmConfigured}>
                   {isStreaming ? t("chat.streaming") : t("chat.send")}
-                </button>
+                </Button>
               </form>
             </>
           )}
-        </section>
+        </Card>
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { Entitlements } from "@/features/admin/types";
 import { useLocale } from "@/i18n/context";
 
@@ -15,42 +17,51 @@ type Props = {
 
 export function AdminEntitlementsPanel({ entitlements, auditSummary, loading }: Props) {
   const { t } = useLocale();
-  if (loading) {
-    return <p className="text-slate-400">{t("common.loading")}</p>;
-  }
   return (
-    <section className="rounded-lg border border-slate-800 bg-leovee-panel p-6">
-      <h2 className="text-lg font-semibold text-slate-100">{t("admin.entitlements.title")}</h2>
-      {entitlements ? (
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-slate-500">{t("admin.entitlements.plan")}</dt>
-            <dd className="text-slate-100">{formatPlanLabel(entitlements)}</dd>
+    <Card data-testid="admin-entitlements-panel">
+      <CardHeader>
+        <CardTitle>{t("admin.entitlements.title")}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {loading && (
+          <div className="flex flex-col gap-2" data-testid="admin-entitlements-loading">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-10 w-full" />
           </div>
-          <div>
-            <dt className="text-slate-500">{t("admin.entitlements.subscription")}</dt>
-            <dd className="text-slate-100">{entitlements.subscription_status ?? "—"}</dd>
-          </div>
-        </dl>
-      ) : (
-        <p className="mt-2 text-slate-400">{t("admin.entitlements.empty")}</p>
-      )}
-      {entitlements?.limits && (
-        <ul className="mt-4 list-inside list-disc text-sm text-slate-300">
-          {Object.entries(entitlements.limits).map(([key, value]) => (
-            <li key={key}>
-              {key}: {value}
-            </li>
-          ))}
-        </ul>
-      )}
-      {auditSummary && (
-        <p className="mt-4 text-xs text-slate-500" data-testid="admin-audit-summary">
-          {t("admin.entitlements.audit")} — {t("admin.entitlements.users")}:{" "}
-          {auditSummary.users ?? 0}, {t("admin.entitlements.workspaces")}:{" "}
-          {auditSummary.workspaces ?? 0}
-        </p>
-      )}
-    </section>
+        )}
+        {!loading && entitlements && (
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">{t("admin.entitlements.plan")}</dt>
+              <dd className="text-foreground">{formatPlanLabel(entitlements)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{t("admin.entitlements.subscription")}</dt>
+              <dd className="text-foreground">{entitlements.subscription_status ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
+        {!loading && !entitlements && (
+          <p className="text-sm text-muted-foreground">{t("admin.entitlements.empty")}</p>
+        )}
+        {!loading && entitlements?.limits && (
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            {Object.entries(entitlements.limits).map(([metric, limit]) => (
+              <div key={metric}>
+                <dt className="text-muted-foreground">{metric}</dt>
+                <dd className="font-mono text-foreground">{String(limit)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {!loading && auditSummary && (
+          <p className="text-xs text-muted-foreground" data-testid="admin-audit-summary">
+            {t("admin.entitlements.audit")} — {t("admin.entitlements.users")}:{" "}
+            {auditSummary.users ?? 0}, {t("admin.entitlements.workspaces")}:{" "}
+            {auditSummary.workspaces ?? 0}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,6 @@
 import { useLocale } from "@/i18n/context";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import type { CalibrationBin, MemoryListItem } from "./types";
 
 type Props = {
@@ -10,31 +12,39 @@ type Props = {
 export function MemoryPanel({ memories, bins, onDelete }: Props) {
   const { t } = useLocale();
   return (
-    <section className="grid gap-6 md:grid-cols-2">
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-100">{t("memory.workspace")}</h2>
-        <ul className="space-y-2">
-          {memories.map((memory) => (
-            <li
-              key={memory.id}
-              className="flex items-start justify-between gap-3 rounded border border-slate-700 p-3"
-            >
-              <div>
-                <p className="font-medium text-slate-100">{memory.key}</p>
-                <p className="text-xs text-slate-400">{memory.type}</p>
-              </div>
-              <button
-                type="button"
-                data-testid={`memory-delete-${memory.id}`}
-                className="text-sm text-red-400 hover:text-red-300"
-                onClick={() => onDelete(memory.id)}
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("memory.workspace")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="flex flex-col gap-2">
+            {memories.map((memory) => (
+              <li
+                key={memory.id}
+                className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
               >
-                {t("common.delete")}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm font-medium text-foreground">
+                    {memory.key}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{memory.type}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  data-testid={`memory-delete-${memory.id}`}
+                  onClick={() => onDelete(memory.id)}
+                  className="shrink-0"
+                >
+                  {t("common.delete")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
       <CalibrationChart bins={bins} />
     </section>
   );
@@ -44,18 +54,22 @@ function CalibrationChart({ bins }: { bins: CalibrationBin[] }) {
   const { t } = useLocale();
   const max = Math.max(1, ...bins.map((b) => b.predicted_count));
   return (
-    <div>
-      <h2 className="mb-3 text-lg font-semibold text-slate-100">{t("memory.calibration")}</h2>
-      <div className="flex h-40 items-end gap-1">
-        {bins.map((bin) => (
-          <div
-            key={`${bin.bin_lower}-${bin.bin_upper}`}
-            className="flex-1 bg-sky-600"
-            style={{ height: `${(bin.predicted_count / max) * 100}%` }}
-            title={`${bin.bin_lower}-${bin.bin_upper}`}
-          />
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("memory.calibration")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex h-40 items-end gap-1">
+          {bins.map((bin) => (
+            <div
+              key={`${bin.bin_lower}-${bin.bin_upper}`}
+              className="flex-1 rounded-t bg-chart-1"
+              style={{ height: `${(bin.predicted_count / max) * 100}%` }}
+              title={`${bin.bin_lower}-${bin.bin_upper}`}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

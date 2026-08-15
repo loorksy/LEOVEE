@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLinkCode, listLinks, revokeLink, type LinkCode } from "@/api/telegram";
 import { useLocale } from "@/i18n/context";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Linking a Telegram account, from inside the platform (ADR 0009).
@@ -37,73 +39,76 @@ export function TelegramSettings() {
   const links = linksQuery.data ?? [];
 
   return (
-    <section className="flex flex-col gap-6" data-testid="telegram-settings">
-      <header>
-        <h2 className="text-xl font-semibold text-slate-100">{t("telegram.title")}</h2>
-        <p className="mt-1 text-slate-400">{t("telegram.intro")}</p>
-      </header>
-
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          className="self-start rounded bg-sky-600 px-4 py-2 text-white"
-          onClick={() => codeMutation.mutate()}
-          disabled={codeMutation.isPending}
-        >
-          {t("telegram.generate")}
-        </button>
-
-        {issued ? (
-          <div
-            className="rounded border border-slate-700 bg-slate-900 p-4"
-            data-testid="telegram-link-code"
+    <Card data-testid="telegram-settings" className="sm:max-w-lg">
+      <CardHeader>
+        <CardTitle>{t("telegram.title")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("telegram.intro")}</p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <Button
+            type="button"
+            className="self-start"
+            onClick={() => codeMutation.mutate()}
+            disabled={codeMutation.isPending}
           >
-            <p className="text-slate-300">{t("telegram.codeLabel")}</p>
-            <p className="mt-2 font-mono text-2xl tracking-widest text-slate-100">
-              {issued.code}
-            </p>
-            <p className="mt-2 text-sm text-slate-400">
-              {t("telegram.expires")}: {new Date(issued.expires_at).toLocaleTimeString()}
-            </p>
-            <p className="mt-2 text-sm text-slate-400">{issued.note}</p>
-          </div>
-        ) : null}
-      </div>
+            {t("telegram.generate")}
+          </Button>
 
-      <div className="flex flex-col gap-2">
-        <h3 className="text-lg text-slate-200">{t("telegram.linked")}</h3>
-        {links.length === 0 ? (
-          <p className="text-slate-400">{t("telegram.none")}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {links.map((link) => (
-              <li
-                key={link.telegram_user_id}
-                className="flex items-center justify-between rounded border border-slate-700 p-3"
-                data-testid={`telegram-link-${link.telegram_user_id}`}
-              >
-                <span className="text-slate-200">
-                  {link.telegram_username ? `@${link.telegram_username}` : link.telegram_user_id}
-                  <span className="ms-3 text-sm text-slate-400">
-                    {t("telegram.lastMessage")}:{" "}
-                    {link.last_message_at
-                      ? new Date(link.last_message_at).toLocaleString()
-                      : t("telegram.never")}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="rounded border border-slate-600 px-3 py-1 text-slate-200"
-                  onClick={() => revokeMutation.mutate(link.telegram_user_id)}
-                  disabled={revokeMutation.isPending}
+          {issued ? (
+            <div
+              className="rounded-lg border border-border bg-muted/50 p-4"
+              data-testid="telegram-link-code"
+            >
+              <p className="text-sm text-foreground">{t("telegram.codeLabel")}</p>
+              <p className="mt-2 font-mono text-2xl tracking-widest text-foreground">
+                {issued.code}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("telegram.expires")}: {new Date(issued.expires_at).toLocaleTimeString()}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{issued.note}</p>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-foreground">{t("telegram.linked")}</h3>
+          {links.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("telegram.none")}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {links.map((link) => (
+                <li
+                  key={link.telegram_user_id}
+                  className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  data-testid={`telegram-link-${link.telegram_user_id}`}
                 >
-                  {t("telegram.revoke")}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
+                  <span className="text-sm text-foreground">
+                    {link.telegram_username ? `@${link.telegram_username}` : link.telegram_user_id}
+                    <span className="ms-3 text-sm text-muted-foreground">
+                      {t("telegram.lastMessage")}:{" "}
+                      {link.last_message_at
+                        ? new Date(link.last_message_at).toLocaleString()
+                        : t("telegram.never")}
+                    </span>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 self-start sm:self-center"
+                    onClick={() => revokeMutation.mutate(link.telegram_user_id)}
+                    disabled={revokeMutation.isPending}
+                  >
+                    {t("telegram.revoke")}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

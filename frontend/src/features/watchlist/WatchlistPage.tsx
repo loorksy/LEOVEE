@@ -9,6 +9,13 @@ import {
 } from "@/api/watchlist";
 import { useWatchlistQuotesStream } from "@/features/watchlist/useWatchlistQuotesStream";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Trash2 } from "lucide-react";
 
 const QUOTE_POLL_MS = 15_000;
 
@@ -62,113 +69,128 @@ export function WatchlistPage() {
   const items = watchlistsQuery.data?.items ?? [];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("watchlist.title")}</h1>
-        <p className="mt-1 text-slate-400">{t("watchlist.intro")}</p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="watchlist-title"
+        title={t("watchlist.title")}
+        description={t("watchlist.intro")}
+      />
 
       <form
         onSubmit={(event) => {
           event.preventDefault();
           if (newListName.trim()) createMutation.mutate(newListName.trim());
         }}
-        className="flex gap-2"
+        className="flex flex-col gap-2 sm:flex-row"
       >
         <label htmlFor="new-watchlist-name" className="sr-only">
           {t("watchlist.newName")}
         </label>
-        <input
+        <Input
           id="new-watchlist-name"
           data-testid="new-watchlist-name"
           value={newListName}
           onChange={(event) => setNewListName(event.target.value)}
           placeholder={t("watchlist.newName")}
-          className="w-64 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          className="sm:w-64"
         />
-        <button
-          type="submit"
-          data-testid="create-watchlist"
-          disabled={createMutation.isPending}
-          className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-        >
+        <Button type="submit" data-testid="create-watchlist" disabled={createMutation.isPending}>
           {t("watchlist.create")}
-        </button>
+        </Button>
       </form>
 
-      {watchlistsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
-      {watchlistsQuery.isError && <p className="text-amber-400">{t("common.error.load")}</p>}
+      {watchlistsQuery.isLoading && (
+        <div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="watchlist-loading"
+        >
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Card key={index} className="flex flex-col gap-3 p-3">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </Card>
+          ))}
+        </div>
+      )}
+      {watchlistsQuery.isError && (
+        <p className="text-sm text-destructive">{t("common.error.load")}</p>
+      )}
       {!watchlistsQuery.isLoading && items.length === 0 && (
-        <p className="text-slate-400" data-testid="watchlist-empty">
+        <p className="text-sm text-muted-foreground" data-testid="watchlist-empty">
           {t("watchlist.empty")}
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((wl) => (
-          <section
-            key={wl.id}
-            data-testid={`watchlist-${wl.id}`}
-            className="rounded-lg border border-slate-800 bg-leovee-panel p-4"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-100">{wl.name}</h2>
-              <button
-                type="button"
+          <Card key={wl.id} data-testid={`watchlist-${wl.id}`} className="flex flex-col">
+            <CardHeader className="flex-row items-center justify-between gap-2">
+              <CardTitle className="min-w-0 truncate text-base">{wl.name}</CardTitle>
+              <IconButton
+                aria-label={t("common.delete")}
+                data-testid={`delete-watchlist-${wl.id}`}
                 onClick={() => deleteMutation.mutate(wl.id)}
-                className="text-sm text-red-400 hover:text-red-300"
+                disabled={deleteMutation.isPending}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
-                {t("common.delete")}
-              </button>
-            </div>
-            <ul className="mt-3 space-y-1 text-sm">
-              {wl.symbols.map((sym) => {
-                const price = liveQuotes[sym.code] ?? sym.last_price;
-                return (
-                  <li key={sym.item_id} className="flex justify-between text-slate-300">
-                    <span>{sym.code}</span>
-                    <span data-testid={`quote-${sym.code}`} className="text-slate-100">
-                      {price ?? "—"}
-                    </span>
-                  </li>
-                );
-              })}
-              {wl.symbols.length === 0 && (
-                <li className="text-slate-500">{t("watchlist.noSymbols")}</li>
-              )}
-            </ul>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                const symbol = symbolDrafts[wl.id]?.trim();
-                if (symbol) addSymbolMutation.mutate({ watchlistId: wl.id, symbol });
-              }}
-              className="mt-3 flex gap-2"
-            >
-              <label htmlFor={`symbol-${wl.id}`} className="sr-only">
-                {t("watchlist.addSymbol")}
-              </label>
-              <input
-                id={`symbol-${wl.id}`}
-                value={symbolDrafts[wl.id] ?? ""}
-                onChange={(event) =>
-                  setSymbolDrafts((prev) => ({
-                    ...prev,
-                    [wl.id]: event.target.value.toUpperCase(),
-                  }))
-                }
-                placeholder={DEFAULT_SYMBOL}
-                className="w-32 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
-              />
-              <button
-                type="submit"
-                disabled={addSymbolMutation.isPending}
-                className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                <Trash2 className="size-4" aria-hidden="true" />
+              </IconButton>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-3">
+              <ul className="flex flex-col gap-1 text-sm">
+                {wl.symbols.map((sym) => {
+                  const price = liveQuotes[sym.code] ?? sym.last_price;
+                  return (
+                    <li
+                      key={sym.item_id}
+                      className="flex items-center justify-between gap-2 text-muted-foreground"
+                    >
+                      <span className="font-mono">{sym.code}</span>
+                      <span data-testid={`quote-${sym.code}`} className="font-mono text-foreground">
+                        {price ?? "—"}
+                      </span>
+                    </li>
+                  );
+                })}
+                {wl.symbols.length === 0 && (
+                  <li className="text-muted-foreground">{t("watchlist.noSymbols")}</li>
+                )}
+              </ul>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const symbol = symbolDrafts[wl.id]?.trim();
+                  if (symbol) addSymbolMutation.mutate({ watchlistId: wl.id, symbol });
+                }}
+                className="mt-auto flex flex-col gap-2 sm:flex-row"
               >
-                {t("watchlist.add")}
-              </button>
-            </form>
-          </section>
+                <label htmlFor={`symbol-${wl.id}`} className="sr-only">
+                  {t("watchlist.addSymbol")}
+                </label>
+                <Input
+                  id={`symbol-${wl.id}`}
+                  value={symbolDrafts[wl.id] ?? ""}
+                  onChange={(event) =>
+                    setSymbolDrafts((prev) => ({
+                      ...prev,
+                      [wl.id]: event.target.value.toUpperCase(),
+                    }))
+                  }
+                  placeholder={DEFAULT_SYMBOL}
+                  className="sm:w-32"
+                />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  disabled={addSymbolMutation.isPending}
+                >
+                  {t("watchlist.add")}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>

@@ -1,18 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchHealth } from "@/api/health";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 function HealthErrorMessage() {
   const { t } = useLocale();
   if (import.meta.env.DEV) {
     return (
-      <p className="mt-2 text-amber-400">
+      <p className="mt-2 text-sm text-destructive">
         {t("dashboard.error.dev")}{" "}
-        <code className="rounded bg-slate-800 px-1">docker compose up</code>.
+        <code className="rounded bg-muted px-1 font-mono text-xs">docker compose up</code>.
       </p>
     );
   }
-  return <p className="mt-2 text-amber-400">{t("dashboard.error.unreachable")}</p>;
+  return <p className="mt-2 text-sm text-destructive">{t("dashboard.error.unreachable")}</p>;
 }
 
 export function HomePage() {
@@ -28,30 +31,38 @@ export function HomePage() {
     data.checks?.redis?.ok !== false;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold" data-testid="home-title">
-          {t("dashboard.title")}
-        </h1>
-        <p className="mt-1 text-slate-400">{t("dashboard.subtitle")}</p>
-      </header>
-      <section className="rounded-lg border border-slate-800 bg-leovee-panel p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          {t("dashboard.apiStatus")}
-        </h2>
-        {isLoading && <p className="mt-2 text-slate-400">{t("dashboard.checking")}</p>}
-        {isError && <HealthErrorMessage />}
-        {data !== undefined && !isError && (
-          <div className="mt-2">
-            <p className={healthy ? "text-emerald-400" : "text-amber-400"}>
-              {healthy ? t("dashboard.healthy") : t("dashboard.degraded")}
-            </p>
-            <pre className="mt-2 overflow-auto text-sm text-slate-400">
-              {JSON.stringify(data, null, 2)}
-            </pre>
-          </div>
-        )}
-      </section>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="home-title"
+        title={t("dashboard.title")}
+        description={t("dashboard.subtitle")}
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="uppercase tracking-wide text-muted-foreground">
+            {t("dashboard.apiStatus")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading && (
+            <div className="flex flex-col gap-2" data-testid="home-health-loading">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          )}
+          {isError && <HealthErrorMessage />}
+          {data !== undefined && !isError && (
+            <div className="flex flex-col gap-2">
+              <p className={healthy ? "text-sm text-success" : "text-sm text-warning"}>
+                {healthy ? t("dashboard.healthy") : t("dashboard.degraded")}
+              </p>
+              <pre className="overflow-x-auto rounded-lg bg-muted/50 p-3 font-mono text-xs text-muted-foreground">
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

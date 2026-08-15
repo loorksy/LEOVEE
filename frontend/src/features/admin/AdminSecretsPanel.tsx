@@ -1,4 +1,10 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { AlertCircle, CheckCircle2, Circle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/lib/cn";
 import type { AdminSecretItem } from "@/features/admin/types";
 import { useLocale } from "@/i18n/context";
 import type { TranslationKey } from "@/i18n";
@@ -57,67 +63,97 @@ export function AdminSecretsPanel({
   }
 
   return (
-    <section
-      className="rounded-lg border border-slate-800 bg-leovee-panel p-4"
-      data-testid="admin-secrets-panel"
-    >
-      <h2 className="text-lg font-medium text-slate-100">{t("admin.secrets.title")}</h2>
-      <p className="mt-1 text-sm text-slate-400">
-        {t("admin.secrets.intro")} (
-        <code className="text-slate-300">{oandaEnvironment || "practice"}</code>
-        ). {t("admin.secrets.executionDisabled")}
-      </p>
-
-      {loading && <p className="mt-3 text-sm text-slate-500">{t("common.loading")}</p>}
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-amber-400">
-          {error}
+    <Card data-testid="admin-secrets-panel">
+      <CardHeader>
+        <CardTitle>{t("admin.secrets.title")}</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          {t("admin.secrets.intro")} (
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
+            {oandaEnvironment || "practice"}
+          </code>
+          ). {t("admin.secrets.executionDisabled")}
         </p>
-      )}
-      {success && (
-        <p className="mt-3 text-sm text-emerald-400" data-testid="admin-secrets-saved">
-          {success}
-        </p>
-      )}
+      </CardHeader>
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-        {items.map((item) => (
-          <label key={item.key} className="block text-sm text-slate-300" htmlFor={`secret-${item.key}`}>
-            <span className="flex items-center justify-between gap-2">
-              <span>{LABEL_KEYS[item.key] ? t(LABEL_KEYS[item.key]) : item.key}</span>
-              <span
-                className={item.configured ? "text-emerald-400" : "text-slate-500"}
-                data-testid={`secret-status-${item.key}`}
-                data-configured={item.configured ? "true" : "false"}
-              >
-                {item.configured ? t("admin.secrets.configured") : t("admin.secrets.notSet")}
-              </span>
-            </span>
-            <input
-              id={`secret-${item.key}`}
-              type={item.key === "OANDA_ENVIRONMENT" ? "text" : "password"}
-              autoComplete="off"
-              placeholder={
-                item.configured
-                  ? t("admin.secrets.placeholderKeep")
-                  : t("admin.secrets.placeholderPaste")
-              }
-              value={drafts[item.key] ?? ""}
-              onChange={(event) =>
-                setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))
-              }
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-            />
-          </label>
-        ))}
-        <button
-          type="submit"
-          disabled={saving || loading}
-          className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {saving ? t("admin.secrets.saving") : t("admin.secrets.save")}
-        </button>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="flex flex-col gap-4">
+          {loading && (
+            <div className="flex flex-col gap-3" data-testid="admin-secrets-loading">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              data-testid="admin-secrets-error"
+              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p>{error}</p>
+            </div>
+          )}
+          {success && (
+            <div
+              role="status"
+              data-testid="admin-secrets-saved"
+              className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success"
+            >
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p>{success}</p>
+            </div>
+          )}
+
+          {!loading &&
+            items.map((item) => (
+              <div key={item.key} className="flex flex-col gap-1.5">
+                <label
+                  htmlFor={`secret-${item.key}`}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground"
+                >
+                  <span>{LABEL_KEYS[item.key] ? t(LABEL_KEYS[item.key]) : item.key}</span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 text-xs font-medium",
+                      item.configured ? "text-success" : "text-muted-foreground",
+                    )}
+                    data-testid={`secret-status-${item.key}`}
+                    data-configured={item.configured ? "true" : "false"}
+                  >
+                    {item.configured ? (
+                      <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                    ) : (
+                      <Circle className="size-3.5" aria-hidden="true" />
+                    )}
+                    {item.configured ? t("admin.secrets.configured") : t("admin.secrets.notSet")}
+                  </span>
+                </label>
+                <Input
+                  id={`secret-${item.key}`}
+                  type={item.key === "OANDA_ENVIRONMENT" ? "text" : "password"}
+                  autoComplete="off"
+                  placeholder={
+                    item.configured
+                      ? t("admin.secrets.placeholderKeep")
+                      : t("admin.secrets.placeholderPaste")
+                  }
+                  value={drafts[item.key] ?? ""}
+                  onChange={(event) =>
+                    setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))
+                  }
+                />
+              </div>
+            ))}
+        </CardContent>
+
+        <CardFooter>
+          <Button type="submit" disabled={saving || loading} data-testid="admin-secrets-save">
+            {saving ? t("admin.secrets.saving") : t("admin.secrets.save")}
+          </Button>
+        </CardFooter>
       </form>
-    </section>
+    </Card>
   );
 }

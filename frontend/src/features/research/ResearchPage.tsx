@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
 import { listNews } from "@/api/news";
 import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useLocale } from "@/i18n/context";
 
 export function ResearchPage() {
@@ -14,14 +18,25 @@ export function ResearchPage() {
     newsQuery.isSuccess && newsQuery.data.provider_configured === false;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("research.title")}</h1>
-        <p className="text-sm text-slate-400">{t("research.intro")}</p>
-      </header>
-      {newsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="research-title"
+        title={t("research.title")}
+        description={t("research.intro")}
+      />
+
+      {newsQuery.isLoading && (
+        <div className="flex flex-col gap-3" data-testid="research-loading">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="flex flex-col gap-2 p-3">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </Card>
+          ))}
+        </div>
+      )}
       {newsQuery.isError && (
-        <p className="text-amber-400">{(newsQuery.error as Error).message}</p>
+        <p className="text-sm text-destructive">{(newsQuery.error as Error).message}</p>
       )}
       {notConfigured && (
         <ProviderNotConfiguredBanner
@@ -31,27 +46,26 @@ export function ResearchPage() {
         />
       )}
       {!notConfigured && (
-        <ul className="space-y-3">
+        <ul className="flex flex-col gap-3">
           {(newsQuery.data?.items ?? []).map((item) => (
-            <li
-              key={item.id}
-              className="rounded border border-slate-800 bg-leovee-panel px-4 py-3"
-              data-testid={`news-${item.id}`}
-            >
-              <p className="text-sm font-medium text-slate-100">{item.headline}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {item.source ?? t("research.sourceUnknown")} · {item.published_at}
-              </p>
-              {item.url ? (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 inline-block text-xs text-leovee-accent hover:underline"
-                >
-                  {t("research.openSource")}
-                </a>
-              ) : null}
+            <li key={item.id}>
+              <Card className="p-3 sm:p-4" data-testid={`news-${item.id}`}>
+                <p className="text-sm font-medium text-foreground">{item.headline}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.source ?? t("research.sourceUnknown")} · {item.published_at}
+                </p>
+                {item.url ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    {t("research.openSource")}
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </Card>
             </li>
           ))}
         </ul>
@@ -60,7 +74,7 @@ export function ResearchPage() {
         newsQuery.isSuccess &&
         newsQuery.data.provider_configured &&
         newsQuery.data.items.length === 0 && (
-          <p className="text-slate-400">{t("research.empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("research.empty")}</p>
         )}
     </div>
   );

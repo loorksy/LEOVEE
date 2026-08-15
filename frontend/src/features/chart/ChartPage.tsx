@@ -26,6 +26,9 @@ import {
 } from "@/features/chart/annotationStream";
 import { BACKEND_TIMEFRAMES, backendTimeframeToChart } from "@/features/chart/timeframe";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 
 const DEFAULT_TIMEFRAME = "H1";
@@ -125,15 +128,15 @@ export function ChartPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-100">{t("chart.title")}</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <label htmlFor="chart-symbol" className="sr-only">
-            {t("common.symbol")}
-          </label>
-          <input
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+      <PageHeader testId="chart-title" title={t("chart.title")} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="chart-symbol">
+          {t("common.symbol")}
+          <Input
             id="chart-symbol"
+            data-testid="chart-symbol-input"
+            className="sm:w-40"
             value={symbol}
             onChange={(event) =>
               setSearchParams((prev) => {
@@ -142,13 +145,14 @@ export function ChartPage() {
                 return next;
               })
             }
-            className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
           />
-          <label htmlFor="chart-timeframe" className="sr-only">
-            {t("common.timeframe")}
-          </label>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="chart-timeframe">
+          {t("common.timeframe")}
           <select
             id="chart-timeframe"
+            data-testid="chart-timeframe-select"
+            className="h-11 rounded-md border border-border bg-input px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-28"
             value={timeframe}
             onChange={(event) =>
               setSearchParams((prev) => {
@@ -157,7 +161,6 @@ export function ChartPage() {
                 return next;
               })
             }
-            className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
           >
             {BACKEND_TIMEFRAMES.map((tf) => (
               <option key={tf} value={tf}>
@@ -165,23 +168,20 @@ export function ChartPage() {
               </option>
             ))}
           </select>
-        </div>
-      </header>
+        </label>
+      </div>
       {candlesQuery.isError && (
-        <p className="text-amber-400">{t("chart.error.candles", { symbol })}</p>
+        <p className="text-sm text-destructive">{t("chart.error.candles", { symbol })}</p>
       )}
-      <div
-        data-testid="chart-container"
-        className="min-h-[420px] flex-1 rounded-lg border border-slate-800 bg-leovee-panel"
-      >
+      <Card data-testid="chart-container" className="min-h-[420px] flex-1 overflow-hidden">
         <TradingViewChart
           symbol={symbol}
           resolution={chartResolution}
           loadCandles={loadCandlesForChart}
           onShapesReady={handleShapesReady}
         />
-      </div>
-      <p className="text-xs text-slate-500" data-testid="annotation-count">
+      </Card>
+      <p className="text-xs text-muted-foreground" data-testid="annotation-count">
         {t("chart.annotations.count", { count: annotationCount })}
       </p>
     </div>

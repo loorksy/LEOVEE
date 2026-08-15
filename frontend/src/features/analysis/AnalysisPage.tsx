@@ -13,6 +13,17 @@ import {
 } from "@/components/ProviderNotConfiguredBanner";
 import { useLocale } from "@/i18n/context";
 import type { LocaleContextValue } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { cn } from "@/lib/cn";
+
+// Same visual treatment as <Card> (rounded-xl border border-border bg-card),
+// but as a semantic <section> — the result and degraded panels are addressed
+// by section-relative queries elsewhere (App.e2e.test.tsx), so the element
+// itself must stay a <section>, not Card's <div>.
+const RESULT_SECTION_CLASS = "rounded-xl border border-border bg-card text-card-foreground";
 
 type Translator = LocaleContextValue["t"];
 
@@ -123,11 +134,12 @@ export function AnalysisPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("analysis.title")}</h1>
-        <p className="mt-1 text-slate-400">{t("analysis.intro")}</p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
+      <PageHeader
+        title={t("analysis.title")}
+        description={t("analysis.intro")}
+        testId="analysis-title"
+      />
 
       {providersReady && !oandaConfigured && (
         <ProviderNotConfiguredBanner
@@ -150,39 +162,40 @@ export function AnalysisPage() {
           if (!canRun) return;
           mutation.mutate();
         }}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-800 bg-leovee-panel p-4"
+        className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:flex-wrap sm:items-end"
       >
-        <label className="text-sm text-slate-300" htmlFor="analysis-symbol">
+        <label className="flex flex-col gap-1 text-sm text-muted-foreground sm:w-36" htmlFor="analysis-symbol">
           {t("common.symbol")}
-          <input
+          <Input
             id="analysis-symbol"
             value={symbol}
             onChange={(event) => setSymbol(event.target.value.toUpperCase())}
             disabled={!canRun}
-            className="mt-1 block w-32 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100 disabled:opacity-50"
+            className="font-mono uppercase tracking-wide"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground sm:min-h-0">
           <input
             type="checkbox"
             checked={completePipeline}
             onChange={(event) => setCompletePipeline(event.target.checked)}
             disabled={!canRun}
+            className="size-4 shrink-0 rounded border-border accent-primary disabled:opacity-50"
           />
           {t("analysis.fullPipeline")}
         </label>
-        <button
+        <Button
           type="submit"
           data-testid="analysis-run"
           disabled={mutation.isPending || !canRun}
-          className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+          className="w-full sm:ms-auto sm:w-auto"
         >
           {mutation.isPending ? t("analysis.running") : t("analysis.run")}
-        </button>
+        </Button>
       </form>
 
       {mutation.isError && (
-        <p className="text-amber-400" data-testid="analysis-error">
+        <p className="text-sm text-destructive" data-testid="analysis-error">
           {mutation.error instanceof Error ? mutation.error.message : t("analysis.error.failed")}
         </p>
       )}
@@ -222,19 +235,21 @@ function AnalysisResult({
   if (degradedReason) {
     return (
       <section
-        className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-6"
+        className={cn(RESULT_SECTION_CLASS, "border-warning/30 bg-warning/10 p-4 sm:p-6")}
         data-testid="analysis-degraded"
       >
-        <h2 className="text-lg font-semibold text-amber-100">
-          {result.symbol} · {result.timeframe} — {t("analysis.blocked")}
+        <h2 className="break-words text-lg font-semibold text-foreground">
+          <span className="font-mono">{result.symbol}</span> · {result.timeframe} —{" "}
+          {t("analysis.blocked")}
         </h2>
-        <p className="mt-2 text-sm text-amber-100/90">
-          {t("analysis.degraded.resultLabel")}: <span className="font-semibold">NO_TRADE</span> ·{" "}
-          {t("analysis.degraded.reasonLabel")}{" "}
-          <code className="text-amber-50">{degradedReason}</code>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-foreground/90">
+          <span>{t("analysis.degraded.resultLabel")}:</span>
+          <Badge variant="warning">NO_TRADE</Badge>
+          <span>{t("analysis.degraded.reasonLabel")}</span>
+          <code className="font-mono text-warning">{degradedReason}</code>
         </p>
-        <p className="mt-1 text-sm text-amber-200/80">{t("analysis.degraded.explanation")}</p>
-        {narrativeText && <p className="mt-3 text-sm text-amber-100/80">{narrativeText}</p>}
+        <p className="mt-1 text-sm text-muted-foreground">{t("analysis.degraded.explanation")}</p>
+        {narrativeText && <p className="mt-3 text-sm text-foreground/90">{narrativeText}</p>}
         {evidence && <EvidencePanel report={evidence} />}
       </section>
     );
@@ -247,49 +262,48 @@ function AnalysisResult({
       : direction === "SELL"
         ? t("direction.sell")
         : direction;
+  const directionBadgeVariant = direction === "BUY" ? "buy" : direction === "SELL" ? "sell" : "neutral";
   const confidence =
     result.decision.confidence == null
       ? null
       : (Number(result.decision.confidence) * 100).toFixed(0);
 
   return (
-    <section
-      className="rounded-lg border border-slate-800 bg-leovee-panel p-6"
-      data-testid="analysis-result"
-    >
-      <h2 className="text-lg font-semibold text-slate-100" data-testid="analysis-result-title">
-        {result.symbol} · {result.timeframe} — {directionLabel}
+    <section className={cn(RESULT_SECTION_CLASS, "p-4 sm:p-6")} data-testid="analysis-result">
+      <h2
+        className="flex flex-wrap items-center gap-2 text-lg font-semibold text-foreground"
+        data-testid="analysis-result-title"
+      >
+        <span>
+          <span className="font-mono">{result.symbol}</span> · {result.timeframe}
+        </span>
+        <Badge variant={directionBadgeVariant}>{directionLabel}</Badge>
       </h2>
-      <p className="mt-1 text-sm text-slate-400" data-testid="analysis-result-meta">
+      <p className="mt-1 text-sm text-muted-foreground" data-testid="analysis-result-meta">
         {confidence != null ? `${t("analysis.confidence", { value: confidence })} · ` : ""}
         {t("analysis.recalled", { count: result.recall.count })} ·{" "}
         {t("analysis.asOf", { date: result.as_of })}
       </p>
-      {narrativeText && <p className="mt-3 text-sm text-slate-300">{narrativeText}</p>}
+      {narrativeText && <p className="mt-3 text-sm text-foreground/90">{narrativeText}</p>}
       {chartStatus && (
-        <p className="mt-3 text-xs text-slate-500" data-testid="chart-status">
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="chart-status">
           {chartStatus}
         </p>
       )}
       {evidence && <EvidencePanel report={evidence} />}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          data-testid="analysis-view-chart"
-          onClick={onViewChart}
-          className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-        >
+        <Button type="button" variant="outline" data-testid="analysis-view-chart" onClick={onViewChart}>
           {t("analysis.viewChart")}
-        </button>
+        </Button>
         {onViewRecommendation && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             data-testid="analysis-view-recommendation"
             onClick={onViewRecommendation}
-            className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
           >
             {t("analysis.viewRecommendation")}
-          </button>
+          </Button>
         )}
       </div>
     </section>

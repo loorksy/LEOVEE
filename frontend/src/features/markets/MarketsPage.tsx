@@ -5,6 +5,9 @@ import { getCandles } from "@/api/markets";
 import { getProvidersStatus } from "@/api/providers";
 import { ProviderNotConfiguredBanner } from "@/components/ProviderNotConfiguredBanner";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const TIMEFRAMES = ["M15", "H1", "H4", "D1"] as const;
 
@@ -27,11 +30,12 @@ export function MarketsPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("markets.title")}</h1>
-        <p className="text-sm text-slate-400">{t("markets.intro")}</p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="markets-title"
+        title={t("markets.title")}
+        description={t("markets.intro")}
+      />
       {providersQuery.isSuccess && !oandaConfigured && (
         <ProviderNotConfiguredBanner
           title={t("markets.provider.notConfigured")}
@@ -39,20 +43,27 @@ export function MarketsPage() {
           testId="oanda-provider-not-configured"
         />
       )}
-      <div className="flex flex-wrap gap-3">
-        <label className="text-xs text-slate-400">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="markets-symbol">
           {t("common.symbol")}
-          <input
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
+          <Input
+            id="markets-symbol"
+            data-testid="markets-symbol-input"
+            className="sm:w-40"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
             disabled={!oandaConfigured}
           />
         </label>
-        <label className="text-xs text-slate-400">
+        <label
+          className="flex flex-col gap-1 text-xs text-muted-foreground"
+          htmlFor="markets-timeframe"
+        >
           {t("common.timeframe")}
           <select
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50"
+            id="markets-timeframe"
+            data-testid="markets-timeframe-select"
+            className="h-11 rounded-md border border-border bg-input px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-28"
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value as (typeof TIMEFRAMES)[number])}
             disabled={!oandaConfigured}
@@ -66,17 +77,21 @@ export function MarketsPage() {
         </label>
       </div>
       {oandaConfigured && candlesQuery.isLoading && (
-        <p className="text-slate-400">{t("common.loading")}</p>
+        <div className="flex flex-col gap-1.5" data-testid="markets-loading">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
       )}
       {oandaConfigured && candlesQuery.isError && (
-        <p className="text-amber-400">
+        <p className="text-sm text-destructive">
           {(candlesQuery.error as Error).message || t("common.error.load")}
         </p>
       )}
       {candlesQuery.data && (
-        <div className="overflow-auto rounded border border-slate-800">
-          <table className="min-w-full text-start text-sm text-slate-300">
-            <thead className="bg-slate-900 text-xs uppercase text-slate-500">
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="min-w-full text-start text-sm text-foreground">
+            <thead className="bg-muted text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">{t("markets.table.time")}</th>
                 <th className="px-3 py-2">{t("markets.table.open")}</th>
@@ -87,12 +102,12 @@ export function MarketsPage() {
             </thead>
             <tbody>
               {candlesQuery.data.candles.slice(-20).map((c) => (
-                <tr key={c.ts} className="border-t border-slate-800">
-                  <td className="px-3 py-1.5 font-mono text-xs">{c.ts}</td>
-                  <td className="px-3 py-1.5">{c.open}</td>
-                  <td className="px-3 py-1.5">{c.high}</td>
-                  <td className="px-3 py-1.5">{c.low}</td>
-                  <td className="px-3 py-1.5">{c.close}</td>
+                <tr key={c.ts} className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{c.ts}</td>
+                  <td className="px-3 py-1.5 font-mono">{c.open}</td>
+                  <td className="px-3 py-1.5 font-mono">{c.high}</td>
+                  <td className="px-3 py-1.5 font-mono">{c.low}</td>
+                  <td className="px-3 py-1.5 font-mono">{c.close}</td>
                 </tr>
               ))}
             </tbody>

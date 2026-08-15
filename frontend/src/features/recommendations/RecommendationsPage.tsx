@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { listRecommendationCards } from "@/api/recommendations";
 import { RecommendationCard } from "@/features/recommendations/RecommendationCard";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export function RecommendationsPage() {
   const { t } = useLocale();
@@ -11,24 +14,40 @@ export function RecommendationsPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("recommendations.title")}</h1>
-        <p className="mt-1 text-slate-400">{t("recommendations.intro")}</p>
-      </header>
-      {isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="recommendations-title"
+        title={t("recommendations.title")}
+        description={t("recommendations.intro")}
+      />
+      {isLoading && (
+        <div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="recommendations-loading"
+        >
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="flex flex-col gap-3 p-3">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-4/5" />
+            </Card>
+          ))}
+        </div>
+      )}
       {isError && (
-        <p className="text-amber-400" data-testid="recommendations-error">
+        <p className="text-sm text-destructive" data-testid="recommendations-error">
           {t("common.error.load")}
         </p>
       )}
       {data && data.items.length === 0 && (
-        <p className="text-slate-400" data-testid="recommendations-empty">
+        <p className="text-sm text-muted-foreground" data-testid="recommendations-empty">
           {t("recommendations.empty")}
         </p>
       )}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {data?.items.map((card) => <RecommendationCard key={card.id} card={card} />)}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {data?.items.map((card) => (
+          <RecommendationCard key={card.id} card={card} />
+        ))}
       </div>
     </div>
   );

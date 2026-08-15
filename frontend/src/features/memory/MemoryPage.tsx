@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteMemory, getCalibrationCurve, listMemories } from "@/api/memory";
 import { MemoryPanel } from "@/features/memory/MemoryPanel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useLocale } from "@/i18n/context";
 
 export function MemoryPage() {
@@ -33,23 +36,37 @@ export function MemoryPage() {
   const loading = memoriesQuery.isLoading || calibrationQuery.isLoading;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("memory.title")}</h1>
-        <p className="mt-1 text-slate-400">{t("memory.intro")}</p>
-      </header>
-      {deleteError && <p className="text-amber-400">{deleteError}</p>}
-      {loading && <p className="text-slate-400">{t("common.loading")}</p>}
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader testId="memory-title" title={t("memory.title")} description={t("memory.intro")} />
+
+      {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+
       {recomputeStats && (
-        <p className="text-xs text-slate-500" data-testid="recompute-stats">
-          {t("memory.recompute")}: {JSON.stringify(recomputeStats)}
-        </p>
+        <div className="rounded-lg border border-border bg-muted/50 p-3" data-testid="recompute-stats">
+          <p className="text-xs font-medium text-muted-foreground">{t("memory.recompute")}</p>
+          <pre className="mt-1 overflow-x-auto font-mono text-xs text-foreground">
+            {JSON.stringify(recomputeStats)}
+          </pre>
+        </div>
       )}
-      <MemoryPanel
-        memories={memoriesQuery.data?.items ?? []}
-        bins={calibrationQuery.data?.bins ?? []}
-        onDelete={handleDelete}
-      />
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="memory-loading">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Card key={index} className="flex flex-col gap-3 p-3">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <MemoryPanel
+          memories={memoriesQuery.data?.items ?? []}
+          bins={calibrationQuery.data?.bins ?? []}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }
