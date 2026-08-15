@@ -1,9 +1,26 @@
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
-import type { RecommendationCardData } from "./types";
+import { useLocale } from "@/i18n/context";
+import type { TranslationKey } from "@/i18n";
+import type { RecommendationCardData, Tradability } from "./types";
 
 type Props = {
   card: RecommendationCardData;
+};
+
+type RenderableTradability = Exclude<Tradability, "rejected">;
+
+/** now -> buy tones, soon -> warning, watch_only -> muted (DESIGN.md §2). */
+function tradabilityBadgeVariant(tradability: RenderableTradability): "buy" | "warning" | "neutral" {
+  if (tradability === "now") return "buy";
+  if (tradability === "soon") return "warning";
+  return "neutral";
+}
+
+const TRADABILITY_LABEL_KEY: Record<RenderableTradability, TranslationKey> = {
+  now: "tradability.now",
+  soon: "tradability.soon",
+  watch_only: "tradability.watchOnly",
 };
 
 /** Trade direction only, never decorative — buy/sell tokens exclusively. */
@@ -37,6 +54,12 @@ function statusBadgeVariant(status: string): "warning" | "info" | "destructive" 
 }
 
 export function RecommendationCard({ card }: Props) {
+  const { t } = useLocale();
+  // "rejected" is filtered out one level up (never a card at all); anything
+  // else renderable-or-absent is handled here.
+  const tradability =
+    card.tradability && card.tradability !== "rejected" ? card.tradability : null;
+
   return (
     <Card data-testid={`recommendation-card-${card.id}`} className="flex h-full flex-col">
       <CardHeader className="flex-row items-center justify-between gap-2">
@@ -54,6 +77,21 @@ export function RecommendationCard({ card }: Props) {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         {card.thesis ? <p className="text-sm text-muted-foreground">{card.thesis}</p> : null}
+        {tradability && (
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={tradabilityBadgeVariant(tradability)}
+              data-testid={`recommendation-card-${card.id}-tradability`}
+            >
+              {t(TRADABILITY_LABEL_KEY[tradability])}
+            </Badge>
+            {card.tradability_reason && (
+              <span className="truncate text-xs text-muted-foreground">
+                {card.tradability_reason}
+              </span>
+            )}
+          </div>
+        )}
         <div className="mt-auto flex flex-wrap items-center gap-2">
           <Badge variant={statusBadgeVariant(card.status)}>{card.status}</Badge>
           {card.badges

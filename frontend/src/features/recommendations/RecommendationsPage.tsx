@@ -12,6 +12,10 @@ export function RecommendationsPage() {
     queryKey: ["recommendations", "cards"],
     queryFn: listRecommendationCards,
   });
+  // A rejected tradability assessment is never rendered as a card at all
+  // (DESIGN.md §2) — filtered here, once, rather than by every consumer of
+  // this list.
+  const visibleCards = data?.items.filter((card) => card.tradability !== "rejected") ?? [];
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -39,13 +43,13 @@ export function RecommendationsPage() {
           {t("common.error.load")}
         </p>
       )}
-      {data && data.items.length === 0 && (
+      {data && visibleCards.length === 0 && (
         <p className="text-sm text-muted-foreground" data-testid="recommendations-empty">
           {t("recommendations.empty")}
         </p>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {data?.items.map((card) => (
+        {visibleCards.map((card) => (
           <RecommendationCard key={card.id} card={card} />
         ))}
       </div>

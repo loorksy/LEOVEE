@@ -185,6 +185,11 @@ def recommendation_to_card(
         "stop": float(rec.stop) if rec.stop is not None else None,
         "targets": rec.targets_json,
         "evidence_preview": (rec.evidence_json or {}).get("engines", {}),
+        # A convincing plan can still be untradeable (entry is far, session is
+        # closed) — reported as its own axis so the card never says "weak
+        # analysis" when the read is right and the moment is simply wrong.
+        "tradability": rec.tradability,
+        "tradability_reason": rec.tradability_reason,
     }
 
 
