@@ -55,14 +55,15 @@ def validate_production_startup(settings: Settings) -> None:
         missing.append("SECRET_KEY")
     elif len(settings.secret_key.encode("utf-8")) < MIN_SECRET_KEY_BYTES:
         missing.append(f"SECRET_KEY must be at least {MIN_SECRET_KEY_BYTES} bytes for HS256")
-    if not settings.oanda_api_token:
-        missing.append("OANDA_API_TOKEN")
-    if (
-        not settings.openai_api_key
-        and not settings.anthropic_api_key
-        and not settings.openrouter_api_key
-    ):
-        missing.append("OPENAI_API_KEY or ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
+    # OANDA_API_TOKEN and the LLM keys are deliberately *not* required here. They
+    # are platform-managed secrets (platform_secrets.MANAGED_SECRET_KEYS): an admin
+    # enters them in the panel after first boot and they are applied from the
+    # encrypted DB row without a redeploy. Requiring them at boot deadlocks a fresh
+    # production install — this function runs in the API lifespan *before*
+    # load_runtime_overrides reads that table, so the DB values can never satisfy
+    # the check, and the panel that would set them is behind the API that refuses
+    # to start. Their absence degrades a feature (analysis returns NO_TRADE with a
+    # named reason); it is not a reason to refuse traffic.
 
     origins = settings.cors_origin_list
     if "*" in origins:

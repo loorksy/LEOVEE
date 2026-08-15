@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 
 from app.core.config import Settings
 
 logger = structlog.get_logger(__name__)
+
+#: The levels sentry_sdk.capture_message accepts. Spelled out here rather than
+#: imported from sentry_sdk, which is an optional dependency this module is
+#: careful to import only inside functions.
+SentryLevel = Literal["fatal", "critical", "error", "warning", "info", "debug"]
 
 
 def init_sentry(settings: Settings) -> None:
@@ -47,7 +52,7 @@ def capture_exception(exc: BaseException, **extra: Any) -> None:
         sentry_sdk.capture_exception(exc)
 
 
-def capture_message(message: str, level: str = "info") -> None:
+def capture_message(message: str, level: SentryLevel = "info") -> None:
     try:
         import sentry_sdk
     except ImportError:

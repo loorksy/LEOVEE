@@ -1,0 +1,66 @@
+# TLS edge for a DEDICATED production VPS — Caddy owns :80 and :443 directly.
+#
+# Why this is a separate file from ./Caddyfile: that one is written for the
+# shared-host topology, where an nginx SNI edge (scripts/setup_vps_edge_nginx.sh)
+# terminates :443, re-dials Caddy on loopback, and prepends a PROXY-protocol
+# header so Caddy can still see the real client IP. Its `listener_wrappers`
+# block exists only to consume that header.
+#
+# Here there is no nginx hop: the client connects to Caddy, so the peer address
+# already IS the client and no PROXY header is ever sent. Keeping the wrapper
+# would mean depending on its fallback behaviour for every public connection to
+# get the one thing that matters — real client IPs feeding X-Forwarded-For, which
+# TRUST_PROXY_HEADERS makes the per-client rate-limit key. If that ever resolved
+# the wrong way, every client would share one bucket and one abuser would lock
+# all tenants out of login. Not worth inheriting for a topology that does not use it.
+#
+# Use ./Caddyfile instead if this VPS also serves other sites on :80/:443.
+{
+	email {$ACME_EMAIL}
+}
+
+{$LEOVEE_DOMAIN} {
+	encode gzip
+
+	handle /health* {
+		reverse_proxy api:8000
+	}
+
+	# /metrics is not public: only private/internal networks (Prometheus on the
+	# host/VPC). METRICS_BEARER_TOKEN on the API is the second lock.
+	@metrics_external {
+		path /metrics
+		not remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1 ::1
+	}
+	respond @metrics_external "Forbidden" 403
+
+	handle /metrics {
+		reverse_proxy api:8000
+	}
+
+	handle /api/v1/mcp/* {
+		reverse_proxy leovee-mcp:8001
+	}
+	handle /api/* {
+		# API CSP is enforced by FastAPI SecurityHeadersMiddleware (default-src 'none').
+		reverse_proxy api:8000
+	}
+	handle /ws/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		# SPA CSP (looser connect-src for same-origin API + WS).
+		# worker-src/child-src blob: lets TradingView Advanced Charts spawn its
+		# blob: Web Workers; without them the chart fails to load under this CSP.
+		# No 'unsafe-eval' is added. default-src/frame-ancestors unchanged.
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' wss: https:; frame-ancestors 'none'; base-uri 'self'"
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

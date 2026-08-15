@@ -57,6 +57,37 @@ if [[ "${DATABASE_URL}" == *"://postgres:"* || "${DATABASE_URL}" == *"://leovee:
   fail "DATABASE_URL must authenticate as 'leovee_app' (got a privileged role). Use DATABASE_MIGRATION_URL for the migrate step."
 fi
 
+# Pull the two passwords back out of the URLs so the rest of the stack can be
+# configured from one source of truth. Format: scheme://user:password@host:port/db
+url_password() {
+  local url="$1"
+  local userinfo="${url#*://}"
+  userinfo="${userinfo%%@*}"
+  [[ "${userinfo}" == *:* ]] || return 1
+  printf '%s' "${userinfo#*:}"
+}
+
+POSTGRES_PASSWORD="$(url_password "${DATABASE_MIGRATION_URL}")" ||
+  fail "DATABASE_MIGRATION_URL has no password. Expected postgresql+asyncpg://leovee:<pw>@postgres:5432/leovee"
+LEOVEE_APP_DB_PASSWORD="$(url_password "${DATABASE_URL}")" ||
+  fail "DATABASE_URL has no password. Expected postgresql+asyncpg://leovee_app:<pw>@postgres:5432/leovee"
+
+# The compose defaults ('leovee' for the owner role, and the 'leovee_app'
+# literal that migration 007 assigns) are published in this repository. They are
+# fine for local dev, where nothing is reachable; in production they are a known
+# credential on the shared compose network, which every container — api, worker,
+# mcp, and anything added later — can reach. Refuse them here rather than let a
+# deploy inherit them silently.
+if [[ "${POSTGRES_PASSWORD}" == "leovee" ]]; then
+  fail "DATABASE_MIGRATION_URL uses the built-in 'leovee' password. Generate one: openssl rand -hex 24"
+fi
+if [[ "${LEOVEE_APP_DB_PASSWORD}" == "leovee_app" ]]; then
+  fail "DATABASE_URL uses the built-in 'leovee_app' password. Generate one: openssl rand -hex 24"
+fi
+if [[ "${POSTGRES_PASSWORD}" == "${LEOVEE_APP_DB_PASSWORD}" ]]; then
+  fail "The owner and application roles must not share a password — that erases the privilege split RLS depends on."
+fi
+
 umask 077
 # Write without `set -x` and without echoing values. OANDA/LLM keys are written
 # only when the operator supplied them; otherwise they are left blank for the
@@ -77,6 +108,12 @@ ACME_EMAIL=${ACME_EMAIL}
 DATABASE_URL=${DATABASE_URL}
 DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL}
 REDIS_URL=${REDIS_URL}
+
+# Consumed by docker-compose.yml to initialise the postgres owner role, and by
+# deploy_prod_vps.sh to re-assign the leovee_app password after migrations (007
+# hardcodes the literal 'leovee_app', so it must be reset on every upgrade).
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+LEOVEE_APP_DB_PASSWORD=${LEOVEE_APP_DB_PASSWORD}
 
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 KMS_PROVIDER=local
