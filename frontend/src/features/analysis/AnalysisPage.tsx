@@ -205,7 +205,7 @@ export function AnalysisPage() {
           result={result}
           chartStatus={chartStatus}
           onViewChart={() =>
-            navigate(`/analyst?symbol=${result.symbol}&timeframe=${result.timeframe}`)
+            navigate(`/chat?symbol=${result.symbol}&timeframe=${result.timeframe}&chart=1`)
           }
           onViewRecommendation={
             result.recommendation_id ? () => navigate("/recommendations") : undefined

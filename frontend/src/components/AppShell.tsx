@@ -10,6 +10,7 @@ import { LocaleSwitcher } from "@/i18n/LocaleSwitcher";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { IconButton } from "@/components/ui/IconButton";
 import { NAV_ITEMS, type NavItem } from "@/components/shell/navConfig";
+import { useSheetSlot } from "@/hooks/useSheet";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar";
@@ -160,7 +161,9 @@ export function AppShell() {
   const { t, dir } = useLocale();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Shared with the chat workspace's chart sheet: opening one closes the
+  // other, so the two overlays can never stack (DESIGN.md's single-slot rule).
+  const [mobileOpen, setMobileOpen] = useSheetSlot("navDrawer");
   const drawerRef = useRef<HTMLElement | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -168,7 +171,7 @@ export function AppShell() {
   // the new page — the common source of a "why is the menu still open" bug.
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, setMobileOpen]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -206,7 +209,7 @@ export function AppShell() {
       document.removeEventListener("keydown", onKeyDown);
       opener?.focus();
     };
-  }, [mobileOpen]);
+  }, [mobileOpen, setMobileOpen]);
 
   return (
     <div dir={dir} data-testid="app-shell" className="flex h-dvh overflow-hidden bg-background">

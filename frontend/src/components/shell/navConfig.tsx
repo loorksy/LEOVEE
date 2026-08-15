@@ -12,7 +12,6 @@ import {
   RotateCcw,
   Settings,
   ShieldCheck,
-  Sparkles,
   Target,
   TrendingUp,
   Wallet,
@@ -26,9 +25,10 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+// The AI Analyst / chart page folded into /chat as a companion sheet/pane
+// (matching AiChart) — there is no longer a separate destination for it.
 export const NAV_ITEMS: NavItem[] = [
   { to: "/", labelKey: "nav.home", testId: "nav-home", icon: Home },
-  { to: "/analyst", labelKey: "nav.analyst", testId: "nav-analyst", icon: Sparkles },
   { to: "/chat", labelKey: "nav.chat", testId: "nav-chat", icon: MessageSquare },
   { to: "/markets", labelKey: "nav.markets", testId: "nav-markets", icon: TrendingUp },
   { to: "/watchlist", labelKey: "nav.watchlist", testId: "nav-watchlist", icon: Eye },
