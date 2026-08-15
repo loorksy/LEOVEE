@@ -21,8 +21,16 @@ export default defineConfig({
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8000 ws://localhost:8000",
+      // No Content-Security-Policy here: the dev server isn't the security
+      // boundary (docker/caddy/Caddyfile.prod is, and enforces script-src
+      // 'self' with no 'unsafe-inline' for real) — Vite's own HMR client
+      // injects an inline module script into every page it serves, so
+      // mirroring that policy here doesn't test anything, it just breaks the
+      // dev server in any CSP-enforcing browser (confirmed: React Refresh's
+      // preamble is blocked and the app never mounts). Application code stays
+      // CSP-clean regardless — see public/theme-boot.js for why the one
+      // script this app needs before first paint is an external file, not
+      // inline — so the real policy is exercised unchanged in production.
     },
     proxy: {
       "/api": {

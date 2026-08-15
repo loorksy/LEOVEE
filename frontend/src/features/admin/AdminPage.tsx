@@ -16,6 +16,7 @@ import { AdminOverviewPanel } from "@/features/admin/AdminOverviewPanel";
 import { AdminSecretsPanel } from "@/features/admin/AdminSecretsPanel";
 import { useAdminAccess } from "@/features/admin/useAdminAccess";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 /**
  * `/admin` — plan/billing is visible to every workspace member; audit,
@@ -83,18 +84,22 @@ export function AdminPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100" data-testid="admin-title">
-          {t("admin.title")}
-        </h1>
-        <p className="mt-1 text-slate-400">
-          {t("admin.intro")} — <code>{accessQuery.data?.role ?? "…"}</code>.
-        </p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        testId="admin-title"
+        title={t("admin.title")}
+        description={
+          <>
+            {t("admin.intro")} —{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
+              {accessQuery.data?.role ?? "…"}
+            </code>
+          </>
+        }
+      />
 
       {accessQuery.isError && (
-        <p className="text-amber-400">{t("admin.error.access")}</p>
+        <p className="text-sm text-warning">{t("admin.error.access")}</p>
       )}
 
       <AdminEntitlementsPanel
@@ -104,13 +109,13 @@ export function AdminPage() {
       />
 
       {!isSupport && !accessQuery.isLoading && (
-        <p data-testid="admin-access-restricted" className="text-sm text-slate-500">
+        <p data-testid="admin-access-restricted" className="text-sm text-muted-foreground">
           {t("admin.restricted")}
         </p>
       )}
 
       {isSupport && !isPlatformAdmin && (
-        <p data-testid="admin-platform-only-hint" className="text-sm text-slate-500">
+        <p data-testid="admin-platform-only-hint" className="text-sm text-muted-foreground">
           {t("admin.platformOnly")}
         </p>
       )}

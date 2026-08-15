@@ -1,22 +1,55 @@
 /**
- * Design tokens — the palette as CSS custom properties (M10, from AiChart's
- * DESIGN.md). Components consume the semantic Tailwind classes built on these
- * (`text-buy`, `bg-warning/10`, …), never raw hex.
+ * Design tokens — the palette as CSS custom properties (from AiChart's
+ * DESIGN.md, verified against its shipped `globals.css`). Components consume
+ * the semantic Tailwind classes built on these (`text-buy`, `bg-warning/10`,
+ * `bg-primary`, …), never raw hex.
  *
- * Two rules the tokens themselves encode:
+ * Three rules the tokens themselves encode:
  *
  * - **Buy/sell mean trade direction and nothing else.** `--success` carries the
  *   same values today, but it is a separate token on purpose: if the trading
  *   palette is ever retuned, healthy-status UI must not drag along with it.
  * - **Dark is the designed case, not the inversion.** The product is a trading
  *   terminal read at night; light mode derives from dark, not the reverse.
+ * - **`--primary` is monochrome, on purpose.** Black-on-white / white-on-black
+ *   is the one accent this product uses for actions — no brand indigo, no
+ *   purple. Color is reserved for trading/status meaning (buy/sell/warning/
+ *   info), never spent on decoration.
  */
 :root {
+  --radius: 0.625rem;
+  --radius-lg: 0.875rem;
+
   --background: #ffffff;
-  --card: #ffffff;
   --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #000000;
+  --muted: #f2f2f2;
   --muted-foreground: #404040;
+  /* Neutral hover/highlight tint — a background role, never text. Components
+     that need an AA-checked accent color use `info` or `primary`. */
+  --accent: #f2f2f2;
+  --accent-foreground: #000000;
+
   --border: #e5e5e5;
+  --input: #ffffff;
+  --ring: #000000;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #000000;
+  --sidebar-active-bg: #f2f2f2;
+  --sidebar-active-text: #000000;
+
+  --surface-elevated: #ffffff;
 
   --buy: #15803d;
   --sell: #dc2626;
@@ -26,16 +59,44 @@
   --warning: #b45309;
   --info: #0284c7;
   --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
 
-  --accent: #6366f1;
+  --chart-1: #52525b;
+  --chart-2: #0284c7;
+  --chart-3: #16a34a;
+  --chart-4: #d97706;
+  --chart-5: #dc2626;
 }
 
 .dark {
-  --background: #0f1419;
-  --card: #1a2332;
+  --background: #000000;
   --foreground: #f5f5f5;
+  --card: #0a0a0a;
+  --card-foreground: #f5f5f5;
+  --popover: #0a0a0a;
+  --popover-foreground: #f5f5f5;
+
+  --primary: #fafafa;
+  --primary-foreground: #000000;
+  --secondary: #111111;
+  --secondary-foreground: #f5f5f5;
+  --muted: #111111;
   --muted-foreground: #a3a3a3;
-  --border: #1f2937;
+  --accent: #111111;
+  --accent-foreground: #f5f5f5;
+
+  --border: #1f1f1f;
+  --input: #0a0a0a;
+  --ring: #a3a3a3;
+
+  --sidebar: #000000;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-border: #1f1f1f;
+  --sidebar-ring: #a3a3a3;
+  --sidebar-active-bg: #141414;
+  --sidebar-active-text: #fafafa;
+
+  --surface-elevated: #0a0a0a;
 
   --buy: #22c55e;
   /* red-400, not 500: #ef4444 reads 4.19:1 on the card surface — a sell label
@@ -45,4 +106,11 @@
   --warning: #f59e0b;
   --info: #38bdf8;
   --destructive: #f87171;
+  --destructive-foreground: #000000;
+
+  --chart-1: #a1a1aa;
+  --chart-2: #38bdf8;
+  --chart-3: #22c55e;
+  --chart-4: #f59e0b;
+  --chart-5: #f87171;
 }

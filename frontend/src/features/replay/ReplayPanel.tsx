@@ -1,4 +1,6 @@
 import { useLocale } from "@/i18n/context";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export type ReplayPreview = {
   symbol: string;
@@ -20,32 +22,44 @@ type Props = {
 export function ReplayPanel({ preview, loading }: Props) {
   const { t } = useLocale();
   if (loading) {
-    return <p className="text-slate-400">{t("replay.loading")}</p>;
+    return (
+      <Card className="p-3" data-testid="replay-panel-loading">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-56" />
+          <Skeleton className="mt-2 h-16 w-full" />
+        </div>
+      </Card>
+    );
   }
   if (!preview) {
-    return <p className="text-slate-400">{t("replay.empty")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("replay.empty")}</p>;
   }
   return (
-    <section className="rounded-lg border border-slate-800 bg-leovee-panel p-6">
-      <h2 className="text-lg font-semibold text-slate-100">{t("replay.historical")}</h2>
-      <p className="text-xs text-slate-500">
-        {preview.symbol} {preview.timeframe} ·{" "}
-        {t("replay.asof.value", { timestamp: preview.as_of })}
-      </p>
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <dt className="text-slate-500">{t("replay.candles.visible")}</dt>
-          <dd className="text-slate-100">{preview.candle_count}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">{t("replay.candles.hidden")}</dt>
-          <dd className="text-slate-100">{preview.excluded_future_candles}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">{t("replay.memories")}</dt>
-          <dd className="text-slate-100">{preview.recall.counts.memories}</dd>
-        </div>
-      </dl>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("replay.historical")}</CardTitle>
+        <p className="font-mono text-xs text-muted-foreground">
+          {preview.symbol} {preview.timeframe} ·{" "}
+          {t("replay.asof.value", { timestamp: preview.as_of })}
+        </p>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground">{t("replay.candles.visible")}</dt>
+            <dd className="font-mono text-foreground">{preview.candle_count}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{t("replay.candles.hidden")}</dt>
+            <dd className="font-mono text-foreground">{preview.excluded_future_candles}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{t("replay.memories")}</dt>
+            <dd className="font-mono text-foreground">{preview.recall.counts.memories}</dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }

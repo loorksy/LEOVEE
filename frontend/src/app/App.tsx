@@ -1,12 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
 import { HomePage } from "@/features/dashboard/HomePage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SignupPage } from "@/features/auth/SignupPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
-import { ChartPage } from "@/features/chart/ChartPage";
 import { ChatPage } from "@/features/chat/ChatPage";
 import { AnalysisPage } from "@/features/analysis/AnalysisPage";
 import { RecommendationsPage } from "@/features/recommendations/RecommendationsPage";
@@ -24,6 +23,17 @@ import { SettingsPage } from "@/features/settings/SettingsPage";
 
 const queryClient = new QueryClient();
 
+/** The chart lives inside /chat now (a companion pane/sheet, not a page).
+ *  A bare `<Navigate>` drops query params — preserved here so a bookmarked
+ *  or already-shared `/analyst?symbol=...&timeframe=...` still opens the
+ *  right instrument instead of a blank chat. */
+function AnalystRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("chart", "1");
+  return <Navigate to={`/chat?${params.toString()}`} replace />;
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -35,7 +45,7 @@ export function App() {
             <Route element={<AppShell />}>
               <Route path="/" element={<HomePage />} />
               <Route element={<RequireAuth />}>
-                <Route path="/analyst" element={<ChartPage />} />
+                <Route path="/analyst" element={<AnalystRedirect />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/markets" element={<MarketsPage />} />
                 <Route path="/analysis" element={<AnalysisPage />} />

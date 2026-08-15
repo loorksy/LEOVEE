@@ -6,6 +6,12 @@ import { useWorkspaceId } from "@/hooks/useWorkspaceId";
 import { useNotificationsStream } from "@/features/alerts/useNotificationsStream";
 import type { NotificationData } from "@/features/alerts/types";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardInset } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export function AlertsPage() {
   const { t } = useLocale();
@@ -55,146 +61,142 @@ export function AlertsPage() {
   const alerts = alertsQuery.data?.items ?? [];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100">{t("alerts.title")}</h1>
-        <p className="mt-1 text-slate-400">{t("alerts.intro")}</p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader testId="alerts-title" title={t("alerts.title")} description={t("alerts.intro")} />
 
       <form
         onSubmit={(event) => {
           event.preventDefault();
           createMutation.mutate();
         }}
-        className="flex flex-wrap items-end gap-2"
+        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
       >
-        <div className="flex flex-col">
-          <label htmlFor="alert-symbol" className="text-xs text-slate-500">
-            {t("common.symbol")}
-          </label>
-          <input
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="alert-symbol">
+          {t("common.symbol")}
+          <Input
             id="alert-symbol"
             value={symbol}
             onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-            className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+            className="sm:w-28"
           />
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="alert-op" className="text-xs text-slate-500">
-            {t("alerts.condition")}
-          </label>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="alert-op">
+          {t("alerts.condition")}
           <select
             id="alert-op"
             value={op}
             onChange={(event) => setOp(event.target.value as "gte" | "lte" | "eq")}
-            className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+            className="h-11 rounded-md border border-border bg-input px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:h-9 sm:w-44"
           >
             <option value="gte">{t("alerts.op.gte")}</option>
             <option value="lte">{t("alerts.op.lte")}</option>
             <option value="eq">{t("alerts.op.eq")}</option>
           </select>
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="alert-threshold" className="text-xs text-slate-500">
-            {t("alerts.threshold")}
-          </label>
-          <input
+        </label>
+        <label
+          className="flex flex-col gap-1 text-xs text-muted-foreground"
+          htmlFor="alert-threshold"
+        >
+          {t("alerts.threshold")}
+          <Input
             id="alert-threshold"
             value={threshold}
             onChange={(event) => setThreshold(event.target.value)}
-            className="w-24 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+            className="sm:w-24"
           />
-        </div>
-        <button
-          type="submit"
-          data-testid="create-alert"
-          disabled={createMutation.isPending}
-          className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-        >
+        </label>
+        <Button type="submit" data-testid="create-alert" disabled={createMutation.isPending}>
           {t("alerts.create")}
-        </button>
+        </Button>
       </form>
 
-      {alertsQuery.isLoading && <p className="text-slate-400">{t("common.loading")}</p>}
-      {alertsQuery.isError && <p className="text-amber-400">{t("common.error.load")}</p>}
-      {triggerError && <p className="text-amber-400">{triggerError}</p>}
+      {alertsQuery.isLoading && (
+        <div className="flex flex-col gap-2" data-testid="alerts-loading">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      )}
+      {alertsQuery.isError && <p className="text-sm text-destructive">{t("common.error.load")}</p>}
+      {triggerError && <p className="text-sm text-destructive">{triggerError}</p>}
       {!alertsQuery.isLoading && alerts.length === 0 && (
-        <p className="text-slate-400" data-testid="alerts-empty">
+        <p className="text-sm text-muted-foreground" data-testid="alerts-empty">
           {t("alerts.empty")}
         </p>
       )}
 
-      <ul className="space-y-2">
+      <ul className="flex flex-col gap-3">
         {alerts.map((alert) => (
-          <li
-            key={alert.id}
-            data-testid={`alert-${alert.id}`}
-            className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-800 bg-leovee-panel p-3 text-sm"
-          >
-            <div>
-              <p className="font-medium text-slate-100">
-                {alert.type} · {JSON.stringify(alert.condition)}
-              </p>
-              <p className="text-xs text-slate-500">
-                {alert.active ? t("alerts.active") : t("alerts.inactive")}
-                {alert.last_triggered_at
-                  ? ` · ${t("alerts.lastTriggered", { time: alert.last_triggered_at })}`
-                  : ""}
-              </p>
-            </div>
-            <div
-              className="flex flex-col items-end gap-1 rounded border border-dashed border-amber-800/70 bg-amber-950/20 p-2"
-              data-testid={`alert-ui-test-${alert.id}`}
-            >
-              <p className="max-w-[14rem] text-end text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                {t("alerts.uiTest.label")}
-              </p>
-              <div className="flex items-center gap-2">
-                <label htmlFor={`trigger-price-${alert.id}`} className="sr-only">
-                  {t("alerts.uiTest.priceLabel")}
-                </label>
-                <input
-                  id={`trigger-price-${alert.id}`}
-                  data-testid={`trigger-price-${alert.id}`}
-                  value={triggerPrices[alert.id] ?? ""}
-                  onChange={(event) =>
-                    setTriggerPrices((prev) => ({ ...prev, [alert.id]: event.target.value }))
-                  }
-                  placeholder={t("common.price")}
-                  className="w-24 rounded border border-amber-900/60 bg-slate-900 px-2 py-1 text-slate-100"
-                />
-                <button
-                  type="button"
-                  data-testid={`fire-ui-test-${alert.id}`}
-                  onClick={() =>
-                    triggerMutation.mutate({
-                      id: alert.id,
-                      price: Number(triggerPrices[alert.id] ?? "0"),
-                    })
-                  }
-                  className="rounded border border-amber-700/70 px-3 py-1 text-xs font-medium text-amber-100 hover:bg-amber-950/50"
-                >
-                  {t("alerts.uiTest.fire")}
-                </button>
+          <li key={alert.id} data-testid={`alert-${alert.id}`}>
+            <Card className="flex flex-col gap-3 p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {alert.type} · <span className="font-mono">{JSON.stringify(alert.condition)}</span>
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant={alert.active ? "info" : "neutral"}>
+                    {alert.active ? t("alerts.active") : t("alerts.inactive")}
+                  </Badge>
+                  {alert.last_triggered_at && (
+                    <span>{t("alerts.lastTriggered", { time: alert.last_triggered_at })}</span>
+                  )}
+                </div>
               </div>
-            </div>
+
+              <CardInset
+                className="flex flex-col gap-2 border border-dashed border-warning/40 bg-warning/5"
+                data-testid={`alert-ui-test-${alert.id}`}
+              >
+                <p className="max-w-[16rem] text-end text-[10px] font-semibold uppercase tracking-wide text-warning">
+                  {t("alerts.uiTest.label")}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor={`trigger-price-${alert.id}`} className="sr-only">
+                    {t("alerts.uiTest.priceLabel")}
+                  </label>
+                  <Input
+                    id={`trigger-price-${alert.id}`}
+                    data-testid={`trigger-price-${alert.id}`}
+                    value={triggerPrices[alert.id] ?? ""}
+                    onChange={(event) =>
+                      setTriggerPrices((prev) => ({ ...prev, [alert.id]: event.target.value }))
+                    }
+                    placeholder={t("common.price")}
+                    className="h-9 w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid={`fire-ui-test-${alert.id}`}
+                    onClick={() =>
+                      triggerMutation.mutate({
+                        id: alert.id,
+                        price: Number(triggerPrices[alert.id] ?? "0"),
+                      })
+                    }
+                    className="border-warning/50 text-warning hover:bg-warning/10"
+                  >
+                    {t("alerts.uiTest.fire")}
+                  </Button>
+                </div>
+              </CardInset>
+            </Card>
           </li>
         ))}
       </ul>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-100">{t("alerts.notifications")}</h2>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-foreground">{t("alerts.notifications")}</h2>
         {notifications.length === 0 && (
-          <p className="mt-2 text-sm text-slate-400">{t("alerts.notifications.empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("alerts.notifications.empty")}</p>
         )}
-        <ul className="mt-2 space-y-2" data-testid="notification-list">
+        <ul className="flex flex-col gap-2" data-testid="notification-list">
           {notifications.map((note) => (
-            <li
-              key={note.id}
-              className="rounded border border-sky-800 bg-sky-950/40 p-3 text-sm text-sky-200"
-            >
-              <p className="font-semibold">{note.title}</p>
-              <p className="text-xs">{note.message}</p>
+            <li key={note.id}>
+              <Card className="border-info/30 bg-info/5 p-3">
+                <p className="text-sm font-semibold text-foreground">{note.title}</p>
+                <p className="text-xs text-muted-foreground">{note.message}</p>
+              </Card>
             </li>
           ))}
         </ul>

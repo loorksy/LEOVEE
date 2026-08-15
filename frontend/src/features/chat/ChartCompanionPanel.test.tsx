@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { ChartPage } from "./ChartPage";
+import { ChartCompanionPanel } from "./ChartCompanionPanel";
 import * as marketsApi from "@/api/markets";
 import * as chartApi from "@/api/chart";
 import * as workspaceHook from "@/hooks/useWorkspaceId";
@@ -25,10 +25,11 @@ vi.mock("@/chart", async () => {
 });
 
 // The real component loads 27 MB of vendored charting library from a script
-// tag. Stubbed so the page can be tested at all — and stubbed to *call back*
-// immediately, because the engine is now created when the chart hands over its
-// drawing surface. A stub that rendered nothing would leave no engine, and the
-// test would pass by asserting against a page that never got one.
+// tag. Stubbed so the panel can be tested at all — and stubbed to *call
+// back* immediately, because the engine is now created when the chart hands
+// over its drawing surface. A stub that rendered nothing would leave no
+// engine, and the test would pass by asserting against a panel that never
+// got one.
 vi.mock("@/chart/tradingview/TradingViewChart", () => ({
   TradingViewChart: ({
     onShapesReady,
@@ -40,7 +41,7 @@ vi.mock("@/chart/tradingview/TradingViewChart", () => ({
   },
 }));
 
-describe("ChartPage", () => {
+describe("ChartCompanionPanel", () => {
   it("loads candles + annotations and feeds them into the chart engine", async () => {
     vi.spyOn(marketsApi, "getCandles").mockResolvedValue({
       symbol: "XAUUSD",
@@ -66,7 +67,7 @@ describe("ChartPage", () => {
     } as ReturnType<typeof workspaceHook.useWorkspaceId>);
     vi.spyOn(chartStreamHook, "useChartStream").mockImplementation(() => undefined);
 
-    renderWithProviders(<ChartPage />);
+    renderWithProviders(<ChartCompanionPanel />);
 
     expect(screen.getByTestId("chart-container")).toBeInTheDocument();
 

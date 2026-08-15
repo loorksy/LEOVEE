@@ -4,6 +4,9 @@ import { useState } from "react";
 import { previewReplay } from "@/api/replay";
 import { ReplayPanel, type ReplayPreview } from "@/features/replay/ReplayPanel";
 import { useLocale } from "@/i18n/context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
 export function ReplayPage() {
   const { t } = useLocale();
@@ -23,32 +26,30 @@ export function ReplayPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-100" data-testid="replay-title">
-          {t("replay.title")}
-        </h1>
-        <p className="text-sm text-slate-400">{t("replay.intro")}</p>
-      </header>
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader testId="replay-title" title={t("replay.title")} description={t("replay.intro")} />
       <form
-        className="flex flex-wrap items-end gap-3"
+        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           mutation.mutate();
         }}
       >
-        <label className="text-xs text-slate-400">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="replay-symbol">
           {t("common.symbol")}
-          <input
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          <Input
+            id="replay-symbol"
+            className="sm:w-40"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           />
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="replay-timeframe">
           {t("common.timeframe")}
           <select
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+            id="replay-timeframe"
+            data-testid="replay-timeframe-select"
+            className="h-11 rounded-md border border-border bg-input px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-28"
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
           >
@@ -59,26 +60,22 @@ export function ReplayPage() {
             ))}
           </select>
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="replay-asof">
           {t("replay.asof")}
-          <input
+          <Input
+            id="replay-asof"
             type="datetime-local"
-            className="mt-1 block rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+            className="sm:w-56"
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}
           />
         </label>
-        <button
-          type="submit"
-          data-testid="replay-preview-button"
-          className="rounded bg-leovee-accent px-4 py-2 text-sm font-medium text-slate-950"
-          disabled={mutation.isPending}
-        >
+        <Button type="submit" data-testid="replay-preview-button" disabled={mutation.isPending}>
           {mutation.isPending ? t("common.loading") : t("replay.preview")}
-        </button>
+        </Button>
       </form>
       {mutation.isError ? (
-        <p className="text-sm text-red-400">{(mutation.error as Error).message}</p>
+        <p className="text-sm text-destructive">{(mutation.error as Error).message}</p>
       ) : null}
       <ReplayPanel preview={preview} loading={mutation.isPending} />
     </div>

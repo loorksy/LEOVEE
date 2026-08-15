@@ -302,17 +302,9 @@ describe("Batch 3 mocked end-to-end flow", () => {
     fireEvent.click(screen.getByTestId("nav-recommendations"));
     expect(await screen.findByText("XAUUSD BUY")).toBeInTheDocument();
 
-    // See the recalled memory in chat. The "new conversation" button is the only
-    // button on the chat page besides the shell's sign-out control.
+    // See the recalled memory in chat.
     fireEvent.click(screen.getByTestId("nav-chat"));
-    const newConversationButton = await waitFor(() => {
-      const candidate = screen
-        .getAllByRole("button")
-        .find((button) => button.getAttribute("data-testid") !== "nav-signout");
-      expect(candidate).toBeDefined();
-      return candidate as HTMLElement;
-    });
-    fireEvent.click(newConversationButton);
+    fireEvent.click(await screen.findByTestId("chat-new-conversation"));
     await waitFor(() => expect(document.getElementById("chat-draft")).not.toBeNull());
     const draft = document.getElementById("chat-draft") as HTMLInputElement;
     fireEvent.change(draft, { target: { value: "What's the current bias on XAUUSD?" } });

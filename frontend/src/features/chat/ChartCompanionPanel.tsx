@@ -1,5 +1,14 @@
+/**
+ * The chart, as the chat's companion surface — not a page. Same engine
+ * wiring `ChartPage` used to own directly (symbol/timeframe via URL params,
+ * candles + annotations + live stream into a `ChartEngine`), relocated so it
+ * can live inside the sheet/pane the merged chat workspace renders it in.
+ *
+ * The `TradingViewChart` DOM node this mounts is never unmounted by the
+ * sheet/pane toggle around it — only CSS classes change there — so a symbol
+ * change never throws away drawings on the widget.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -9,10 +18,7 @@ import {
   type SemanticAnnotation,
 } from "@/chart";
 import { TradingViewChart } from "@/chart/tradingview/TradingViewChart";
-import {
-  resolutionForTimeframe,
-  timeframeForResolution,
-} from "@/chart/tradingview/datafeed";
+import { resolutionForTimeframe, timeframeForResolution } from "@/chart/tradingview/datafeed";
 import type { TradingViewShapeApi } from "@/chart";
 import { normalizeBackendCandle } from "@/chart/ChartDataAdapter";
 import { getCandles } from "@/api/markets";
@@ -25,12 +31,13 @@ import {
   applyAnnotationEvent,
 } from "@/features/chart/annotationStream";
 import { BACKEND_TIMEFRAMES, backendTimeframeToChart } from "@/features/chart/timeframe";
+import { DEFAULT_SYMBOL } from "@/config/symbols";
 import { useLocale } from "@/i18n/context";
-
+import { Input } from "@/components/ui/Input";
 
 const DEFAULT_TIMEFRAME = "H1";
 
-export function ChartPage() {
+export function ChartCompanionPanel() {
   const { t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const symbol = (searchParams.get("symbol") ?? DEFAULT_SYMBOL).toUpperCase();
@@ -43,16 +50,9 @@ export function ChartPage() {
   const workspaceQuery = useWorkspaceId();
   const chartResolution = resolutionForTimeframe(backendTimeframeToChart(timeframe));
 
-  // The library asks for history by its own resolution string; the API speaks
-  // frame codes. Translating here keeps the mapping in one direction and one
-  // place — two translations of the same pair drift, and the symptom is a chart
-  // that quietly renders the wrong frame.
   const loadCandlesForChart = useCallback(
     async (requestedSymbol: string, resolution: string) => {
-      const response = await getCandles(
-        requestedSymbol,
-        timeframeForResolution(resolution),
-      );
+      const response = await getCandles(requestedSymbol, timeframeForResolution(resolution));
       return response.candles.map(normalizeBackendCandle);
     },
     [],
@@ -68,13 +68,8 @@ export function ChartPage() {
     queryFn: () => listChartAnnotations(),
   });
 
-  // The engine is created when the chart hands over its drawing surface, not on
-  // mount: an engine with nowhere to draw would silently accept annotations and
-  // discard them, which looks exactly like an analysis that produced none.
   const handleShapesReady = useCallback((shapes: TradingViewShapeApi) => {
-    const engine = createChartEngine({
-      surface: new TradingViewAnnotationSurface({ shapes }),
-    });
+    const engine = createChartEngine({ surface: new TradingViewAnnotationSurface({ shapes }) });
     engineRef.current = engine;
     engine.setSymbol(symbol);
     engine.setTimeframe(backendTimeframeToChart(timeframe));
@@ -125,15 +120,14 @@ export function ChartPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-100">{t("chart.title")}</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <label htmlFor="chart-symbol" className="sr-only">
-            {t("common.symbol")}
-          </label>
-          <input
+    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="chart-symbol">
+          {t("common.symbol")}
+          <Input
             id="chart-symbol"
+            data-testid="chart-symbol-input"
+            className="h-9 w-28"
             value={symbol}
             onChange={(event) =>
               setSearchParams((prev) => {
@@ -142,13 +136,14 @@ export function ChartPage() {
                 return next;
               })
             }
-            className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
           />
-          <label htmlFor="chart-timeframe" className="sr-only">
-            {t("common.timeframe")}
-          </label>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" htmlFor="chart-timeframe">
+          {t("common.timeframe")}
           <select
             id="chart-timeframe"
+            data-testid="chart-timeframe-select"
+            className="h-9 w-24 rounded-md border border-border bg-input px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             value={timeframe}
             onChange={(event) =>
               setSearchParams((prev) => {
@@ -157,7 +152,6 @@ export function ChartPage() {
                 return next;
               })
             }
-            className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
           >
             {BACKEND_TIMEFRAMES.map((tf) => (
               <option key={tf} value={tf}>
@@ -165,14 +159,17 @@ export function ChartPage() {
               </option>
             ))}
           </select>
-        </div>
-      </header>
+        </label>
+        <p className="ms-auto text-xs text-muted-foreground" data-testid="annotation-count">
+          {t("chart.annotations.count", { count: annotationCount })}
+        </p>
+      </div>
       {candlesQuery.isError && (
-        <p className="text-amber-400">{t("chart.error.candles", { symbol })}</p>
+        <p className="text-sm text-destructive">{t("chart.error.candles", { symbol })}</p>
       )}
       <div
         data-testid="chart-container"
-        className="min-h-[420px] flex-1 rounded-lg border border-slate-800 bg-leovee-panel"
+        className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card"
       >
         <TradingViewChart
           symbol={symbol}
@@ -181,9 +178,6 @@ export function ChartPage() {
           onShapesReady={handleShapesReady}
         />
       </div>
-      <p className="text-xs text-slate-500" data-testid="annotation-count">
-        {t("chart.annotations.count", { count: annotationCount })}
-      </p>
     </div>
   );
 }
