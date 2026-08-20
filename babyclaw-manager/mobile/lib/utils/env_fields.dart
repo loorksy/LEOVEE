@@ -56,7 +56,7 @@ const envFields = <EnvFieldSpec>[
   EnvFieldSpec(
     key: EnvKeys.openaiKey,
     label: 'OPENAI_API_KEY',
-    hint: 'مفتاح OpenAI — يُستخدم عند اختيار OpenAI أو OmniRoute',
+    hint: 'من platform.openai.com → API keys — مطلوب عند اختيار OpenAI',
     optional: true,
   ),
   EnvFieldSpec(
