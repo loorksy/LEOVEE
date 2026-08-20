@@ -42,7 +42,7 @@ const envFields = <EnvFieldSpec>[
   EnvFieldSpec(
     key: EnvKeys.claudeOauth,
     label: 'CLAUDE_CODE_OAUTH_TOKEN',
-    hint: 'رمز المصادقة من أمر claude setup-token',
+    hint: 'رمز المصادقة من أمر claude setup-token (يبدأ بـ sk-ant-oat)',
   ),
   EnvFieldSpec(
     key: EnvKeys.openaiKey,

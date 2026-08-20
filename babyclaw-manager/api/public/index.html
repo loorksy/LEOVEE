@@ -101,8 +101,11 @@
         <span class="hint">معرف مستخدم تليجرام (من @userinfobot)</span>
         <input id="TELEGRAM_USER_ID" inputmode="numeric" />
         <label>CLAUDE_CODE_OAUTH_TOKEN</label>
-        <span class="hint">رمز المصادقة من أمر claude setup-token</span>
+        <span class="hint">من أمر claude setup-token — يجب أن يبدأ بـ sk-ant-oat</span>
         <input id="CLAUDE_CODE_OAUTH_TOKEN" type="password" />
+        <label>ANTHROPIC_API_KEY</label>
+        <span class="hint">بديل: مفتاح Anthropic الذي يبدأ بـ sk-ant-api</span>
+        <input id="ANTHROPIC_API_KEY" type="password" />
         <label>OPENAI_API_KEY</label>
         <span class="hint">(اختياري) مفتاح OpenAI لنسخ الصوت</span>
         <input id="OPENAI_API_KEY" type="password" />
@@ -117,7 +120,7 @@
     </div>
 
     <script>
-      const keys = ["TELEGRAM_TOKEN","TELEGRAM_USER_ID","CLAUDE_CODE_OAUTH_TOKEN","OPENAI_API_KEY","TELEGRAM_CHAT_ID"];
+      const keys = ["TELEGRAM_TOKEN","TELEGRAM_USER_ID","CLAUDE_CODE_OAUTH_TOKEN","ANTHROPIC_API_KEY","OPENAI_API_KEY","TELEGRAM_CHAT_ID"];
       const lock = document.getElementById("lock");
       const app = document.getElementById("app");
       const loginMsg = document.getElementById("loginMsg");
@@ -171,6 +174,11 @@
         for (const key of keys) values[key] = document.getElementById(key).value.trim();
         try {
           app.classList.add("busy");
+          if (values.CLAUDE_CODE_OAUTH_TOKEN && !values.CLAUDE_CODE_OAUTH_TOKEN.startsWith("sk-ant-")
+              && !values.ANTHROPIC_API_KEY) {
+            show(appMsg, "رمز Claude غير صالح. الصق ناتج claude setup-token أو مفتاح sk-ant-api", false);
+            return;
+          }
           const result = await api("POST", "/api/env", values);
           show(appMsg, result.message || "تم التحديث بنجاح", true);
         } catch (err) {
