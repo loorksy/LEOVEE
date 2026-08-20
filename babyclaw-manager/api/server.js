@@ -15,6 +15,7 @@ const {
   ALLOWED_KEYS,
 } = require("./lib/envfile");
 const { restartAgent } = require("./lib/restart");
+const { applyProvider, normalizeProvider } = require("./lib/provider");
 
 function loadDotEnv(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -143,13 +144,16 @@ function createApp(overrides = {}) {
           code: "empty_body",
         });
       }
-      validateUpdates(updates);
-      const written = writeEnvFile(config.envFile, updates);
+      const merged = { ...readEnvFile(config.envFile), ...updates };
+      validateUpdates(merged);
+      writeEnvFile(config.envFile, updates);
+      const applied = applyProvider(config.envFile, updates);
       const restarted = await restartAgent(config);
       return res.json({
         ok: true,
         message: "تم التحديث بنجاح",
-        updatedKeys: written.keys,
+        provider: applied.provider,
+        updatedKeys: Object.keys(updates),
         restarted: true,
         restart: restarted.stdout.trim(),
       });
@@ -157,6 +161,29 @@ function createApp(overrides = {}) {
       return res.status(error.status || 500).json({
         ok: false,
         error: error.message || "فشل الاتصال بالخادم",
+        code: error.code || "internal",
+      });
+    }
+  });
+
+  app.post("/api/provider", auth, async (req, res) => {
+    try {
+      const provider = normalizeProvider(req.body?.AI_PROVIDER || req.body?.provider);
+      const extra = { AI_PROVIDER: provider };
+      if (req.body?.AI_MODEL) extra.AI_MODEL = String(req.body.AI_MODEL).trim();
+      const applied = applyProvider(config.envFile, extra);
+      const restarted = await restartAgent(config);
+      return res.json({
+        ok: true,
+        message: `تم التبديل إلى ${applied.provider}`,
+        provider: applied.provider,
+        restarted: true,
+        restart: restarted.stdout.trim(),
+      });
+    } catch (error) {
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: error.message || "فشل تبديل المزود",
         code: error.code || "internal",
       });
     }

@@ -11,6 +11,14 @@ const ALLOWED_KEYS = [
   "OPENAI_API_KEY",
   "TELEGRAM_CHAT_ID",
   "WORKSPACE",
+  "AI_PROVIDER",
+  "AI_MODEL",
+  "OMNIROUTE_URL",
+  "OMNIROUTE_API_KEY",
+  "ANTHROPIC_BASE_URL",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_MODEL",
+  "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
 ];
 
 const REQUIRED_KEYS = ["TELEGRAM_TOKEN", "TELEGRAM_USER_ID"];
@@ -67,6 +75,18 @@ function upsertEnvContent(content, updates) {
   return joined;
 }
 
+function stripEnvKeys(content, keys) {
+  const drop = new Set(keys);
+  return String(content || "")
+    .split(/\n/)
+    .filter((line) => {
+      const match = line.match(/^([A-Z0-9_]+)=/);
+      return !(match && drop.has(match[1]));
+    })
+    .join("\n")
+    .replace(/\n*$/, "\n");
+}
+
 function unescapeEnvValue(value) {
   const text = String(value ?? "");
   if (
@@ -103,7 +123,12 @@ function writeEnvFile(filePath, updates) {
     fs.copyFileSync(absolute, `${absolute}.bak-${stamp}`);
   }
 
-  const next = upsertEnvContent(current, updates);
+  let next = upsertEnvContent(current, updates);
+  const emptyRouting = Object.entries(updates)
+    .filter(([key, value]) => key.startsWith("ANTHROPIC_") || key.startsWith("CLAUDE_CODE_") || key === "AI_MODEL")
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+  if (emptyRouting.length) next = stripEnvKeys(next, emptyRouting);
   const tmp = `${absolute}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, next, { encoding: "utf8", mode: 0o600 });
   fs.renameSync(tmp, absolute);
@@ -127,4 +152,5 @@ module.exports = {
   upsertEnvContent,
   writeEnvFile,
   readEnvFile,
+  stripEnvKeys,
 };

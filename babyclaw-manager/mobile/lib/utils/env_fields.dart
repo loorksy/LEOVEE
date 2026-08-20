@@ -47,7 +47,21 @@ const envFields = <EnvFieldSpec>[
   EnvFieldSpec(
     key: EnvKeys.openaiKey,
     label: 'OPENAI_API_KEY',
-    hint: '(اختياري) مفتاح OpenAI لنسخ الصوت',
+    hint: 'مفتاح OpenAI عند اختيار مزود OpenAI، وأيضاً لنسخ الصوت',
+    optional: true,
+  ),
+  EnvFieldSpec(
+    key: 'AI_PROVIDER',
+    label: 'AI_PROVIDER',
+    hint: 'claude أو openai أو omniroute',
+    obscure: false,
+    optional: true,
+  ),
+  EnvFieldSpec(
+    key: 'AI_MODEL',
+    label: 'AI_MODEL',
+    hint: 'اختياري: openai/gpt-4o-mini أو auto',
+    obscure: false,
     optional: true,
   ),
   EnvFieldSpec(

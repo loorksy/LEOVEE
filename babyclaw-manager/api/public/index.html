@@ -46,7 +46,7 @@
       h1, h2 { margin: 0 0 8px; }
       p, label, .hint { color: var(--muted); }
       .hint { display: block; font-size: 13px; margin: 4px 0 14px; }
-      input {
+      input, select {
         width: 100%;
         border: 1px solid var(--line);
         background: transparent;
@@ -55,6 +55,14 @@
         padding: 14px;
         font-size: 16px;
       }
+      .seg { display: flex; gap: 8px; margin: 0 0 16px; }
+      .seg button {
+        margin: 0;
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--text);
+      }
+      .seg button.on { background: var(--btn); color: #fff; border-color: var(--btn); }
       button {
         width: 100%;
         border: 0;
@@ -94,6 +102,14 @@
         <button id="themeBtn" class="ghost" type="button" style="width:auto;padding:10px 14px">الوضع</button>
       </div>
       <div class="card">
+        <label>مزود الذكاء الاصطناعي</label>
+        <span class="hint">بدّل عند الحاجة. OpenAI وOmniRoute يمرّان عبر بوابة OmniRoute المحلية.</span>
+        <div class="seg" id="providerSeg">
+          <button type="button" data-p="claude">Claude</button>
+          <button type="button" data-p="openai">OpenAI</button>
+          <button type="button" data-p="omniroute">OmniRoute</button>
+        </div>
+        <input id="AI_PROVIDER" type="hidden" value="claude" />
         <label>TELEGRAM_TOKEN</label>
         <span class="hint">توكن البوت من @BotFather</span>
         <input id="TELEGRAM_TOKEN" type="password" />
@@ -107,8 +123,17 @@
         <span class="hint">بديل: مفتاح Anthropic الذي يبدأ بـ sk-ant-api</span>
         <input id="ANTHROPIC_API_KEY" type="password" />
         <label>OPENAI_API_KEY</label>
-        <span class="hint">(اختياري) مفتاح OpenAI لنسخ الصوت</span>
+        <span class="hint">مفتاح OpenAI — يُستخدم عند اختيار OpenAI، وأيضاً لنسخ الصوت</span>
         <input id="OPENAI_API_KEY" type="password" />
+        <label>AI_MODEL</label>
+        <span class="hint">اختياري: مثل openai/gpt-4o-mini أو auto مع OmniRoute</span>
+        <input id="AI_MODEL" />
+        <label>OMNIROUTE_URL</label>
+        <span class="hint">عنوان بوابة OmniRoute (الافتراضي محلي)</span>
+        <input id="OMNIROUTE_URL" placeholder="http://127.0.0.1:20128" />
+        <label>OMNIROUTE_API_KEY</label>
+        <span class="hint">مفتاح OmniRoute من لوحة البوابة إن طُلب</span>
+        <input id="OMNIROUTE_API_KEY" type="password" />
         <label>TELEGRAM_CHAT_ID</label>
         <span class="hint">(اختياري) معرف الدردشة للإشعارات الآلية</span>
         <input id="TELEGRAM_CHAT_ID" />
@@ -120,7 +145,7 @@
     </div>
 
     <script>
-      const keys = ["TELEGRAM_TOKEN","TELEGRAM_USER_ID","CLAUDE_CODE_OAUTH_TOKEN","ANTHROPIC_API_KEY","OPENAI_API_KEY","TELEGRAM_CHAT_ID"];
+      const keys = ["TELEGRAM_TOKEN","TELEGRAM_USER_ID","CLAUDE_CODE_OAUTH_TOKEN","ANTHROPIC_API_KEY","OPENAI_API_KEY","TELEGRAM_CHAT_ID","AI_PROVIDER","AI_MODEL","OMNIROUTE_URL","OMNIROUTE_API_KEY"];
       const lock = document.getElementById("lock");
       const app = document.getElementById("app");
       const loginMsg = document.getElementById("loginMsg");
@@ -143,11 +168,34 @@
         return data;
       }
 
+      function setProvider(name) {
+        document.getElementById("AI_PROVIDER").value = name;
+        document.querySelectorAll("#providerSeg button").forEach((btn) => {
+          btn.classList.toggle("on", btn.dataset.p === name);
+        });
+      }
+      document.querySelectorAll("#providerSeg button").forEach((btn) => {
+        btn.onclick = async () => {
+          setProvider(btn.dataset.p);
+          try {
+            app.classList.add("busy");
+            const result = await api("POST", "/api/provider", { AI_PROVIDER: btn.dataset.p });
+            show(appMsg, result.message, true);
+          } catch (err) {
+            show(appMsg, err.message, false);
+          } finally {
+            app.classList.remove("busy");
+          }
+        };
+      });
+
       async function loadEnv() {
         const data = await api("GET", "/api/env");
         for (const key of keys) {
-          document.getElementById(key).value = (data.values && data.values[key]) || "";
+          const el = document.getElementById(key);
+          if (el) el.value = (data.values && data.values[key]) || "";
         }
+        setProvider((data.values && data.values.AI_PROVIDER) || "claude");
       }
 
       async function enterApp() {
@@ -174,9 +222,14 @@
         for (const key of keys) values[key] = document.getElementById(key).value.trim();
         try {
           app.classList.add("busy");
-          if (values.CLAUDE_CODE_OAUTH_TOKEN && !values.CLAUDE_CODE_OAUTH_TOKEN.startsWith("sk-ant-")
+          const provider = values.AI_PROVIDER || "claude";
+          if (provider === "claude" && values.CLAUDE_CODE_OAUTH_TOKEN && !values.CLAUDE_CODE_OAUTH_TOKEN.startsWith("sk-ant-")
               && !values.ANTHROPIC_API_KEY) {
             show(appMsg, "رمز Claude غير صالح. الصق ناتج claude setup-token أو مفتاح sk-ant-api", false);
+            return;
+          }
+          if (provider === "openai" && !values.OPENAI_API_KEY) {
+            show(appMsg, "أدخل OPENAI_API_KEY قبل التبديل إلى OpenAI", false);
             return;
           }
           const result = await api("POST", "/api/env", values);

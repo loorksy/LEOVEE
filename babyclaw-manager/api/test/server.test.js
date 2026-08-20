@@ -7,9 +7,12 @@ const os = require("os");
 const path = require("path");
 const http = require("http");
 
+process.env.SKIP_OMNIROUTE = "1";
+
 const { createApp } = require("../server");
 const { upsertEnvContent, pickAllowedUpdates, validateUpdates } = require("../lib/envfile");
 const { timingSafeEqualString } = require("../lib/auth");
+const { routingFor } = require("../lib/provider");
 
 function startServer(app) {
   return new Promise((resolve) => {
@@ -56,6 +59,14 @@ test("pickAllowedUpdates ignores unknown keys", () => {
 
 test("validateUpdates requires telegram fields", () => {
   assert.throws(() => validateUpdates({ TELEGRAM_TOKEN: "" }), /ناقصة/);
+});
+
+test("routingFor points Claude Code at OmniRoute for openai and omniroute", () => {
+  const openai = routingFor({ AI_PROVIDER: "openai", OMNIROUTE_URL: "http://127.0.0.1:20128" });
+  assert.equal(openai.ANTHROPIC_BASE_URL, "http://127.0.0.1:20128");
+  assert.equal(openai.ANTHROPIC_MODEL, "openai/gpt-4o-mini");
+  const direct = routingFor({ AI_PROVIDER: "claude" });
+  assert.equal(direct.ANTHROPIC_BASE_URL, "");
 });
 
 test("timingSafeEqualString rejects mismatched tokens", () => {

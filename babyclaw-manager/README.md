@@ -11,7 +11,15 @@
 - العنوان الافتراضي داخل تطبيق Flutter هو `https://leovee.lork.cloud`
 - النسخة القديمة من Leovee محفوظة على الخادم في `/opt/leovee.bak-20260820`
 
-## رمز الدخول إلى التطبيق
+## تبديل مزود الذكاء الاصطناعي
+
+من `https://leovee.lork.cloud` بعد الدخول يمكن اختيار:
+
+- **Claude**: Anthropic مباشرة (`CLAUDE_CODE_OAUTH_TOKEN` أو `ANTHROPIC_API_KEY`)
+- **OpenAI**: عبر بوابة [OmniRoute](https://github.com/diegosouzapw/OmniRoute) المحلية مع `OPENAI_API_KEY`
+- **OmniRoute**: توجيه تلقائي لعدة مزودين عبر `http://127.0.0.1:20128`
+
+التبديل يعيد كتابة `ANTHROPIC_BASE_URL` ويعيد تشغيل وكيل BabyClaw.
 
 رمز شاشة القفل هو **`2026`**. القيمة غير مخزّنة كنص واضح داخل التطبيق؛ يُقارن الإدخال مع بصمة SHA-256.
 
