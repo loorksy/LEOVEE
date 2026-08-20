@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BabyClaw API</title>
+    <title>BabyClaw</title>
     <style>
       :root {
         color-scheme: dark;
@@ -12,59 +12,197 @@
         --text: #e8eefc;
         --muted: #9aa8c7;
         --ok: #34d399;
+        --err: #f87171;
         --line: #22304a;
+        --accent: #2dd4bf;
+        --btn: #0f766e;
+      }
+      body.light {
+        color-scheme: light;
+        --bg: #eef4f8;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --line: #dbe4ee;
+        --btn: #0f766e;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         min-height: 100vh;
         font-family: ui-sans-serif, system-ui, sans-serif;
-        background: radial-gradient(circle at top, #16324f, var(--bg) 45%);
+        background: radial-gradient(circle at top, #16324f, var(--bg) 50%);
         color: var(--text);
-        display: grid;
-        place-items: center;
-        padding: 24px;
       }
-      main {
-        width: min(560px, 100%);
+      body.light { background: radial-gradient(circle at top, #d9ece8, var(--bg) 50%); }
+      .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 40px; }
+      .card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 24px;
-        padding: 28px;
+        padding: 22px;
+        margin-bottom: 16px;
       }
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: var(--ok);
-        display: inline-block;
-        margin-left: 8px;
+      h1, h2 { margin: 0 0 8px; }
+      p, label, .hint { color: var(--muted); }
+      .hint { display: block; font-size: 13px; margin: 4px 0 14px; }
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--text);
+        border-radius: 14px;
+        padding: 14px;
+        font-size: 16px;
       }
-      h1 { margin: 0 0 8px; font-size: 1.6rem; }
-      p { color: var(--muted); line-height: 1.7; }
-      code {
-        display: block;
-        background: #0b1220;
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin: 8px 0;
-        color: #dbeafe;
-        direction: ltr;
-        text-align: left;
+      button {
+        width: 100%;
+        border: 0;
+        border-radius: 16px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 700;
+        margin-top: 10px;
+        background: var(--btn);
+        color: #fff;
       }
+      button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+      button.tonal { background: #134e4a; }
+      .lock { min-height: 80vh; display: grid; place-items: center; }
+      .msg { margin-top: 12px; min-height: 24px; }
+      .msg.err { color: var(--err); }
+      .msg.ok { color: var(--ok); }
+      .hidden { display: none; }
+      .top { display: flex; justify-content: space-between; align-items: center; }
+      .busy { opacity: 0.6; pointer-events: none; }
     </style>
   </head>
   <body>
-    <main>
-      <p><span class="dot"></span> الخدمة تعمل</p>
-      <h1>BabyClaw Env API</h1>
-      <p>
-        هذا خادم إعدادات الوكيل، وليس موقع ويب للتصفح. أدِر المتغيرات من تطبيق الموبايل بعد إدخال رمز الدخول.
-      </p>
-      <code>GET /health</code>
-      <code>GET /api/health</code>
-      <code>POST /api/env</code>
-      <code>POST /api/restart</code>
-    </main>
+    <div id="lock" class="wrap lock">
+      <div class="card">
+        <h1>BabyClaw</h1>
+        <p>أدخل رمز الدخول للمتابعة</p>
+        <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="••••" />
+        <button id="loginBtn" type="button">دخول</button>
+        <div id="loginMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="app" class="wrap hidden">
+      <div class="top">
+        <h1>إعدادات BabyClaw</h1>
+        <button id="themeBtn" class="ghost" type="button" style="width:auto;padding:10px 14px">الوضع</button>
+      </div>
+      <div class="card">
+        <label>TELEGRAM_TOKEN</label>
+        <span class="hint">توكن البوت من @BotFather</span>
+        <input id="TELEGRAM_TOKEN" type="password" />
+        <label>TELEGRAM_USER_ID</label>
+        <span class="hint">معرف مستخدم تليجرام (من @userinfobot)</span>
+        <input id="TELEGRAM_USER_ID" inputmode="numeric" />
+        <label>CLAUDE_CODE_OAUTH_TOKEN</label>
+        <span class="hint">رمز المصادقة من أمر claude setup-token</span>
+        <input id="CLAUDE_CODE_OAUTH_TOKEN" type="password" />
+        <label>OPENAI_API_KEY</label>
+        <span class="hint">(اختياري) مفتاح OpenAI لنسخ الصوت</span>
+        <input id="OPENAI_API_KEY" type="password" />
+        <label>TELEGRAM_CHAT_ID</label>
+        <span class="hint">(اختياري) معرف الدردشة للإشعارات الآلية</span>
+        <input id="TELEGRAM_CHAT_ID" />
+      </div>
+      <button id="saveBtn" type="button">حفظ وإرسال إلى الخادم</button>
+      <button id="testBtn" class="ghost" type="button">اختبار الاتصال</button>
+      <button id="restartBtn" class="tonal" type="button">إعادة تشغيل الوكيل</button>
+      <div id="appMsg" class="msg"></div>
+    </div>
+
+    <script>
+      const keys = ["TELEGRAM_TOKEN","TELEGRAM_USER_ID","CLAUDE_CODE_OAUTH_TOKEN","OPENAI_API_KEY","TELEGRAM_CHAT_ID"];
+      const lock = document.getElementById("lock");
+      const app = document.getElementById("app");
+      const loginMsg = document.getElementById("loginMsg");
+      const appMsg = document.getElementById("appMsg");
+
+      function show(el, text, ok) {
+        el.className = "msg " + (ok ? "ok" : "err");
+        el.textContent = text;
+      }
+
+      async function api(method, path, body) {
+        const res = await fetch(path, {
+          method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "فشل الاتصال بالخادم");
+        return data;
+      }
+
+      async function loadEnv() {
+        const data = await api("GET", "/api/env");
+        for (const key of keys) {
+          document.getElementById(key).value = (data.values && data.values[key]) || "";
+        }
+      }
+
+      async function enterApp() {
+        lock.classList.add("hidden");
+        app.classList.remove("hidden");
+        try { await loadEnv(); } catch (err) { show(appMsg, err.message, false); }
+      }
+
+      document.getElementById("loginBtn").onclick = async () => {
+        loginMsg.textContent = "";
+        try {
+          await api("POST", "/api/login", { pin: document.getElementById("pin").value });
+          await enterApp();
+        } catch (err) {
+          show(loginMsg, err.message, false);
+        }
+      };
+      document.getElementById("pin").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("loginBtn").click();
+      });
+
+      document.getElementById("saveBtn").onclick = async () => {
+        const values = {};
+        for (const key of keys) values[key] = document.getElementById(key).value.trim();
+        try {
+          app.classList.add("busy");
+          const result = await api("POST", "/api/env", values);
+          show(appMsg, result.message || "تم التحديث بنجاح", true);
+        } catch (err) {
+          show(appMsg, err.message, false);
+        } finally {
+          app.classList.remove("busy");
+        }
+      };
+      document.getElementById("testBtn").onclick = async () => {
+        try {
+          await api("GET", "/api/health");
+          show(appMsg, "تم الوصول إلى الخادم بنجاح", true);
+        } catch (err) {
+          show(appMsg, err.message, false);
+        }
+      };
+      document.getElementById("restartBtn").onclick = async () => {
+        try {
+          app.classList.add("busy");
+          const result = await api("POST", "/api/restart");
+          show(appMsg, result.message || "تم إعادة تشغيل الوكيل", true);
+        } catch (err) {
+          show(appMsg, err.message, false);
+        } finally {
+          app.classList.remove("busy");
+        }
+      };
+      document.getElementById("themeBtn").onclick = () => {
+        document.body.classList.toggle("light");
+      };
+
+      api("GET", "/api/health").then(enterApp).catch(() => {});
+    </script>
   </body>
 </html>

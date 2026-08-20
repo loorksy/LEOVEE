@@ -100,7 +100,24 @@ test("API health, deploy, and restart flow", async (t) => {
     headers: { accept: "text/html" },
   });
   assert.equal(htmlHome.status, 200);
-  assert.match(await htmlHome.text(), /BabyClaw Env API/);
+  assert.match(await htmlHome.text(), /أدخل رمز الدخول للمتابعة/);
+
+  const badPin = await request(port, "POST", "/api/login", { body: { pin: "0000" } });
+  assert.equal(badPin.status, 401);
+
+  const loginRes = await fetch(`http://127.0.0.1:${port}/api/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pin: "2026" }),
+  });
+  assert.equal(loginRes.status, 200);
+  const cookie = String(loginRes.headers.get("set-cookie") || "");
+  assert.match(cookie, /bc_session=/);
+
+  const cookieHealth = await fetch(`http://127.0.0.1:${port}/api/health`, {
+    headers: { cookie },
+  });
+  assert.equal(cookieHealth.status, 200);
 
   const deploy = await request(port, "POST", "/api/env", {
     token: "test-token-1234567890",

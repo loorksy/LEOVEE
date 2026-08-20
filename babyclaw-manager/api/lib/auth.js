@@ -32,8 +32,44 @@ function parseAllowlist(value) {
     .filter(Boolean);
 }
 
+const PIN_SHA256 =
+  "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab";
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+function verifyPin(pin) {
+  return timingSafeEqualString(sha256Hex(String(pin || "").trim()), PIN_SHA256);
+}
+
+function sessionToken(apiToken) {
+  return crypto
+    .createHmac("sha256", String(apiToken || "dev-secret"))
+    .update("babyclaw-web-session-v1")
+    .digest("hex");
+}
+
+function parseCookies(req) {
+  const header = req.get("cookie") || "";
+  const out = {};
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 1) continue;
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    try {
+      out[key] = decodeURIComponent(value);
+    } catch {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function createAuthMiddleware({ apiToken, allowedIps }) {
   const allowlist = parseAllowlist(allowedIps);
+  const cookieToken = sessionToken(apiToken);
 
   return function authMiddleware(req, res, next) {
     if (allowlist.length > 0) {
@@ -48,7 +84,10 @@ function createAuthMiddleware({ apiToken, allowedIps }) {
     }
 
     const provided = extractBearerToken(req);
-    if (!apiToken || !timingSafeEqualString(provided, apiToken)) {
+    const cookie = parseCookies(req).bc_session || "";
+    const okBearer = Boolean(apiToken) && timingSafeEqualString(provided, apiToken);
+    const okCookie = Boolean(cookie) && timingSafeEqualString(cookie, cookieToken);
+    if (!okBearer && !okCookie) {
       return res.status(401).json({
         ok: false,
         error: "رمز المصادقة غير صالح",
@@ -66,4 +105,8 @@ module.exports = {
   clientIp,
   parseAllowlist,
   createAuthMiddleware,
+  verifyPin,
+  sessionToken,
+  parseCookies,
+  PIN_SHA256,
 };

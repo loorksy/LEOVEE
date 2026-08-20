@@ -6,11 +6,12 @@ const express = require("express");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
-const { createAuthMiddleware } = require("./lib/auth");
+const { createAuthMiddleware, verifyPin, sessionToken } = require("./lib/auth");
 const {
   pickAllowedUpdates,
   validateUpdates,
   writeEnvFile,
+  readEnvFile,
   ALLOWED_KEYS,
 } = require("./lib/envfile");
 const { restartAgent } = require("./lib/restart");
@@ -94,6 +95,33 @@ function createApp(overrides = {}) {
   const auth = createAuthMiddleware({
     apiToken: config.apiToken,
     allowedIps: config.allowedIps,
+  });
+
+  function setSessionCookie(req, res) {
+    const token = sessionToken(config.apiToken);
+    const secure = req.secure || req.get("x-forwarded-proto") === "https";
+    res.setHeader(
+      "Set-Cookie",
+      `bc_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${
+        secure ? "; Secure" : ""
+      }`
+    );
+  }
+
+  app.post("/api/login", (req, res) => {
+    if (!verifyPin(req.body?.pin)) {
+      return res.status(401).json({
+        ok: false,
+        error: "رمز الدخول غير صحيح",
+        code: "bad_pin",
+      });
+    }
+    setSessionCookie(req, res);
+    return res.json({ ok: true, message: "تم الدخول" });
+  });
+
+  app.get("/api/env", auth, (_req, res) => {
+    res.json({ ok: true, values: readEnvFile(config.envFile) });
   });
 
   app.get("/api/health", auth, (_req, res) => {

@@ -66,6 +66,30 @@ function upsertEnvContent(content, updates) {
   return joined;
 }
 
+function unescapeEnvValue(value) {
+  const text = String(value ?? "");
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+  return text;
+}
+
+function readEnvFile(filePath) {
+  const values = {};
+  for (const key of ALLOWED_KEYS) values[key] = "";
+  if (!fs.existsSync(filePath)) return values;
+  const content = fs.readFileSync(filePath, "utf8");
+  for (const line of content.split(/\n/)) {
+    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (!match || !ALLOWED_KEYS.includes(match[1])) continue;
+    values[match[1]] = unescapeEnvValue(match[2]);
+  }
+  return values;
+}
+
 function writeEnvFile(filePath, updates) {
   const absolute = path.resolve(filePath);
   const dir = path.dirname(absolute);
@@ -101,4 +125,5 @@ module.exports = {
   validateUpdates,
   upsertEnvContent,
   writeEnvFile,
+  readEnvFile,
 };
