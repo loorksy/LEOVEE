@@ -30,6 +30,10 @@ cd backend && pip install -e ".[dev]" && uvicorn app.main:app --reload
 cd frontend && npm ci && npm run dev
 ```
 
+## BabyClaw manager
+
+Self-hosted BabyClaw env manager (VPS API + Flutter app) lives in `babyclaw-manager/`. See `babyclaw-manager/README.md`.
+
 ## License
 
 Proprietary — Leovee.
