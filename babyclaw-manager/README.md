@@ -2,6 +2,15 @@
 
 مشروع متكامل لإزالة موقع `leovee.lork.cloud` من الـ VPS، تثبيت وكيل [BabyClaw (yogesharc)](https://github.com/yogesharc/babyclaw)، وتشغيل خادم API صغير يستقبل إعدادات `.env` من تطبيق Flutter.
 
+## النشر الحالي على الـ VPS
+
+الموقع الحي: `https://leovee.lork.cloud`
+
+- `GET /health` يعمل بدون مصادقة
+- مسارات `/api/*` تتطلب `Authorization: Bearer <API_TOKEN>`
+- العنوان الافتراضي داخل تطبيق Flutter هو `https://leovee.lork.cloud`
+- النسخة القديمة من Leovee محفوظة على الخادم في `/opt/leovee.bak-20260820`
+
 ## رمز الدخول إلى التطبيق
 
 رمز شاشة القفل هو **`2026`**. القيمة غير مخزّنة كنص واضح داخل التطبيق؛ يُقارن الإدخال مع بصمة SHA-256.

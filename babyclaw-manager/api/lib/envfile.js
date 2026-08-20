@@ -83,6 +83,13 @@ function writeEnvFile(filePath, updates) {
   fs.writeFileSync(tmp, next, { encoding: "utf8", mode: 0o600 });
   fs.renameSync(tmp, absolute);
   fs.chmodSync(absolute, 0o600);
+  const owner = process.env.BABYCLAW_USER || "babyclaw";
+  try {
+    const { execFileSync } = require("child_process");
+    execFileSync("chown", [`${owner}:${owner}`, absolute]);
+  } catch {
+    // Running as the file owner already; ignore.
+  }
   return { path: absolute, keys: Object.keys(updates) };
 }
 

@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "babyclaw-env-api",
       script: "server.js",
-      cwd: "/home/babyclaw/env-api",
+      cwd: process.env.API_CWD || "/opt/leovee/api",
       interpreter: "node",
       instances: 1,
       autorestart: true,

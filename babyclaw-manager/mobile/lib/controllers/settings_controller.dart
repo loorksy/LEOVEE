@@ -22,7 +22,10 @@ class SettingsController extends GetxController {
     for (final spec in envFields) {
       fields[spec.key] = TextEditingController(text: _storage.read(spec.key));
     }
-    serverUrl.text = _storage.read(EnvKeys.serverUrl, fallback: 'http://');
+    serverUrl.text = _storage.read(
+      EnvKeys.serverUrl,
+      fallback: 'https://leovee.lork.cloud',
+    );
     apiToken.text = _storage.read(EnvKeys.apiToken);
   }
 
