@@ -1,0 +1,23 @@
+name: babyclaw_manager
+description: تطبيق لإدارة متغيرات بيئة BabyClaw بأمان.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  crypto: ^3.0.6
+  dio: ^5.7.0
+  get: ^4.6.6
+  shared_preferences: ^2.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
