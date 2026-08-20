@@ -5,6 +5,7 @@ import '../controllers/settings_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../utils/env_fields.dart';
 import '../widgets/env_field.dart';
+import '../widgets/provider_selector.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -55,6 +56,16 @@ class SettingsScreen extends StatelessWidget {
                       hint: 'الرمز الذي طبعه سكربت الإعداد على الـ VPS',
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                title: 'المزود',
+                child: Obx(
+                  () => ProviderSelector(
+                    value: settings.provider.value,
+                    onChanged: settings.switchProvider,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

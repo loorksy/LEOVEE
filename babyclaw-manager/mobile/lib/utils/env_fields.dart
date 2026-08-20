@@ -2,8 +2,11 @@ class EnvKeys {
   static const telegramToken = 'TELEGRAM_TOKEN';
   static const telegramUserId = 'TELEGRAM_USER_ID';
   static const claudeOauth = 'CLAUDE_CODE_OAUTH_TOKEN';
+  static const anthropicKey = 'ANTHROPIC_API_KEY';
   static const openaiKey = 'OPENAI_API_KEY';
   static const telegramChatId = 'TELEGRAM_CHAT_ID';
+  static const provider = 'AI_PROVIDER';
+  static const model = 'AI_MODEL';
   static const serverUrl = 'server_url';
   static const apiToken = 'api_token';
 }
@@ -42,23 +45,22 @@ const envFields = <EnvFieldSpec>[
   EnvFieldSpec(
     key: EnvKeys.claudeOauth,
     label: 'CLAUDE_CODE_OAUTH_TOKEN',
-    hint: 'رمز المصادقة من أمر claude setup-token (يبدأ بـ sk-ant-oat)',
+    hint: 'رمز Claude من claude setup-token (يبدأ بـ sk-ant-oat)',
+  ),
+  EnvFieldSpec(
+    key: EnvKeys.anthropicKey,
+    label: 'ANTHROPIC_API_KEY',
+    hint: 'بديل: مفتاح Anthropic الذي يبدأ بـ sk-ant-api',
+    optional: true,
   ),
   EnvFieldSpec(
     key: EnvKeys.openaiKey,
     label: 'OPENAI_API_KEY',
-    hint: 'مفتاح OpenAI عند اختيار مزود OpenAI، وأيضاً لنسخ الصوت',
+    hint: 'مفتاح OpenAI — يُستخدم عند اختيار OpenAI أو OmniRoute',
     optional: true,
   ),
   EnvFieldSpec(
-    key: 'AI_PROVIDER',
-    label: 'AI_PROVIDER',
-    hint: 'claude أو openai أو omniroute',
-    obscure: false,
-    optional: true,
-  ),
-  EnvFieldSpec(
-    key: 'AI_MODEL',
+    key: EnvKeys.model,
     label: 'AI_MODEL',
     hint: 'اختياري: openai/gpt-4o-mini أو auto',
     obscure: false,

@@ -126,11 +126,13 @@ function createApp(overrides = {}) {
   });
 
   app.get("/api/health", auth, (_req, res) => {
+    const values = readEnvFile(config.envFile);
     res.json({
       ok: true,
       service: "babyclaw-env-api",
       envFile: path.basename(config.envFile),
       allowedKeys: ALLOWED_KEYS,
+      provider: normalizeProvider(values.AI_PROVIDER),
     });
   });
 
@@ -147,7 +149,7 @@ function createApp(overrides = {}) {
       const merged = { ...readEnvFile(config.envFile), ...updates };
       validateUpdates(merged);
       writeEnvFile(config.envFile, updates);
-      const applied = applyProvider(config.envFile, updates);
+      const applied = await applyProvider(config.envFile, updates);
       const restarted = await restartAgent(config);
       return res.json({
         ok: true,
@@ -171,7 +173,7 @@ function createApp(overrides = {}) {
       const provider = normalizeProvider(req.body?.AI_PROVIDER || req.body?.provider);
       const extra = { AI_PROVIDER: provider };
       if (req.body?.AI_MODEL) extra.AI_MODEL = String(req.body.AI_MODEL).trim();
-      const applied = applyProvider(config.envFile, extra);
+      const applied = await applyProvider(config.envFile, extra);
       const restarted = await restartAgent(config);
       return res.json({
         ok: true,

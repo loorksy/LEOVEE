@@ -103,7 +103,7 @@
       </div>
       <div class="card">
         <label>مزود الذكاء الاصطناعي</label>
-        <span class="hint">بدّل عند الحاجة. OpenAI وOmniRoute يمرّان عبر بوابة OmniRoute المحلية.</span>
+        <span class="hint">اضغط للتبديل فوراً. OpenAI وOmniRoute يستخدمان البوابة المحلية مع مفتاح OpenAI.</span>
         <div class="seg" id="providerSeg">
           <button type="button" data-p="claude">Claude</button>
           <button type="button" data-p="openai">OpenAI</button>
@@ -176,10 +176,15 @@
       }
       document.querySelectorAll("#providerSeg button").forEach((btn) => {
         btn.onclick = async () => {
-          setProvider(btn.dataset.p);
+          const next = btn.dataset.p;
+          if (next === "openai" && !document.getElementById("OPENAI_API_KEY").value.trim()) {
+            show(appMsg, "أدخل OPENAI_API_KEY ثم احفظ قبل التبديل إلى OpenAI", false);
+            return;
+          }
+          setProvider(next);
           try {
             app.classList.add("busy");
-            const result = await api("POST", "/api/provider", { AI_PROVIDER: btn.dataset.p });
+            const result = await api("POST", "/api/provider", { AI_PROVIDER: next });
             show(appMsg, result.message, true);
           } catch (err) {
             show(appMsg, err.message, false);

@@ -5,6 +5,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 
 const { readEnvFile, writeEnvFile } = require("./envfile");
+const { upsertOpenAiProvider } = require("./omniroute");
 
 const PROVIDERS = ["claude", "openai", "omniroute"];
 
@@ -46,6 +47,15 @@ function routingFor(values) {
   };
 }
 
+function requireOpenAiKey(values) {
+  if (normalizeProvider(values.AI_PROVIDER) !== "openai") return;
+  if (String(values.OPENAI_API_KEY || "").trim()) return;
+  const error = new Error("أدخل OPENAI_API_KEY قبل التبديل إلى OpenAI");
+  error.status = 400;
+  error.code = "openai_key_required";
+  throw error;
+}
+
 function writeClaudeSettings(homeDir, routing) {
   const dir = path.join(homeDir, ".claude");
   fs.mkdirSync(dir, { recursive: true });
@@ -64,23 +74,48 @@ function writeClaudeSettings(homeDir, routing) {
   }
 }
 
-function applyProvider(envFile, extra = {}) {
+function ensureOmniRoute(envFile) {
+  const script = path.resolve(__dirname, "..", "..", "scripts", "ensure-omniroute.sh");
+  if (!fs.existsSync(script)) return;
+  const omniEnv = process.env.OMNIROUTE_ENV_FILE || "/opt/leovee/omniroute.env";
+  try {
+    execFileSync("bash", [script, omniEnv, envFile], {
+      timeout: 180000,
+      stdio: "pipe",
+    });
+  } catch (error) {
+    const wrapped = new Error(
+      `تعذر تشغيل OmniRoute: ${error.stderr || error.message}`
+    );
+    wrapped.status = 500;
+    wrapped.code = "omniroute_failed";
+    throw wrapped;
+  }
+}
+
+async function syncGatewayProviders(values) {
+  const provider = normalizeProvider(values.AI_PROVIDER);
+  if (provider === "claude") return { ok: true, skipped: true };
+  const key = String(values.OPENAI_API_KEY || "").trim();
+  if (!key) {
+    if (provider === "openai") requireOpenAiKey(values);
+    return { ok: true, skipped: true };
+  }
+  const baseUrl = String(values.OMNIROUTE_URL || "http://127.0.0.1:20128").replace(/\/+$/, "");
+  return upsertOpenAiProvider({
+    baseUrl,
+    apiKey: key,
+    omniEnvFile: process.env.OMNIROUTE_ENV_FILE || "/opt/leovee/omniroute.env",
+  });
+}
+
+async function applyProvider(envFile, extra = {}) {
   const current = { ...readEnvFile(envFile), ...extra };
+  requireOpenAiKey(current);
   const routing = routingFor(current);
   if (routing.AI_PROVIDER !== "claude" && process.env.SKIP_OMNIROUTE !== "1") {
-    const script = path.resolve(__dirname, "..", "..", "scripts", "ensure-omniroute.sh");
-    if (fs.existsSync(script)) {
-      try {
-        execFileSync("bash", [script], { timeout: 180000, stdio: "pipe" });
-      } catch (error) {
-        const wrapped = new Error(
-          `تعذر تشغيل OmniRoute: ${error.stderr || error.message}`
-        );
-        wrapped.status = 500;
-        wrapped.code = "omniroute_failed";
-        throw wrapped;
-      }
-    }
+    ensureOmniRoute(envFile);
+    await syncGatewayProviders(current);
   }
   const written = writeEnvFile(envFile, {
     AI_PROVIDER: routing.AI_PROVIDER,
@@ -98,6 +133,7 @@ module.exports = {
   PROVIDERS,
   normalizeProvider,
   routingFor,
+  requireOpenAiKey,
   writeClaudeSettings,
   applyProvider,
 };

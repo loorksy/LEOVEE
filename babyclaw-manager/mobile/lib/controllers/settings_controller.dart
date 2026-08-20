@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../utils/env_fields.dart';
+import '../widgets/provider_selector.dart';
 
 class SettingsController extends GetxController {
   SettingsController(this._storage, this._api);
@@ -12,6 +13,7 @@ class SettingsController extends GetxController {
   final ApiService _api;
 
   final busy = false.obs;
+  final provider = 'claude'.obs;
   final serverUrl = TextEditingController();
   final apiToken = TextEditingController();
   final fields = <String, TextEditingController>{};
@@ -27,6 +29,8 @@ class SettingsController extends GetxController {
       fallback: 'https://leovee.lork.cloud',
     );
     apiToken.text = _storage.read(EnvKeys.apiToken);
+    final stored = _storage.read(EnvKeys.provider, fallback: 'claude');
+    provider.value = providerOptions.containsKey(stored) ? stored : 'claude';
   }
 
   @override
@@ -42,6 +46,7 @@ class SettingsController extends GetxController {
   Map<String, String> _values() {
     return {
       for (final spec in envFields) spec.key: fields[spec.key]!.text.trim(),
+      EnvKeys.provider: provider.value,
     };
   }
 
@@ -65,6 +70,14 @@ class SettingsController extends GetxController {
     );
   }
 
+  bool _requireServer() {
+    if (serverUrl.text.trim().isEmpty || apiToken.text.trim().isEmpty) {
+      _snack('تحقق من الحقول', 'أدخل عنوان الخادم ورمز API', error: true);
+      return false;
+    }
+    return true;
+  }
+
   Future<void> saveAndDeploy() async {
     final values = _values();
     if (values[EnvKeys.telegramToken]!.isEmpty ||
@@ -73,10 +86,12 @@ class SettingsController extends GetxController {
           error: true);
       return;
     }
-    if (serverUrl.text.trim().isEmpty || apiToken.text.trim().isEmpty) {
-      _snack('تحقق من الحقول', 'أدخل عنوان الخادم ورمز API', error: true);
+    if (provider.value == 'openai' && values[EnvKeys.openaiKey]!.isEmpty) {
+      _snack('تحقق من الحقول', 'أدخل OPENAI_API_KEY قبل التبديل إلى OpenAI',
+          error: true);
       return;
     }
+    if (!_requireServer()) return;
 
     busy.value = true;
     try {
@@ -94,7 +109,34 @@ class SettingsController extends GetxController {
     }
   }
 
+  Future<void> switchProvider(String next) async {
+    if (next == 'openai' &&
+        (fields[EnvKeys.openaiKey]?.text.trim().isEmpty ?? true)) {
+      _snack('تحقق من الحقول', 'أدخل OPENAI_API_KEY ثم احفظ قبل التبديل إلى OpenAI',
+          error: true);
+      return;
+    }
+    provider.value = next;
+    if (!_requireServer()) return;
+
+    busy.value = true;
+    try {
+      await _persist();
+      final result = await _api.switchProvider(
+        serverUrl: serverUrl.text,
+        apiToken: apiToken.text,
+        provider: next,
+      );
+      _snack('المزود', result['message']?.toString() ?? 'تم التبديل');
+    } catch (error) {
+      _snack('خطأ', error.toString(), error: true);
+    } finally {
+      busy.value = false;
+    }
+  }
+
   Future<void> testConnection() async {
+    if (!_requireServer()) return;
     busy.value = true;
     try {
       await _persist();
@@ -111,6 +153,7 @@ class SettingsController extends GetxController {
   }
 
   Future<void> restartBot() async {
+    if (!_requireServer()) return;
     busy.value = true;
     try {
       await _persist();

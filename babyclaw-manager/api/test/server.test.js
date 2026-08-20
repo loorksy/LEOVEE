@@ -65,6 +65,8 @@ test("routingFor points Claude Code at OmniRoute for openai and omniroute", () =
   const openai = routingFor({ AI_PROVIDER: "openai", OMNIROUTE_URL: "http://127.0.0.1:20128" });
   assert.equal(openai.ANTHROPIC_BASE_URL, "http://127.0.0.1:20128");
   assert.equal(openai.ANTHROPIC_MODEL, "openai/gpt-4o-mini");
+  const auto = routingFor({ AI_PROVIDER: "omniroute" });
+  assert.equal(auto.ANTHROPIC_MODEL, "auto");
   const direct = routingFor({ AI_PROVIDER: "claude" });
   assert.equal(direct.ANTHROPIC_BASE_URL, "");
 });
@@ -152,6 +154,30 @@ test("API health, deploy, and restart flow", async (t) => {
   });
   assert.equal(restart.status, 200);
   assert.equal(restart.json.ok, true);
+
+  const switched = await request(port, "POST", "/api/provider", {
+    token: "test-token-1234567890",
+    body: { AI_PROVIDER: "openai" },
+  });
+  assert.equal(switched.status, 200, JSON.stringify(switched.json));
+  assert.equal(switched.json.provider, "openai");
+  assert.match(fs.readFileSync(envFile, "utf8"), /ANTHROPIC_BASE_URL=http:\/\/127\.0\.0\.1:20128/);
+
+  const backToClaude = await request(port, "POST", "/api/provider", {
+    token: "test-token-1234567890",
+    body: { AI_PROVIDER: "claude" },
+  });
+  assert.equal(backToClaude.status, 200, JSON.stringify(backToClaude.json));
+  assert.equal(backToClaude.json.provider, "claude");
+  assert.doesNotMatch(fs.readFileSync(envFile, "utf8"), /ANTHROPIC_BASE_URL=/);
+
+  fs.appendFileSync(envFile, "OPENAI_API_KEY=\n");
+  const missingKey = await request(port, "POST", "/api/provider", {
+    token: "test-token-1234567890",
+    body: { AI_PROVIDER: "openai" },
+  });
+  assert.equal(missingKey.status, 400, JSON.stringify(missingKey.json));
+  assert.equal(missingKey.json.code, "openai_key_required");
 });
 
 test("IP allowlist rejects unknown clients", async (t) => {

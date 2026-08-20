@@ -17,9 +17,11 @@
 
 - **Claude**: Anthropic مباشرة (`CLAUDE_CODE_OAUTH_TOKEN` أو `ANTHROPIC_API_KEY`)
 - **OpenAI**: عبر بوابة [OmniRoute](https://github.com/diegosouzapw/OmniRoute) المحلية مع `OPENAI_API_KEY`
-- **OmniRoute**: توجيه تلقائي لعدة مزودين عبر `http://127.0.0.1:20128`
+- **OmniRoute**: توجيه تلقائي (`auto`) عبر `http://127.0.0.1:20128`
 
-التبديل يعيد كتابة `ANTHROPIC_BASE_URL` ويعيد تشغيل وكيل BabyClaw.
+التبديل من الواجهة أو التطبيق يعيد كتابة `ANTHROPIC_BASE_URL`، يحدّث حاوية OmniRoute بمفتاح OpenAI، ويعيد تشغيل وكيل BabyClaw.
+
+من التطبيق: بطاقة **المزود** (Claude / OpenAI / OmniRoute). أدخل `OPENAI_API_KEY` ثم اضغط OpenAI عند الحاجة.
 
 رمز شاشة القفل هو **`2026`**. القيمة غير مخزّنة كنص واضح داخل التطبيق؛ يُقارن الإدخال مع بصمة SHA-256.
 
@@ -79,6 +81,7 @@ curl -s -H "Authorization: Bearer YOUR_API_TOKEN" http://127.0.0.1:3000/api/heal
 | `GET /health` | فحص عام بدون مصادقة |
 | `GET /api/health` | اختبار الاتصال من التطبيق (يتطلب Bearer token) |
 | `POST /api/env` | تحديث `/home/babyclaw/.env` ثم إعادة تشغيل جلسة tmux `main` |
+| `POST /api/provider` | تبديل المزود (`claude` / `openai` / `omniroute`) وتشغيل OmniRoute عند الحاجة |
 | `POST /api/restart` | إعادة تشغيل الوكيل فقط |
 
 الحماية:
@@ -137,10 +140,11 @@ flutter build ipa --release
 1. افتح التطبيق وأدخل رمز الدخول `2026`.
 2. أدخل عنوان الخادم مثل `http://IP:3000` ورمز API.
 3. املأ متغيرات BabyClaw.
-4. **حفظ وإرسال إلى الخادم** يخزّن القيم محلياً عبر `SharedPreferences` ثم يرسلها JSON إلى API ويعيد تشغيل الوكيل.
-5. **اختبار الاتصال** يتحقق من الوصول إلى الـ VPS.
-6. **إعادة تشغيل الوكيل** يعيد تشغيل جلسة tmux دون تغيير `.env`.
-7. أيقونة القمر/الشمس تبدّل الوضع الليلي.
+4. اختر المزود من بطاقة التبديل: **Claude** أو **OpenAI** أو **OmniRoute**.
+5. **حفظ وإرسال إلى الخادم** يخزّن القيم محلياً عبر `SharedPreferences` ثم يرسلها JSON إلى API ويعيد تشغيل الوكيل.
+6. **اختبار الاتصال** يتحقق من الوصول إلى الـ VPS.
+7. **إعادة تشغيل الوكيل** يعيد تشغيل جلسة tmux دون تغيير `.env`.
+8. أيقونة القمر/الشمس تبدّل الوضع الليلي.
 
 ---
 

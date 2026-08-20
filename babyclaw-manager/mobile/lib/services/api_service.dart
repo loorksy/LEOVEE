@@ -28,7 +28,7 @@ class ApiService {
     return BaseOptions(
       baseUrl: _normalizeBase(serverUrl),
       connectTimeout: const Duration(seconds: 12),
-      receiveTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 180),
       headers: {
         'Authorization': 'Bearer ${apiToken.trim()}',
         'Content-Type': 'application/json',
@@ -97,5 +97,26 @@ class ApiService {
     required String apiToken,
   }) {
     return _send(serverUrl, apiToken, 'POST', '/api/restart');
+  }
+
+  Future<Map<String, dynamic>> switchProvider({
+    required String serverUrl,
+    required String apiToken,
+    required String provider,
+  }) {
+    return _send(
+      serverUrl,
+      apiToken,
+      'POST',
+      '/api/provider',
+      body: {'AI_PROVIDER': provider},
+    );
+  }
+
+  Future<Map<String, dynamic>> getEnv({
+    required String serverUrl,
+    required String apiToken,
+  }) {
+    return _send(serverUrl, apiToken, 'GET', '/api/env');
   }
 }
