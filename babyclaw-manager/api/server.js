@@ -73,6 +73,20 @@ function createApp(overrides = {}) {
     })
   );
 
+  const publicDir = path.join(__dirname, "public");
+
+  app.get("/", (req, res) => {
+    const wantsHtml = String(req.get("accept") || "").includes("text/html");
+    if (wantsHtml) {
+      return res.sendFile(path.join(publicDir, "index.html"));
+    }
+    return res.json({
+      ok: true,
+      service: "babyclaw-env-api",
+      message: "الخدمة تعمل",
+    });
+  });
+
   app.get("/health", (_req, res) => {
     res.json({ ok: true, service: "babyclaw-env-api" });
   });

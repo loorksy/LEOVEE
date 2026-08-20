@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BabyClaw API</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1220;
+        --card: #121a2b;
+        --text: #e8eefc;
+        --muted: #9aa8c7;
+        --ok: #34d399;
+        --line: #22304a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: radial-gradient(circle at top, #16324f, var(--bg) 45%);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main {
+        width: min(560px, 100%);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 28px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--ok);
+        display: inline-block;
+        margin-left: 8px;
+      }
+      h1 { margin: 0 0 8px; font-size: 1.6rem; }
+      p { color: var(--muted); line-height: 1.7; }
+      code {
+        display: block;
+        background: #0b1220;
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin: 8px 0;
+        color: #dbeafe;
+        direction: ltr;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><span class="dot"></span> الخدمة تعمل</p>
+      <h1>BabyClaw Env API</h1>
+      <p>
+        هذا خادم إعدادات الوكيل، وليس موقع ويب للتصفح. أدِر المتغيرات من تطبيق الموبايل بعد إدخال رمز الدخول.
+      </p>
+      <code>GET /health</code>
+      <code>GET /api/health</code>
+      <code>POST /api/env</code>
+      <code>POST /api/restart</code>
+    </main>
+  </body>
+</html>

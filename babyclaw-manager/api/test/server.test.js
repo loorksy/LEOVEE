@@ -92,6 +92,16 @@ test("API health, deploy, and restart flow", async (t) => {
   const publicHealth = await request(port, "GET", "/health");
   assert.equal(publicHealth.status, 200);
 
+  const home = await request(port, "GET", "/");
+  assert.equal(home.status, 200);
+  assert.equal(home.json.ok, true);
+
+  const htmlHome = await fetch(`http://127.0.0.1:${port}/`, {
+    headers: { accept: "text/html" },
+  });
+  assert.equal(htmlHome.status, 200);
+  assert.match(await htmlHome.text(), /BabyClaw Env API/);
+
   const deploy = await request(port, "POST", "/api/env", {
     token: "test-token-1234567890",
     body: {
